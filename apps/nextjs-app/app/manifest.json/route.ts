@@ -1,12 +1,12 @@
 import { basePath } from "@/lib/utils";
-import type { MetadataRoute } from "next";
 
-export default function manifest(): MetadataRoute.Manifest {
-  return {
+export function GET() {
+  const manifest = {
     name: "Streamystats",
     short_name: "Streamystats",
     description: "A statistics service for Jellyfin.",
     start_url: `${basePath}/`,
+    scope: `${basePath}/`,
     display: "standalone",
     background_color: "#000",
     theme_color: "#1C4ED8",
@@ -23,4 +23,10 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
   };
+
+  return new Response(JSON.stringify(manifest), {
+    headers: {
+      "Content-Type": "application/manifest+json",
+    },
+  });
 }

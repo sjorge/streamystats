@@ -68,7 +68,7 @@ export const config = {
 };
 
 const ADMIN_ONLY_PATHS = ["history", "settings", "activities", "users", "setup"];
-const PUBLIC_PATHS = ["login"];
+const PUBLIC_PATHS = ["login", "manifest.json"];
 
 const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
 
