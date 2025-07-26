@@ -21,6 +21,7 @@ export const metadata: Metadata = {
   title: "Streamystats",
   description:
     "A statistics service for Jellyfin, providing analytics and data visualization. 📈",
+  manifest: `${basePath}/manifest.json`,
 };
 
 export default function RootLayout({
@@ -30,9 +31,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="manifest" href={`${basePath}/manifest.json`} />
-      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
