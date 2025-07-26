@@ -63,12 +63,12 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico, icon.png (metadata files)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|icon.png).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|web-app-manifest-|manifest.json).*)",
   ],
 };
 
 const ADMIN_ONLY_PATHS = ["history", "settings", "activities", "users", "setup"];
-const PUBLIC_PATHS = ["login", "manifest.json"];
+const PUBLIC_PATHS = ["login"];
 
 const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
 
