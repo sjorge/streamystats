@@ -122,7 +122,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <Link
-            href={`/servers/${server.id}/users/${row.original.userId?.toString() || ""}`}
+            href={`/servers/${server.id}/users/${row.original.userId}`}
             className="flex items-center gap-2 group"
           >
             <JellyfinAvatar
