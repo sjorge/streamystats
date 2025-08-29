@@ -1,8 +1,8 @@
 import { format, fromUnixTime } from "date-fns";
 import { fromZonedTime, toZonedTime, getTimezoneOffset } from "date-fns-tz";
 
-// Get the timezone from environment or default to 'Europe/Stockholm'
-export const TIMEZONE = process.env.TZ || "Europe/Stockholm";
+// Get the timezone from environment or default to 'Etc/UTC'
+export const TIMEZONE = process.env.TZ || "Etc/UTC";
 
 /**
  * Converts a UTC hour to the local hour in the configured timezone
