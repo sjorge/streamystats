@@ -35,7 +35,7 @@ interface Props {
   data: IWatchTimePerHour[];
 }
 
-const TIMEZONE = process.env.TZ || "Europe/London";
+const TIMEZONE = process.env.TZ || "Etc/UTC";
 
 export const WatchTimePerHour: React.FC<Props> = ({
   title,
