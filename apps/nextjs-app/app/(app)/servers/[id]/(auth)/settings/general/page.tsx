@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { DeleteServer } from "../DeleteServer";
 import { VersionSection } from "../VersionSection";
 import { SystemStatsDisplay } from "@/components/SystemStatsDisplay";
+import { SyncManager } from "../SyncManager";
 
 export default async function GeneralSettings(props: {
   params: Promise<{ id: string }>;
@@ -23,6 +24,7 @@ export default async function GeneralSettings(props: {
       <div className="space-y-8">
         <VersionSection />
         <SystemStatsDisplay />
+        <SyncManager serverId={server.id} serverName={server.name} />
         <DeleteServer server={server} />
       </div>
     </Container>
