@@ -21,46 +21,10 @@ services:
     networks:
       - app-network
 
-  nextjs-app:
-    build:
-      context: .
-      dockerfile: apps/nextjs-app/Dockerfile
-      args:
-        VERSION: ${VERSION:-latest}
-        COMMIT_SHA: ${COMMIT_SHA:-unknown}
-        BUILD_TIME: ${BUILD_TIME:-unknown}
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vectorchord:5432/${POSTGRES_DB:-streamystats}
-      - JOB_SERVER_URL=http://job-server:3005
-      - HOSTNAME=0.0.0.0
-    depends_on:
-      vectorchord:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
-  job-server:
-    build:
-      context: .
-      dockerfile: apps/job-server/Dockerfile
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vectorchord:5432/${POSTGRES_DB:-streamystats}
-      - PORT=3005
-      - HOST=0.0.0.0
-    depends_on:
-      vectorchord:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
   vectorchord:
     image: tensorchord/vchord-postgres:pg17-v0.4.1
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -69,6 +33,15 @@ services:
     volumes:
       - vectorchord_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-streamystats}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   vectorchord_data:
