@@ -582,7 +582,7 @@ class SessionPoller {
         audioStreamIndex: tracked.audioStreamIndex,
         subtitleStreamIndex: tracked.subtitleStreamIndex,
         playMethod: tracked.playMethod,
-        isTranscoded: tracked.playMethod !== "DirectPlay",
+        isTranscoded: (tracked.playMethod !== "DirectPlay" && tracked.playMethod !== "DirectStream"),
         mediaSourceId: tracked.mediaSourceId,
         repeatMode: tracked.repeatMode,
         playbackOrder: tracked.playbackOrder,
