@@ -581,9 +581,34 @@ export const updateServerConnection = async ({
       }
 
       const authData = await authResponse.json();
+      
+      // Validate authentication response structure
+      if (!authData || !authData["AccessToken"]) {
+        return {
+          success: false,
+          message: "Invalid authentication response from server",
+        };
+      }
+      
       const accessToken = authData["AccessToken"];
       const user = authData["User"];
-      const isAdmin = user["Policy"]["IsAdministrator"];
+      
+      if (!user || !user["Id"]) {
+        return {
+          success: false,
+          message: "Invalid user data in authentication response",
+        };
+      }
+      
+      const policy = user["Policy"];
+      if (!policy) {
+        return {
+          success: false,
+          message: "Unable to verify user permissions. User policy information is missing.",
+        };
+      }
+      
+      const isAdmin = policy["IsAdministrator"] === true;
 
       // Verify user is an administrator
       if (!isAdmin) {
