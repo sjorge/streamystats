@@ -68,7 +68,7 @@ export const config = {
 };
 
 const ADMIN_ONLY_PATHS = ["history", "settings", "activities", "users", "setup"];
-const PUBLIC_PATHS = ["login"];
+const PUBLIC_PATHS = ["login", "reconnect"];
 
 const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
 
@@ -378,10 +378,18 @@ export async function middleware(request: NextRequest) {
   // Handle server connectivity error
   if (meResult.type === ResultType.ServerConnectivityError) {
     console.warn("Server connectivity issue detected.", meResult.error);
-    // Add a header to indicate server connectivity issues - will be used by the client to show a toast
-    const response = NextResponse.next();
-    response.headers.set("x-server-connectivity-error", "true");
-    return response;
+    
+    // If we're already on the reconnect page, allow access
+    if (page === "reconnect") {
+      return NextResponse.next();
+    }
+    
+    // Redirect to reconnect page
+    const reconnectUrl = id
+      ? new URL(`${basePath}/servers/${id}/reconnect`, request.url)
+      : new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url);
+    
+    return NextResponse.redirect(reconnectUrl);
   }
 
   // If the user is not logged in or has invalid credentials
@@ -419,10 +427,15 @@ export async function middleware(request: NextRequest) {
     // Handle server connectivity error when checking admin status
     if (adminResult.type === ResultType.ServerConnectivityError) {
       console.warn("Server connectivity issue detected.", adminResult.error);
-      // Add a header to indicate server connectivity issues
-      const response = NextResponse.next();
-      response.headers.set("x-server-connectivity-error", "true");
-      return response;
+      
+      // If we're already on the reconnect page, allow access
+      if (page === "reconnect") {
+        return NextResponse.next();
+      }
+      
+      // Redirect to reconnect page
+      const reconnectUrl = new URL(`${basePath}/servers/${id}/reconnect`, request.url);
+      return NextResponse.redirect(reconnectUrl);
     }
 
     const isAdmin =
