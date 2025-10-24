@@ -385,11 +385,16 @@ export async function middleware(request: NextRequest) {
     }
     
     // Redirect to reconnect page
-    const reconnectUrl = id
-      ? new URL(`${basePath}/servers/${id}/reconnect`, request.url)
-      : new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url);
-    
-    return NextResponse.redirect(reconnectUrl);
+    if (id) {
+      const reconnectUrl = new URL(`${basePath}/servers/${id}/reconnect`, request.url);
+      return NextResponse.redirect(reconnectUrl);
+    } else if (servers.length > 0) {
+      const reconnectUrl = new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url);
+      return NextResponse.redirect(reconnectUrl);
+    } else {
+      // No servers available, redirect to setup
+      return NextResponse.redirect(new URL(`${basePath}/setup`, request.url));
+    }
   }
 
   // If the user is not logged in or has invalid credentials
@@ -398,9 +403,16 @@ export async function middleware(request: NextRequest) {
       "User authentication failed, removing cookies.",
       meResult.error
     );
-    const redirectUrl = id
-      ? new URL(`${basePath}/servers/${id}/login`, request.url)
-      : new URL(`${basePath}/servers/${servers[0].id}/login`, request.url);
+    
+    let redirectUrl: URL;
+    if (id) {
+      redirectUrl = new URL(`${basePath}/servers/${id}/login`, request.url);
+    } else if (servers.length > 0) {
+      redirectUrl = new URL(`${basePath}/servers/${servers[0].id}/login`, request.url);
+    } else {
+      // No servers available, redirect to setup
+      redirectUrl = new URL(`${basePath}/setup`, request.url);
+    }
 
     const response = NextResponse.redirect(redirectUrl);
 
@@ -433,7 +445,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
       }
       
-      // Redirect to reconnect page
+      // Redirect to reconnect page (id is guaranteed to exist here from parent condition)
       const reconnectUrl = new URL(`${basePath}/servers/${id}/reconnect`, request.url);
       return NextResponse.redirect(reconnectUrl);
     }
