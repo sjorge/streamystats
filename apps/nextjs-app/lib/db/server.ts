@@ -508,16 +508,12 @@ export const updateServerConnection = async ({
       };
     }
 
-    if (url.endsWith("/")) {
-      return {
-        success: false,
-        message: "URL should not end with a slash",
-      };
-    }
+    // Normalize URL by removing trailing slash
+    const normalizedUrl = url.endsWith("/") ? url.slice(0, -1) : url;
 
     // Test connection to new Jellyfin server with new API key
     try {
-      const testResponse = await fetch(`${url}/System/Info`, {
+      const testResponse = await fetch(`${normalizedUrl}/System/Info`, {
         method: "GET",
         headers: {
           "X-Emby-Token": apiKey,
@@ -553,7 +549,7 @@ export const updateServerConnection = async ({
       const existingServer = await db
         .select({ id: servers.id, name: servers.name })
         .from(servers)
-        .where(eq(servers.url, url))
+        .where(eq(servers.url, normalizedUrl))
         .limit(1);
 
       if (existingServer.length > 0 && existingServer[0].id !== serverId) {
@@ -564,7 +560,7 @@ export const updateServerConnection = async ({
       }
 
       // Authenticate user credentials against new server
-      const authResponse = await fetch(`${url}/Users/AuthenticateByName`, {
+      const authResponse = await fetch(`${normalizedUrl}/Users/AuthenticateByName`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -598,9 +594,9 @@ export const updateServerConnection = async ({
         };
       }
 
-      // Update database with new URL, API key, and optionally name
+      // Update database with normalized URL, API key, and optionally name
       const updateData: Partial<typeof servers.$inferInsert> = {
-        url,
+        url: normalizedUrl,
         apiKey,
         updatedAt: new Date(),
       };
