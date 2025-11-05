@@ -46,9 +46,11 @@ interface ItemMetadataProps {
   item: Item;
   statistics: ItemDetailsResponse;
   showAdminStats?: boolean;
+  serverId: number;
+  itemId: string;
 }
 
-export function ItemMetadata({ item, statistics, showAdminStats = false }: ItemMetadataProps) {
+export function ItemMetadata({ item, statistics, showAdminStats = false, serverId, itemId }: ItemMetadataProps) {
   const [showViewersDialog, setShowViewersDialog] = useState(false);
   const {
     totalViews,
@@ -301,7 +303,8 @@ export function ItemMetadata({ item, statistics, showAdminStats = false }: ItemM
       <ViewerDetailsDialog
         isOpen={showViewersDialog}
         onOpenChange={setShowViewersDialog}
-        viewers={usersWatched}
+        serverId={serverId}
+        itemId={itemId}
       />
     </>
   );
