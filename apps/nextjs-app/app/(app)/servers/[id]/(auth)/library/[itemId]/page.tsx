@@ -60,7 +60,7 @@ export default async function ItemDetailsPage({
           server={server}
           statistics={itemDetails}
         />
-        <ItemMetadata item={itemDetails.item} statistics={itemDetails} />
+        <ItemMetadata item={itemDetails.item} statistics={itemDetails} showAdminStats={showAdmin} />
         {(itemDetails.item.type === "Series" ||
           itemDetails.item.type === "Movie") &&
           similarItems.length > 0 && (
