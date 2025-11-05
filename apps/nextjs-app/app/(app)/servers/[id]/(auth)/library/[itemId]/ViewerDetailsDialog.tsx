@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatDateUS, formatDuration } from "@/lib/utils";
 import { ItemUserStats } from "@/lib/db/items";
-import { Users, Search, X, Loader2 } from "lucide-react";
+import { Users, Search, X, Loader2, ArrowUpDown } from "lucide-react";
 
 interface ViewerDetailsDialogProps {
 	isOpen: boolean;
@@ -92,7 +92,7 @@ export function ViewerDetailsDialog({
 	const [searchQuery, setSearchQuery] = useState("");
 	const [completion, setCompletion] = useState<CompletionState>(CompletionState.all);
 	const [currentPage, setCurrentPage] = useState(1);
-	const [pageSize] = useState(5);
+	const [pageSize] = useState(20);
 
 	const [apiData, setApiData] = useState<ApiResponse | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -175,18 +175,14 @@ export function ViewerDetailsDialog({
 		field: SortBy;
 		label: string;
 	}) => (
-		<TableHead
-			className="cursor-pointer hover:bg-muted/70 select-none"
-			onClick={() => handleSort(field)}
-		>
-			<div className="flex items-center gap-1">
-				<span>{label}</span>
-				{sortBy === field && (
-					<span className="text-xs font-bold">
-						{sortOrder === "asc" ? "↑" : "↓"}
-					</span>
-				)}
-			</div>
+		<TableHead>
+			<Button
+				variant="ghost"
+				onClick={() => handleSort(field)}
+			>
+				{label}
+				<ArrowUpDown className="ml-2 h-4 w-4" />
+			</Button>
 		</TableHead>
 	);
 
@@ -271,15 +267,9 @@ export function ViewerDetailsDialog({
 				{/* Table */}
 				{!isLoading && (
 					<div className="overflow-auto flex-1 px-6">
-						{displayViewers.length === 0 ? (
-							<div className="text-center py-8 text-muted-foreground">
-								{searchQuery || completion !== "all"
-									? "No viewers match your search or filters"
-									: "No viewers yet for this item"}
-							</div>
-						) : (
+						<div className="rounded-md border">
 							<Table>
-								<TableHeader className="sticky top-0 bg-background">
+								<TableHeader>
 									<TableRow>
 										<SortHeader field="userName" label="Username" />
 										<SortHeader field="watchCount" label="Plays" />
@@ -289,33 +279,45 @@ export function ViewerDetailsDialog({
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{displayViewers.map((viewer: ItemUserStats) => (
-										<ViewerRow key={viewer.user.id} viewer={viewer} />
-									))}
+									{displayViewers.length === 0 ? (
+										<TableRow>
+											<TableCell colSpan={5} className="h-24 text-center">
+												{searchQuery || completion !== "all"
+													? "No viewers match your search or filters"
+													: "No results."}
+											</TableCell>
+										</TableRow>
+									) : (
+										displayViewers.map((viewer: ItemUserStats) => (
+											<ViewerRow key={viewer.user.id} viewer={viewer} />
+										))
+									)}
 								</TableBody>
 							</Table>
-						)}
+						</div>
 					</div>
 				)}
 
 				{/* Pagination Controls */}
 				{!isLoading && pagination && (
-					<div className="px-6 py-3 border-t flex items-center justify-between">
-						<div className="text-sm text-neutral-500">
-							{pagination.total === 0
-								? 0
-								: (pagination.page - 1) * pagination.pageSize + 1}{" "}
-							-{" "}
-							{(pagination.page - 1) * pagination.pageSize +
-								displayViewers.length}{" "}
-							of {pagination.total} results.
+					<div className="flex items-center justify-between space-x-2 py-4">
+						<div>
+							<p className="text-sm text-neutral-500">
+								{pagination.total === 0
+									? "0 - 0"
+									: `${(pagination.page - 1) * pagination.pageSize + 1} - ${
+											(pagination.page - 1) * pagination.pageSize +
+											displayViewers.length
+									  }`}{" "}
+								of {pagination.total} results.
+							</p>
 						</div>
-						<div className="flex gap-2">
+						<div className="space-x-2">
 							<Button
 								variant="outline"
 								size="sm"
 								onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-								disabled={currentPage === 1 || pagination.total === 0}
+								disabled={currentPage <= 1 || isLoading || pagination.total === 0}
 							>
 								Previous
 							</Button>
@@ -328,7 +330,8 @@ export function ViewerDetailsDialog({
 									)
 								}
 								disabled={
-									currentPage === pagination.totalPages ||
+									currentPage >= pagination.totalPages ||
+									isLoading ||
 									pagination.total === 0
 								}
 							>
