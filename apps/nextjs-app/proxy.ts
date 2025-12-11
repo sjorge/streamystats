@@ -54,7 +54,6 @@ type Result<T> =
     };
 
 export const config = {
-  runtime: "nodejs",
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
@@ -357,7 +356,7 @@ const validateUserAuth = async (
   }
 };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const { id, page, name } = parsePathname(pathname);
 

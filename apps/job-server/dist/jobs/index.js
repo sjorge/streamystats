@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.JELLYFIN_JOB_NAMES = exports.jellyfinRecentActivitiesSyncWorker = exports.jellyfinRecentItemsSyncWorker = exports.jellyfinActivitiesSyncWorker = exports.jellyfinItemsSyncWorker = exports.jellyfinLibrariesSyncWorker = exports.jellyfinUsersSyncWorker = exports.jellyfinFullSyncWorker = exports.jellyfinSyncWorker = exports.TIMEOUT_CONFIG = exports.OPENAI_CONFIG = exports.openai = exports.logJobResult = exports.syncItems = exports.syncActivities = exports.syncLibraries = exports.syncUsers = exports.generateItemEmbeddingsJob = exports.sequentialServerSyncJob = exports.addServerJob = exports.syncServerDataJob = void 0;
+exports.JELLYFIN_JOB_NAMES = exports.jellyfinRecentActivitiesSyncWorker = exports.jellyfinRecentItemsSyncWorker = exports.jellyfinActivitiesSyncWorker = exports.jellyfinItemsSyncWorker = exports.jellyfinLibrariesSyncWorker = exports.jellyfinUsersSyncWorker = exports.jellyfinFullSyncWorker = exports.jellyfinSyncWorker = exports.TIMEOUT_CONFIG = exports.logJobResult = exports.syncItems = exports.syncActivities = exports.syncLibraries = exports.syncUsers = exports.generateItemEmbeddingsJob = exports.sequentialServerSyncJob = exports.addServerJob = exports.syncServerDataJob = void 0;
 // Export all job functions from their respective modules
 var server_jobs_1 = require("./server-jobs");
 Object.defineProperty(exports, "syncServerDataJob", { enumerable: true, get: function () { return server_jobs_1.syncServerDataJob; } });
@@ -16,8 +16,6 @@ Object.defineProperty(exports, "syncItems", { enumerable: true, get: function ()
 var job_logger_1 = require("./job-logger");
 Object.defineProperty(exports, "logJobResult", { enumerable: true, get: function () { return job_logger_1.logJobResult; } });
 var config_1 = require("./config");
-Object.defineProperty(exports, "openai", { enumerable: true, get: function () { return config_1.openai; } });
-Object.defineProperty(exports, "OPENAI_CONFIG", { enumerable: true, get: function () { return config_1.OPENAI_CONFIG; } });
 Object.defineProperty(exports, "TIMEOUT_CONFIG", { enumerable: true, get: function () { return config_1.TIMEOUT_CONFIG; } });
 // Export Jellyfin sync workers from the original location
 var workers_1 = require("../jellyfin/workers");
