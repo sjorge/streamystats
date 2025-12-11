@@ -2,15 +2,28 @@ import { ActiveSession } from "@/lib/db/active-sessions";
 import { getServer } from "@/lib/db/server";
 import { db, items, users } from "@streamystats/database";
 import { eq } from "drizzle-orm";
+import { requireSession } from "@/lib/api-auth";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Require valid session to view active sessions
+  const { error, session } = await requireSession();
+  if (error) return error;
+
   const { searchParams } = new URL(request.url);
   const serverId = searchParams.get("serverId");
 
   if (!serverId) {
     return new Response("Server ID is required", { status: 400 });
+  }
+
+  // Verify user is accessing their own server's sessions
+  if (session.serverId !== Number(serverId)) {
+    return new Response(
+      JSON.stringify({ error: "Access denied to this server's sessions" }),
+      { status: 403, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   const server = await getServer({ serverId });

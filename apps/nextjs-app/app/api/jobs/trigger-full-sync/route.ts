@@ -1,9 +1,11 @@
-interface RouteParams {
-  // No params needed for this endpoint
-}
+import { requireAdmin } from "@/lib/api-auth";
 
 export async function POST(request: Request) {
   try {
+    // Require admin to trigger sync
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const body = await request.json();
     const { serverId } = body;
 

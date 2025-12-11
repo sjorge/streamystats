@@ -1,6 +1,6 @@
 import { getServers, createServer } from "@/lib/server";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
@@ -27,6 +27,54 @@ export async function GET() {
   }
 }
 
+/**
+ * Validates that the API key belongs to an admin on the target Jellyfin server.
+ */
+async function validateJellyfinAdmin(
+  url: string,
+  apiKey: string
+): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${url}/Users/Me`, {
+      method: "GET",
+      headers: {
+        "X-Emby-Token": apiKey,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        return { valid: false, error: "Invalid API key" };
+      }
+      return {
+        valid: false,
+        error: `Jellyfin server returned ${response.status}`,
+      };
+    }
+
+    const user = await response.json();
+
+    if (!user.Policy?.IsAdministrator) {
+      return {
+        valid: false,
+        error: "API key must belong to a Jellyfin administrator",
+      };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return { valid: false, error: "Connection to Jellyfin server timed out" };
+    }
+    return {
+      valid: false,
+      error: "Failed to connect to Jellyfin server",
+    };
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -39,6 +87,22 @@ export async function POST(request: Request) {
         }),
         {
           status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    // Validate the API key belongs to an admin on the target Jellyfin server
+    const validation = await validateJellyfinAdmin(url, apiKey);
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({
+          error: validation.error,
+        }),
+        {
+          status: 401,
           headers: {
             "Content-Type": "application/json",
           },

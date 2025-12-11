@@ -8,6 +8,7 @@ import {
 } from "@streamystats/database/schema";
 import { getServer } from "@/lib/db/server";
 import { eq } from "drizzle-orm";
+import { requireAdmin } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,10 @@ interface ImportData {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require admin for data import
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     // Parse form data
     const formData = await req.formData();
     const file = formData.get("file") as File;
