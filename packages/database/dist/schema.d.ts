@@ -172,23 +172,6 @@ export declare const servers: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        openAiApiToken: import("drizzle-orm/pg-core").PgColumn<{
-            name: "open_ai_api_token";
-            tableName: "servers";
-            dataType: "string";
-            columnType: "PgText";
-            data: string;
-            driverParam: string;
-            notNull: false;
-            hasDefault: false;
-            isPrimaryKey: false;
-            isAutoincrement: false;
-            hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
-            baseColumn: never;
-            identity: undefined;
-            generated: undefined;
-        }, {}, {}>;
         autoGenerateEmbeddings: import("drizzle-orm/pg-core").PgColumn<{
             name: "auto_generate_embeddings";
             tableName: "servers";
@@ -206,57 +189,6 @@ export declare const servers: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        ollamaApiToken: import("drizzle-orm/pg-core").PgColumn<{
-            name: "ollama_api_token";
-            tableName: "servers";
-            dataType: "string";
-            columnType: "PgText";
-            data: string;
-            driverParam: string;
-            notNull: false;
-            hasDefault: false;
-            isPrimaryKey: false;
-            isAutoincrement: false;
-            hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
-            baseColumn: never;
-            identity: undefined;
-            generated: undefined;
-        }, {}, {}>;
-        ollamaBaseUrl: import("drizzle-orm/pg-core").PgColumn<{
-            name: "ollama_base_url";
-            tableName: "servers";
-            dataType: "string";
-            columnType: "PgText";
-            data: string;
-            driverParam: string;
-            notNull: false;
-            hasDefault: false;
-            isPrimaryKey: false;
-            isAutoincrement: false;
-            hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
-            baseColumn: never;
-            identity: undefined;
-            generated: undefined;
-        }, {}, {}>;
-        ollamaModel: import("drizzle-orm/pg-core").PgColumn<{
-            name: "ollama_model";
-            tableName: "servers";
-            dataType: "string";
-            columnType: "PgText";
-            data: string;
-            driverParam: string;
-            notNull: false;
-            hasDefault: false;
-            isPrimaryKey: false;
-            isAutoincrement: false;
-            hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
-            baseColumn: never;
-            identity: undefined;
-            generated: undefined;
-        }, {}, {}>;
         embeddingProvider: import("drizzle-orm/pg-core").PgColumn<{
             name: "embedding_provider";
             tableName: "servers";
@@ -265,11 +197,79 @@ export declare const servers: import("drizzle-orm/pg-core").PgTableWithColumns<{
             data: string;
             driverParam: string;
             notNull: false;
-            hasDefault: true;
+            hasDefault: false;
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
             enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        embeddingBaseUrl: import("drizzle-orm/pg-core").PgColumn<{
+            name: "embedding_base_url";
+            tableName: "servers";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        embeddingApiKey: import("drizzle-orm/pg-core").PgColumn<{
+            name: "embedding_api_key";
+            tableName: "servers";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        embeddingModel: import("drizzle-orm/pg-core").PgColumn<{
+            name: "embedding_model";
+            tableName: "servers";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        embeddingDimensions: import("drizzle-orm/pg-core").PgColumn<{
+            name: "embedding_dimensions";
+            tableName: "servers";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -2564,8 +2564,8 @@ export declare const items: import("drizzle-orm/pg-core").PgTableWithColumns<{
         embedding: import("drizzle-orm/pg-core").PgColumn<{
             name: "embedding";
             tableName: "items";
-            dataType: "array";
-            columnType: "PgVector";
+            dataType: "custom";
+            columnType: "PgCustomColumn";
             data: number[];
             driverParam: string;
             notNull: false;
@@ -2578,7 +2578,7 @@ export declare const items: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {
-            dimensions: 1536;
+            pgColumnBuilderBrand: "PgCustomColumnBuilderBrand";
         }>;
         processed: import("drizzle-orm/pg-core").PgColumn<{
             name: "processed";

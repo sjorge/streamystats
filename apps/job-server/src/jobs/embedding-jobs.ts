@@ -2,21 +2,44 @@ import { db, Item, items } from "@streamystats/database";
 import axios from "axios";
 import { and, eq, sql } from "drizzle-orm";
 import OpenAI from "openai";
-import { OPENAI_CONFIG, TIMEOUT_CONFIG } from "./config";
+import { TIMEOUT_CONFIG } from "./config";
 import { logJobResult } from "./job-logger";
 import { getJobQueue } from "./queue";
+
+// Embedding configuration passed from job data
+interface EmbeddingConfig {
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+  dimensions: number;
+}
+
+// Default config values
+const DEFAULT_MAX_TEXT_LENGTH = 8000;
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RATE_LIMIT_DELAY = 500;
 
 // Job: Generate embeddings for media items using different providers
 export async function generateItemEmbeddingsJob(job: any) {
   const startTime = Date.now();
-  const { serverId, provider, config } = job.data;
+  const { serverId, provider, config } = job.data as {
+    serverId: number;
+    provider: "openai-compatible" | "ollama";
+    config: EmbeddingConfig;
+  };
   let lastHeartbeat = Date.now();
 
   try {
     // Validate provider early
     if (!provider) {
       throw new Error(
-        "Embedding provider not configured. Please select either 'openai' or 'ollama' in the server settings."
+        "Embedding provider not configured. Please configure it in server settings."
+      );
+    }
+
+    if (!config.baseUrl || !config.model) {
+      throw new Error(
+        "Embedding configuration incomplete. Base URL and model are required."
       );
     }
 
@@ -123,31 +146,55 @@ export async function generateItemEmbeddingsJob(job: any) {
         }
       }
 
-      return textParts.join(" ").substring(0, OPENAI_CONFIG.MAX_TEXT_LENGTH);
+      return textParts.join(" ").substring(0, DEFAULT_MAX_TEXT_LENGTH);
     };
 
-    if (provider === "openai") {
-      if (!config.openaiApiKey) {
-        throw new Error("OpenAI API key not provided");
+    const expectedDimensions = config.dimensions;
+
+    // Validate embedding dimensions match expected
+    const validateEmbedding = (
+      rawEmbedding: number[],
+      itemId: string
+    ): number[] | null => {
+      if (!Array.isArray(rawEmbedding) || rawEmbedding.length === 0) {
+        console.error(`Invalid embedding data for item ${itemId}`);
+        return null;
       }
 
-      const openaiClient = new OpenAI({
-        apiKey: config.openaiApiKey,
+      if (rawEmbedding.length !== expectedDimensions) {
+        console.error(
+          `Dimension mismatch for item ${itemId}: got ${rawEmbedding.length}, expected ${expectedDimensions}. ` +
+            `Check your model configuration - the model may output different dimensions than configured.`
+        );
+        return null;
+      }
+
+      return rawEmbedding;
+    };
+
+    if (provider === "openai-compatible") {
+      // Use OpenAI SDK with custom baseURL for any OpenAI-compatible API
+      // Supports: OpenAI, Azure OpenAI, Together AI, Fireworks, Anyscale, LocalAI, LM Studio, vLLM, etc.
+      if (!config.apiKey) {
+        throw new Error("API key not provided for OpenAI-compatible provider");
+      }
+
+      const client = new OpenAI({
+        apiKey: config.apiKey,
+        baseURL: config.baseUrl,
         timeout: TIMEOUT_CONFIG.DEFAULT,
-        maxRetries: OPENAI_CONFIG.MAX_RETRIES,
+        maxRetries: DEFAULT_MAX_RETRIES,
       });
 
-      // Process items in batches for OpenAI
-      const BATCH_SIZE = 20; // OpenAI supports up to 2048 inputs, but 20 is a good balance
+      // Process items in batches
+      const BATCH_SIZE = 20;
 
       for (let i = 0; i < unprocessedItems.length; i += BATCH_SIZE) {
         const batch = unprocessedItems.slice(i, i + BATCH_SIZE);
 
         try {
-          // Send heartbeat if needed
           await sendHeartbeat();
 
-          // Prepare all texts for the batch, track items to skip
           const batchData: { item: Item; textToEmbed: string }[] = [];
           const itemsToSkip: Item[] = [];
 
@@ -160,7 +207,6 @@ export async function generateItemEmbeddingsJob(job: any) {
             }
           }
 
-          // Mark items with no text as processed (skip them permanently)
           if (itemsToSkip.length > 0) {
             for (const item of itemsToSkip) {
               await db
@@ -172,36 +218,36 @@ export async function generateItemEmbeddingsJob(job: any) {
           }
 
           if (batchData.length === 0) {
-            continue; // All items in batch were skipped
+            continue;
           }
 
-          // Extract just the texts for the API call
           const textsToEmbed = batchData.map((data) => data.textToEmbed);
 
-          console.log(`Processing OpenAI batch: ${batchData.length} items`);
+          console.log(
+            `Processing batch: ${batchData.length} items via ${config.baseUrl}`
+          );
 
-          // Call OpenAI API with batch of texts
-          const response = await openaiClient.embeddings.create({
-            model: OPENAI_CONFIG.EMBEDDING_MODEL,
+          // Call embedding API
+          // Note: 'dimensions' param only works for models that support it (e.g., OpenAI text-embedding-3-*)
+          const response = await client.embeddings.create({
+            model: config.model,
             input: textsToEmbed,
-            dimensions: OPENAI_CONFIG.EMBEDDING_DIMENSIONS,
+            ...(expectedDimensions ? { dimensions: expectedDimensions } : {}),
           });
 
-          // Validate response structure
           if (!response.data || response.data.length !== batchData.length) {
             throw new Error(
-              `Invalid response structure from OpenAI API: expected ${
-                batchData.length
-              } embeddings, got ${response.data?.length || 0}`
+              `Invalid response: expected ${batchData.length} embeddings, got ${
+                response.data?.length || 0
+              }`
             );
           }
 
-          // Process each embedding in the batch
           for (let j = 0; j < batchData.length; j++) {
             const { item } = batchData[j];
             const embeddingData = response.data[j];
 
-            if (!embeddingData || !embeddingData.embedding) {
+            if (!embeddingData?.embedding) {
               console.error(`No embedding data for item ${item.id}`);
               errorCount++;
               continue;
@@ -209,55 +255,17 @@ export async function generateItemEmbeddingsJob(job: any) {
 
             const rawEmbedding = embeddingData.embedding;
 
-            // Validate embedding dimensions
-            if (!Array.isArray(rawEmbedding) || rawEmbedding.length === 0) {
-              console.error(`Invalid embedding data for item ${item.id}`);
+            const embedding = validateEmbedding(rawEmbedding, item.id);
+            if (!embedding) {
               errorCount++;
               continue;
             }
 
-            let embedding: number[];
-
-            // Ensure embedding has correct dimensions
-            if (rawEmbedding.length !== OPENAI_CONFIG.EMBEDDING_DIMENSIONS) {
-              console.warn(
-                `OpenAI embedding dimension mismatch for item ${item.id}: expected ${OPENAI_CONFIG.EMBEDDING_DIMENSIONS}, got ${rawEmbedding.length}`
-              );
-
-              // Normalize dimensions to match expected size
-              if (rawEmbedding.length < OPENAI_CONFIG.EMBEDDING_DIMENSIONS) {
-                // Pad with zeros
-                embedding = [
-                  ...rawEmbedding,
-                  ...new Array(
-                    OPENAI_CONFIG.EMBEDDING_DIMENSIONS - rawEmbedding.length
-                  ).fill(0),
-                ];
-              } else if (
-                rawEmbedding.length > OPENAI_CONFIG.EMBEDDING_DIMENSIONS
-              ) {
-                // Truncate
-                embedding = rawEmbedding.slice(
-                  0,
-                  OPENAI_CONFIG.EMBEDDING_DIMENSIONS
-                );
-              } else {
-                embedding = rawEmbedding;
-              }
-            } else {
-              embedding = rawEmbedding;
-            }
-
-            // Update item with embedding
             try {
               await db
                 .update(items)
-                .set({
-                  embedding: embedding,
-                  processed: true,
-                })
+                .set({ embedding, processed: true })
                 .where(eq(items.id, item.id));
-
               processedCount++;
             } catch (dbError) {
               console.error(`Database error for item ${item.id}:`, dbError);
@@ -265,49 +273,40 @@ export async function generateItemEmbeddingsJob(job: any) {
             }
           }
 
-          // Add delay between batches (not between individual items)
           await new Promise((resolve) =>
-            setTimeout(resolve, OPENAI_CONFIG.RATE_LIMIT_DELAY)
+            setTimeout(resolve, DEFAULT_RATE_LIMIT_DELAY)
           );
         } catch (batchError) {
-          console.error(
-            `Error processing OpenAI batch starting at index ${i}:`,
-            batchError
-          );
+          console.error(`Error processing batch at index ${i}:`, batchError);
 
-          // Handle specific OpenAI errors
           if (batchError instanceof Error) {
             if (batchError.message.includes("rate_limit")) {
-              throw new Error(
-                `OpenAI rate limit exceeded. Please try again later.`
-              );
+              throw new Error("Rate limit exceeded. Please try again later.");
             } else if (batchError.message.includes("insufficient_quota")) {
+              throw new Error("Quota exceeded. Please check your billing.");
+            } else if (
+              batchError.message.includes("invalid_api_key") ||
+              batchError.message.includes("401")
+            ) {
               throw new Error(
-                `OpenAI quota exceeded. Please check your billing.`
-              );
-            } else if (batchError.message.includes("invalid_api_key")) {
-              throw new Error(
-                `Invalid OpenAI API key. Please check your configuration.`
+                "Invalid API key. Please check your configuration."
               );
             }
           }
 
-          // For other errors, mark all items in batch as errors and continue
           errorCount += batch.length;
           continue;
         }
       }
     } else if (provider === "ollama") {
-      // Process items one by one for Ollama
+      // Ollama uses a different API format (/api/embeddings)
       for (const item of unprocessedItems) {
         try {
-          // Send heartbeat if needed
           await sendHeartbeat();
 
           const textToEmbed = prepareTextForEmbedding(item);
 
           if (!textToEmbed.trim()) {
-            // Mark items without meaningful text as processed (skip permanently)
             await db
               .update(items)
               .set({ processed: true })
@@ -316,22 +315,18 @@ export async function generateItemEmbeddingsJob(job: any) {
             continue;
           }
 
-          if (!config.ollamaBaseUrl || !config.ollamaModel) {
-            throw new Error("Ollama configuration incomplete");
-          }
-
-          const headers: any = {
+          const headers: Record<string, string> = {
             "Content-Type": "application/json",
           };
 
-          if (config.ollamaApiToken) {
-            headers["Authorization"] = `Bearer ${config.ollamaApiToken}`;
+          if (config.apiKey) {
+            headers["Authorization"] = `Bearer ${config.apiKey}`;
           }
 
           const response = await axios.post(
-            `${config.ollamaBaseUrl}/api/embeddings`,
+            `${config.baseUrl}/api/embeddings`,
             {
-              model: config.ollamaModel,
+              model: config.model,
               prompt: textToEmbed,
             },
             {
@@ -340,51 +335,31 @@ export async function generateItemEmbeddingsJob(job: any) {
             }
           );
 
-          let rawEmbedding =
+          const rawEmbedding =
             response.data.embedding || response.data.embeddings;
 
           if (!rawEmbedding) {
             throw new Error("No embedding returned from Ollama");
           }
 
-          let embedding: number[];
-
-          // Ensure we have the right dimensions (pad or truncate to match OPENAI_CONFIG.EMBEDDING_DIMENSIONS)
-          if (rawEmbedding.length < OPENAI_CONFIG.EMBEDDING_DIMENSIONS) {
-            // Pad with zeros
-            embedding = [
-              ...rawEmbedding,
-              ...new Array(
-                OPENAI_CONFIG.EMBEDDING_DIMENSIONS - rawEmbedding.length
-              ).fill(0),
-            ];
-          } else if (rawEmbedding.length > OPENAI_CONFIG.EMBEDDING_DIMENSIONS) {
-            // Truncate
-            embedding = rawEmbedding.slice(
-              0,
-              OPENAI_CONFIG.EMBEDDING_DIMENSIONS
-            );
-          } else {
-            embedding = rawEmbedding;
+          const embedding = validateEmbedding(rawEmbedding, item.id);
+          if (!embedding) {
+            errorCount++;
+            continue;
           }
 
-          // Update item with embedding
           await db
             .update(items)
-            .set({
-              embedding: embedding,
-              processed: true,
-            })
+            .set({ embedding, processed: true })
             .where(eq(items.id, item.id));
 
           processedCount++;
 
           // Ollama is typically self-hosted, use shorter delay
-          await new Promise((resolve) => setTimeout(resolve, 100)); // 0.1 second delay
+          await new Promise((resolve) => setTimeout(resolve, 100));
         } catch (itemError) {
           console.error(`Error processing item ${item.id}:`, itemError);
           errorCount++;
-          // Continue processing other items even if one fails
           continue;
         }
       }
@@ -426,10 +401,9 @@ export async function generateItemEmbeddingsJob(job: any) {
         `Queueing next batch for server ${serverId}, ${remaining} items remaining`
       );
 
-      // Queue next batch with singleton key to prevent duplicates
+      // Queue next batch (no singleton - chained jobs need to run sequentially)
       try {
         const boss = await getJobQueue();
-        const singletonKey = `embedding-server-${serverId}`;
         const nextJobId = await boss.send(
           "generate-item-embeddings",
           {
@@ -440,19 +414,10 @@ export async function generateItemEmbeddingsJob(job: any) {
           {
             retryLimit: 3,
             retryDelay: 30, // 30 seconds
-            singletonKey, // Prevent duplicate jobs for same server
           }
         );
 
-        if (nextJobId) {
-          console.log(
-            `Successfully queued next embedding batch with job ID: ${nextJobId}`
-          );
-        } else {
-          console.log(
-            `Embedding job for server ${serverId} already queued (singleton)`
-          );
-        }
+        console.log(`Queued next embedding batch with job ID: ${nextJobId}`);
       } catch (queueError) {
         console.error("Failed to queue next embedding batch:", queueError);
       }

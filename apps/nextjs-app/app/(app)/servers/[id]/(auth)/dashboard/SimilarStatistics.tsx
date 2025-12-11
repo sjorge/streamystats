@@ -137,19 +137,19 @@ export const SimilarStatistics = ({ data, server }: Props) => {
       </CardHeader>
       <CardContent className="px-5 m-0 pt-0 max-w-full overflow-hidden">
         <Tabs defaultValue={defaultTab}>
-          {(!server.openAiApiToken || server.openAiApiToken === "") &&
-          server.embeddingProvider === "openai" ? (
+          {!server.embeddingBaseUrl || !server.embeddingModel ? (
             <div className="flex flex-col gap-2 max-w-full">
               <Link
                 href={`/servers/${server.id}/settings/ai`}
                 className="w-full sm:w-auto"
               >
                 <Button className="w-full sm:w-auto text-sm" size="sm">
-                  Set up OpenAI API key
+                  Set up embedding provider
                 </Button>
               </Link>
               <p className="opacity-70 text-xs">
-                To get recommendations, you need to set up an OpenAI API key.
+                To get recommendations, you need to configure an embedding
+                provider.
               </p>
             </div>
           ) : null}

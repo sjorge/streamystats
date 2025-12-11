@@ -9,10 +9,31 @@ import {
   integer,
   bigint,
   doublePrecision,
-  vector,
   index,
   unique,
+  customType,
 } from "drizzle-orm/pg-core";
+
+// Custom vector type that supports variable dimensions
+// This allows storing embeddings of any size without hardcoding dimensions
+const vector = customType<{
+  data: number[];
+  driverData: string;
+}>({
+  dataType() {
+    return "vector";
+  },
+  fromDriver(value: string): number[] {
+    // pgvector returns vectors as strings like "[1,2,3]"
+    return value
+      .slice(1, -1)
+      .split(",")
+      .map((v) => parseFloat(v));
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(",")}]`;
+  },
+});
 import { relations } from "drizzle-orm";
 
 // Servers table - main server configurations
@@ -33,14 +54,17 @@ export const servers = pgTable(
     startupWizardCompleted: boolean("startup_wizard_completed")
       .notNull()
       .default(false),
-    openAiApiToken: text("open_ai_api_token"),
     autoGenerateEmbeddings: boolean("auto_generate_embeddings")
       .notNull()
       .default(false),
-    ollamaApiToken: text("ollama_api_token"),
-    ollamaBaseUrl: text("ollama_base_url"),
-    ollamaModel: text("ollama_model"),
-    embeddingProvider: text("embedding_provider").default("openai"),
+
+    // Generic embedding configuration
+    // Supports any OpenAI-compatible API: OpenAI, Azure, Together AI, Fireworks, LocalAI, Ollama, vLLM, etc.
+    embeddingProvider: text("embedding_provider"), // "openai-compatible" | "ollama"
+    embeddingBaseUrl: text("embedding_base_url"),
+    embeddingApiKey: text("embedding_api_key"),
+    embeddingModel: text("embedding_model"),
+    embeddingDimensions: integer("embedding_dimensions").default(1536),
 
     // Sync status tracking
     syncStatus: text("sync_status").notNull().default("pending"), // pending, syncing, completed, failed
@@ -274,20 +298,18 @@ export const items = pgTable(
     rawData: jsonb("raw_data").notNull(), // Full Jellyfin BaseItemDto
 
     // AI and processing
-    embedding: vector("embedding", { dimensions: 1536 }),
+    // Vector column without fixed dimension - supports any embedding model
+    // Dimension is determined by the server's embeddingDimensions config
+    embedding: vector("embedding"),
     processed: boolean("processed").default(false),
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [
-    // Vector index for embedding similarity search
-    index("items_embedding_idx").using(
-      "hnsw",
-      table.embedding.op("vector_cosine_ops")
-    ),
-  ]
+  }
+  // Note: Vector index must be created manually per dimension using:
+  // CREATE INDEX items_embedding_idx ON items USING hnsw ((embedding::vector(N)) vector_cosine_ops)
+  // WHERE vector_dims(embedding) = N;
 );
 
 // Sessions table - user sessions and playback information
