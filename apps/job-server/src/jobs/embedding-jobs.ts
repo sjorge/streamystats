@@ -81,11 +81,18 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
 // Job: Generate embeddings for media items using different providers
 export async function generateItemEmbeddingsJob(job: any) {
   const startTime = Date.now();
-  const { serverId, provider, config } = job.data as {
+  const {
+    serverId,
+    provider: rawProvider,
+    config,
+  } = job.data as {
     serverId: number;
-    provider: "openai-compatible" | "ollama";
+    provider: "openai-compatible" | "openai" | "ollama"; // "openai" is legacy alias
     config: EmbeddingConfig;
   };
+
+  // Normalize legacy "openai" provider to "openai-compatible"
+  const provider = rawProvider === "openai" ? "openai-compatible" : rawProvider;
   let lastHeartbeat = Date.now();
 
   try {
