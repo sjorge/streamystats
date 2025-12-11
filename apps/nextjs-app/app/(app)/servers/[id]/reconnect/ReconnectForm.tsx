@@ -21,12 +21,14 @@ interface ReconnectFormProps {
   serverId: number;
   serverName: string;
   currentUrl: string;
+  showUnreachableAlert?: boolean;
 }
 
 export function ReconnectForm({
   serverId,
   serverName,
   currentUrl,
+  showUnreachableAlert = true,
 }: ReconnectFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -60,9 +62,8 @@ export function ReconnectForm({
       } else {
         toast.error(result.message);
       }
-    } catch (error) {
+    } catch {
       toast.error("An unexpected error occurred");
-      console.error("Error updating server connection:", error);
     } finally {
       setLoading(false);
     }
@@ -70,14 +71,16 @@ export function ReconnectForm({
 
   return (
     <div className="space-y-6">
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Server Unreachable</AlertTitle>
-        <AlertDescription>
-          Unable to connect to <strong>{serverName}</strong>. The Jellyfin
-          server may be offline, or the URL may have changed.
-        </AlertDescription>
-      </Alert>
+      {showUnreachableAlert && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Server Unreachable</AlertTitle>
+          <AlertDescription>
+            Unable to connect to <strong>{serverName}</strong>. The Jellyfin
+            server may be offline, or the URL may have changed.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader>

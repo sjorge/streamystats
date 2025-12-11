@@ -5,13 +5,17 @@ import { ReconnectForm } from "./ReconnectForm";
 
 export default async function ReconnectPage(props: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await props.params;
+  const { from } = await props.searchParams;
   const server = await getServer({ serverId: id });
 
   if (!server) {
     redirect("/setup");
   }
+
+  const showUnreachableAlert = from !== "settings";
 
   return (
     <Container className="flex flex-col items-center justify-center min-h-screen w-screen">
@@ -20,6 +24,7 @@ export default async function ReconnectPage(props: {
           serverId={server.id}
           serverName={server.name}
           currentUrl={server.url}
+          showUnreachableAlert={showUnreachableAlert}
         />
       </div>
     </Container>

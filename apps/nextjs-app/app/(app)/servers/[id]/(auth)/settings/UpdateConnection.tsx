@@ -1,6 +1,11 @@
 "use client";
 
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -13,7 +18,7 @@ export function UpdateConnection({ serverId }: UpdateConnectionProps) {
   const router = useRouter();
 
   const handleUpdateConnection = () => {
-    router.push(`/servers/${serverId}/reconnect`);
+    router.push(`/servers/${serverId}/reconnect?from=settings`);
   };
 
   return (
@@ -33,4 +38,3 @@ export function UpdateConnection({ serverId }: UpdateConnectionProps) {
     </Card>
   );
 }
-
