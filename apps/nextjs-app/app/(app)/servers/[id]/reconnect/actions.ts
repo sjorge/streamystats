@@ -49,7 +49,7 @@ export const updateServerConnectionAction = async ({
       c.set(
         "streamystats-user",
         JSON.stringify({
-          name: username,
+          name: result.username ?? username,
           id: result.userId,
           serverId,
         }),
@@ -83,4 +83,3 @@ export const updateServerConnectionAction = async ({
     };
   }
 };
-
