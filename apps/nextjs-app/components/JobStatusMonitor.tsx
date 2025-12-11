@@ -3,7 +3,7 @@
 import { fetch } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 
 interface JobStatusResponse {
@@ -98,15 +98,18 @@ interface JobStatusMonitorProps {
   refreshInterval?: number;
 }
 
+// Map to store toast IDs for each job
+type ToastMap = Map<string, string | number>;
+
 export function JobStatusMonitor({
   refreshInterval = 5000,
 }: JobStatusMonitorProps) {
-  const previousDataRef = useRef<JobStatusResponse | null>(null);
-  const activeToastsRef = useRef<Set<string>>(new Set());
+  const previousStatusRef = useRef<Record<string, string>>({});
+  const activeToastsRef = useRef<ToastMap>(new Map());
   const params = useParams();
   const serverId = params.id ? Number(params.id) : undefined;
 
-  const { data, isLoading, error } = useQuery({
+  const { data } = useQuery({
     queryKey: ["jobStatus"],
     queryFn: fetchJobStatus,
     refetchInterval: refreshInterval,
@@ -114,25 +117,58 @@ export function JobStatusMonitor({
     retryDelay: 5000,
   });
 
-  const [activeToasts, setActiveToasts] = useState<Set<string>>(new Set());
-
   useEffect(() => {
-    if (data?.jobStatusMap) {
-      // Check all processing jobs
-      Object.entries(data.jobStatusMap).forEach(([jobName, status]) => {
-        if (
-          status === "processing" &&
-          !data.jobStatusMap[`${jobName}-completed`]
-        ) {
-          if (!activeToasts.has(jobName)) {
-            toast.loading(`Processing ${jobName.replace(/-/g, " ")}...`);
-            setActiveToasts((prev) => new Set(prev).add(jobName));
-          }
+    if (!data?.jobStatusMap) return;
+
+    const previousStatus = previousStatusRef.current;
+    const activeToasts = activeToastsRef.current;
+
+    Object.entries(data.jobStatusMap).forEach(([jobName, status]) => {
+      const prevStatus = previousStatus[jobName];
+      const jobLabel = jobName.replace(/-/g, " ");
+
+      // Job started processing
+      if (status === "processing" && prevStatus !== "processing") {
+        // Dismiss any existing toast for this job
+        const existingToastId = activeToasts.get(jobName);
+        if (existingToastId) {
+          toast.dismiss(existingToastId);
         }
-      });
-    }
+        // Show new loading toast
+        const toastId = toast.loading(`Processing ${jobLabel}...`);
+        activeToasts.set(jobName, toastId);
+      }
+      // Job completed
+      else if (status === "completed" && prevStatus === "processing") {
+        const toastId = activeToasts.get(jobName);
+        if (toastId) {
+          toast.dismiss(toastId);
+          activeToasts.delete(jobName);
+        }
+        toast.success(`${jobLabel} completed`);
+      }
+      // Job failed
+      else if (status === "failed" && prevStatus === "processing") {
+        const toastId = activeToasts.get(jobName);
+        if (toastId) {
+          toast.dismiss(toastId);
+          activeToasts.delete(jobName);
+        }
+        toast.error(`${jobLabel} failed`);
+      }
+      // Job is no longer processing (catch-all for edge cases)
+      else if (status !== "processing" && activeToasts.has(jobName)) {
+        const toastId = activeToasts.get(jobName);
+        if (toastId) {
+          toast.dismiss(toastId);
+          activeToasts.delete(jobName);
+        }
+      }
+    });
+
+    // Update previous status
+    previousStatusRef.current = { ...data.jobStatusMap };
   }, [data]);
 
-  // This component now only manages toasts, no JSX rendering
   return null;
 }
