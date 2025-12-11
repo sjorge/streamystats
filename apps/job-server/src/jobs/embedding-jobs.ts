@@ -58,6 +58,7 @@ export async function generateItemEmbeddingsJob(job: any) {
     }
 
     let processedCount = 0;
+    let skippedCount = 0;
     let errorCount = 0;
 
     // Helper function to send heartbeat every 30 seconds
@@ -65,24 +66,10 @@ export async function generateItemEmbeddingsJob(job: any) {
       const now = Date.now();
       if (now - lastHeartbeat > 30000) {
         // 30 seconds
-        await logJobResult(
-          job.id,
-          "generate-item-embeddings",
-          "processing",
-          {
-            serverId,
-            provider,
-            status: "processing",
-            processed: processedCount,
-            total: unprocessedItems.length,
-            lastHeartbeat: new Date().toISOString(),
-          },
-          now - startTime
+        console.log(
+          `Embedding job heartbeat: ${processedCount}/${unprocessedItems.length} processed, ${skippedCount} skipped`
         );
         lastHeartbeat = now;
-        console.log(
-          `Embedding job heartbeat: ${processedCount}/${unprocessedItems.length} processed`
-        );
       }
     };
 
@@ -160,16 +147,32 @@ export async function generateItemEmbeddingsJob(job: any) {
           // Send heartbeat if needed
           await sendHeartbeat();
 
-          // Prepare all texts for the batch
-          const batchData = batch
-            .map((item) => {
-              const textToEmbed = prepareTextForEmbedding(item);
-              return textToEmbed.trim() ? { item, textToEmbed } : null;
-            })
-            .filter(Boolean) as { item: any; textToEmbed: string }[];
+          // Prepare all texts for the batch, track items to skip
+          const batchData: { item: Item; textToEmbed: string }[] = [];
+          const itemsToSkip: Item[] = [];
+
+          for (const item of batch) {
+            const textToEmbed = prepareTextForEmbedding(item);
+            if (textToEmbed.trim()) {
+              batchData.push({ item, textToEmbed });
+            } else {
+              itemsToSkip.push(item);
+            }
+          }
+
+          // Mark items with no text as processed (skip them permanently)
+          if (itemsToSkip.length > 0) {
+            for (const item of itemsToSkip) {
+              await db
+                .update(items)
+                .set({ processed: true })
+                .where(eq(items.id, item.id));
+              skippedCount++;
+            }
+          }
 
           if (batchData.length === 0) {
-            continue; // Skip if no valid texts in this batch
+            continue; // All items in batch were skipped
           }
 
           // Extract just the texts for the API call
@@ -295,7 +298,7 @@ export async function generateItemEmbeddingsJob(job: any) {
         }
       }
     } else if (provider === "ollama") {
-      // Keep Ollama processing unchanged - process items one by one
+      // Process items one by one for Ollama
       for (const item of unprocessedItems) {
         try {
           // Send heartbeat if needed
@@ -304,7 +307,12 @@ export async function generateItemEmbeddingsJob(job: any) {
           const textToEmbed = prepareTextForEmbedding(item);
 
           if (!textToEmbed.trim()) {
-            // Skip items without meaningful text
+            // Mark items without meaningful text as processed (skip permanently)
+            await db
+              .update(items)
+              .set({ processed: true })
+              .where(eq(items.id, item.id));
+            skippedCount++;
             continue;
           }
 
@@ -389,13 +397,19 @@ export async function generateItemEmbeddingsJob(job: any) {
       job.id,
       "generate-item-embeddings",
       "completed",
-      { serverId, provider, processed: processedCount, errors: errorCount },
+      {
+        serverId,
+        provider,
+        processed: processedCount,
+        skipped: skippedCount,
+        errors: errorCount,
+      },
       processingTime
     );
 
-    // If there are more items to process, queue another job
-    const remainingItems = await db
-      .select({ count: items.id })
+    // Check if there are more items to process using an efficient count query
+    const remainingCount = await db
+      .select({ count: sql<number>`count(*)` })
       .from(items)
       .where(
         and(
@@ -405,14 +419,17 @@ export async function generateItemEmbeddingsJob(job: any) {
         )
       );
 
-    if (remainingItems.length > 0) {
+    const remaining = Number(remainingCount[0]?.count ?? 0);
+
+    if (remaining > 0) {
       console.log(
-        `Queueing next batch for server ${serverId}, ${remainingItems.length} items remaining`
+        `Queueing next batch for server ${serverId}, ${remaining} items remaining`
       );
 
-      // Queue next batch using the job queue directly (more efficient than HTTP call)
+      // Queue next batch with singleton key to prevent duplicates
       try {
         const boss = await getJobQueue();
+        const singletonKey = `embedding-server-${serverId}`;
         const nextJobId = await boss.send(
           "generate-item-embeddings",
           {
@@ -423,59 +440,34 @@ export async function generateItemEmbeddingsJob(job: any) {
           {
             retryLimit: 3,
             retryDelay: 30, // 30 seconds
+            singletonKey, // Prevent duplicate jobs for same server
           }
         );
 
-        console.log(
-          `Successfully queued next embedding batch with job ID: ${nextJobId}`
-        );
+        if (nextJobId) {
+          console.log(
+            `Successfully queued next embedding batch with job ID: ${nextJobId}`
+          );
+        } else {
+          console.log(
+            `Embedding job for server ${serverId} already queued (singleton)`
+          );
+        }
       } catch (queueError) {
-        console.error(
-          "Failed to queue next embedding batch directly, falling back to HTTP call:",
-          queueError
-        );
-
-        // Fallback to HTTP call if direct queueing fails
-        setTimeout(async () => {
-          try {
-            // Construct job server URL with proper fallback
-            const jobServerUrl =
-              process.env.JOB_SERVER_URL &&
-              process.env.JOB_SERVER_URL !== "undefined"
-                ? process.env.JOB_SERVER_URL
-                : "http://localhost:3005";
-
-            const response = await fetch(
-              `${jobServerUrl}/api/jobs/start-embedding`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ serverId }),
-              }
-            );
-
-            if (!response.ok) {
-              console.error(
-                `Failed to queue next embedding batch via HTTP: ${response.statusText}`
-              );
-            } else {
-              console.log(
-                "Successfully queued next embedding batch via HTTP fallback"
-              );
-            }
-          } catch (httpError) {
-            console.error(
-              "Error in HTTP fallback for queueing next embedding batch:",
-              httpError
-            );
-          }
-        }, 1000); // 1 second delay
+        console.error("Failed to queue next embedding batch:", queueError);
       }
+    } else {
+      console.log(
+        `Embedding job complete for server ${serverId}. Processed: ${processedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`
+      );
     }
 
-    return { success: true, processed: processedCount, errors: errorCount };
+    return {
+      success: true,
+      processed: processedCount,
+      skipped: skippedCount,
+      errors: errorCount,
+    };
   } catch (error) {
     const processingTime = Date.now() - startTime;
     console.error(`Embedding job failed for server ${serverId}:`, error);
@@ -488,7 +480,6 @@ export async function generateItemEmbeddingsJob(job: any) {
         serverId,
         provider,
         error: error instanceof Error ? error.message : String(error),
-        processed: 0, // Include what was processed before failure
       },
       processingTime,
       error
