@@ -67,17 +67,26 @@ export const config = {
   ],
 };
 
-const ADMIN_ONLY_PATHS = ["history", "settings", "activities", "users", "setup"];
+const ADMIN_ONLY_PATHS = [
+  "history",
+  "settings",
+  "activities",
+  "users",
+  "setup",
+];
 const PUBLIC_PATHS = ["login"];
 
-const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
+const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&");
 
 /**
  * Parse URL pathname to extract server ID, page, and user name
  */
 const parsePathname = (pathname: string) => {
   const segments = basePath
-    ? pathname.replace(new RegExp(`^${BASE_PATH_REGEX}`), '').split("/").filter(Boolean)
+    ? pathname
+        .replace(new RegExp(`^${BASE_PATH_REGEX}`), "")
+        .split("/")
+        .filter(Boolean)
     : pathname.split("/").filter(Boolean);
 
   // Handle /setup
@@ -428,14 +437,19 @@ export async function middleware(request: NextRequest) {
     const isAdmin =
       adminResult.type === ResultType.Success ? adminResult.data : false;
 
-    // Check if user is trying to access another users page (/servers/{x}/users/[name])
-    if (name && (name !== meResult.data.name && !isAdmin)) {
-          return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+    // Check if user is trying to access another users page (/servers/{x}/users/[userId])
+    // Note: "name" here is actually the userId from URL, not the user's display name
+    if (name && name !== meResult.data.id && !isAdmin) {
+      return NextResponse.redirect(
+        new URL(`${basePath}/not-found`, request.url)
+      );
     }
 
     // Check admin permission for restricted paths
     if (page && !name && ADMIN_ONLY_PATHS.includes(page) && !isAdmin) {
-          return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+      return NextResponse.redirect(
+        new URL(`${basePath}/not-found`, request.url)
+      );
     }
   }
 
