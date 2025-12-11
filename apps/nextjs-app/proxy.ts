@@ -2,36 +2,35 @@ import { basePath } from "@/lib/utils";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getServers } from "./lib/server";
-import { eq, and } from "drizzle-orm";
-import { db, User, users } from "@streamystats/database";
 import { getServer } from "./lib/db/server";
+import { jwtVerify } from "jose";
 
 /**
- * Enhanced Middleware with Dual Authentication Validation
+ * Middleware with Signed Session Authentication
  *
- * This middleware provides comprehensive authentication and authorization for the Streamystats application.
- * It performs both local database validation and live Jellyfin server validation to ensure security.
- *
- * Key Security Features:
- * 1. **Dual Validation**: Checks both local database and live Jellyfin server for user validity
- * 2. **Token Verification**: Validates access tokens against the actual Jellyfin server using /Users/Me endpoint
- * 3. **Account Status Checks**: Verifies users are not disabled in either local DB or Jellyfin server
- * 4. **Server Connectivity Handling**: Gracefully handles server connectivity issues with appropriate headers
- * 5. **Automatic Cookie Cleanup**: Removes invalid cookies when authentication fails
+ * Security features:
+ * 1. **Signed Session Cookie**: Uses JWT to cryptographically sign session data, preventing tampering
+ * 2. **Token Verification**: Validates Jellyfin access token to ensure it hasn't expired
+ * 3. **Server Connectivity Handling**: Gracefully handles server connectivity issues
+ * 4. **Automatic Cookie Cleanup**: Removes invalid cookies when authentication fails
  *
  * Authentication Flow:
- * 1. Check if user exists in local database
- * 2. Verify user is not disabled locally
- * 3. Validate access token against Jellyfin server
- * 4. Confirm user ID matches and account is active on Jellyfin
- * 5. Clear cookies and redirect to login if any validation fails
- *
- * Error Handling:
- * - Server connectivity issues: Allow access but set warning headers
- * - Invalid/expired tokens: Clear cookies and redirect to login
- * - Disabled accounts: Deny access and redirect to login
- * - Network timeouts: Distinguish between auth failures and connectivity issues
+ * 1. Verify JWT signature on session cookie (tamper-proof)
+ * 2. Validate Jellyfin access token is still valid
+ * 3. Check server access and admin permissions
+ * 4. Clear cookies and redirect to login if validation fails
  */
+
+const SESSION_SECRET = new TextEncoder().encode(
+  process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production"
+);
+
+interface SessionUser {
+  id: string;
+  name: string;
+  serverId: number;
+  isAdmin: boolean;
+}
 
 enum ResultType {
   Success = "SUCCESS",
@@ -120,238 +119,135 @@ const parsePathname = (pathname: string) => {
   return {};
 };
 
-const getMe = async (request: NextRequest): Promise<Result<User>> => {
-  const userCookie = request.cookies.get("streamystats-user");
+/**
+ * Retrieves the user from the signed session cookie.
+ * The JWT signature ensures the cookie cannot be tampered with.
+ */
+const getSessionUser = async (
+  request: NextRequest
+): Promise<Result<SessionUser>> => {
+  const sessionCookie = request.cookies.get("streamystats-session");
 
-  try {
-    const me = userCookie?.value ? JSON.parse(userCookie.value) : undefined;
-    if (me?.name && me.serverId) {
-      const authResult = await validateUserAuth(request, me);
-      if (authResult.type === ResultType.Success) {
-        return {
-          type: ResultType.Success,
-          data: me,
-        };
-      } else if (authResult.type === ResultType.ServerConnectivityError) {
-        return {
-          type: ResultType.ServerConnectivityError,
-          error: authResult.error,
-        };
-      }
-      return {
-        type: ResultType.Error,
-        error: "Invalid user cookie",
-      };
-    }
-
-    console.warn("Missing required fields in cookie");
-  } catch (e) {
-    console.error(
-      "Failed to parse user cookie. The cookie probably has incorrect information.",
-      e
-    );
-  }
-
-  return {
-    type: ResultType.Error,
-    error: "Invalid user cookie",
-  };
-};
-
-const isUserAdmin = async (
-  request: NextRequest,
-  me: User
-): Promise<Result<boolean>> => {
-  try {
-    // Query the database directly instead of making an API call
-    const userResult = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.id, me.id), eq(users.serverId, me.serverId)))
-      .limit(1);
-
-    if (userResult.length === 0) {
-      return {
-        type: ResultType.Error,
-        error: "User not found in database",
-      };
-    }
-
-    const user = userResult[0];
-
-    // Return true if user has admin role/privileges
-    return {
-      type: ResultType.Success,
-      data: user.isAdministrator === true,
-    };
-  } catch (e) {
-    console.error("Failed to check if user is admin", e);
-
-    // Check if it's a database connectivity issue
-    if (
-      e instanceof Error &&
-      (e.message.includes("connection") ||
-        e.message.includes("timeout") ||
-        e.message.includes("ECONNREFUSED") ||
-        e.message.includes("ENOTFOUND"))
-    ) {
-      return {
-        type: ResultType.ServerConnectivityError,
-        error: "Database connectivity issue",
-      };
-    }
-
+  if (!sessionCookie?.value) {
     return {
       type: ResultType.Error,
-      error: "Failed to verify admin status",
+      error: "No session cookie found",
+    };
+  }
+
+  try {
+    // Verify JWT signature - this ensures the cookie hasn't been tampered with
+    const { payload } = await jwtVerify(sessionCookie.value, SESSION_SECRET);
+
+    const session: SessionUser = {
+      id: payload.id as string,
+      name: payload.name as string,
+      serverId: payload.serverId as number,
+      isAdmin: payload.isAdmin as boolean,
+    };
+
+    // Validate the Jellyfin token is still valid
+    const tokenValidation = await validateJellyfinToken(request, session);
+    if (tokenValidation.type !== ResultType.Success) {
+      return tokenValidation;
+    }
+
+    return {
+      type: ResultType.Success,
+      data: session,
+    };
+  } catch {
+    // JWT verification failed - invalid signature, expired, or malformed
+    return {
+      type: ResultType.Error,
+      error: "Invalid or expired session",
     };
   }
 };
 
 /**
- * @param me The user object from the cookie
- * Validates that the user stored in the cookie is valid and has access to the server.
- * This includes both database validation and actual Jellyfin server validation.
+ * Validates that the Jellyfin access token is still valid.
+ * This catches expired/revoked tokens even though the session JWT is valid.
  */
-const validateUserAuth = async (
+const validateJellyfinToken = async (
   request: NextRequest,
-  me: User
+  session: SessionUser
 ): Promise<Result<boolean>> => {
+  const tokenCookie = request.cookies.get("streamystats-token");
+  if (!tokenCookie?.value) {
+    return {
+      type: ResultType.Error,
+      error: "No access token found",
+    };
+  }
+
+  const server = await getServer({ serverId: session.serverId.toString() });
+  if (!server) {
+    return {
+      type: ResultType.Error,
+      error: "Server not found",
+    };
+  }
+
   try {
-    // First check if user exists in local database
-    const userResult = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.id, me.id), eq(users.serverId, me.serverId)))
-      .limit(1);
+    const jellyfinResponse = await fetch(`${server.url}/Users/Me`, {
+      method: "GET",
+      headers: {
+        "X-Emby-Token": tokenCookie.value,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(5000),
+    });
 
-    if (userResult.length === 0) {
-      return {
-        type: ResultType.Error,
-        error: "User not found in server",
-      };
-    }
-
-    const user = userResult[0];
-
-    // If user is disabled in our database, deny access
-    if (user.isDisabled) {
-      return {
-        type: ResultType.Error,
-        error: "User account is disabled",
-      };
-    }
-
-    // Get the access token from cookies
-    const tokenCookie = request.cookies.get("streamystats-token");
-    if (!tokenCookie?.value) {
-      return {
-        type: ResultType.Error,
-        error: "No access token found",
-      };
-    }
-
-    // Get server information to make the validation request
-    const server = await getServer({ serverId: me.serverId.toString() });
-    if (!server) {
-      return {
-        type: ResultType.Error,
-        error: "Server not found",
-      };
-    }
-
-    // Validate the user token against the actual Jellyfin server
-    try {
-      const jellyfinResponse = await fetch(`${server.url}/Users/Me`, {
-        method: "GET",
-        headers: {
-          "X-Emby-Token": tokenCookie.value,
-          "Content-Type": "application/json",
-        },
-        // Short timeout to avoid hanging requests in middleware
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!jellyfinResponse.ok) {
-        // Token is invalid or expired
-        if (jellyfinResponse.status === 401) {
-          return {
-            type: ResultType.Error,
-            error: "Access token is invalid or expired",
-          };
-        }
-        // Other errors indicate server issues
-        return {
-          type: ResultType.ServerConnectivityError,
-          error: `Jellyfin server returned ${jellyfinResponse.status}`,
-        };
-      }
-
-      const jellyfinUser = await jellyfinResponse.json();
-
-      // Verify the user ID matches what we expect
-      if (jellyfinUser.Id !== me.id) {
+    if (!jellyfinResponse.ok) {
+      if (jellyfinResponse.status === 401) {
         return {
           type: ResultType.Error,
-          error: "User ID mismatch",
+          error: "Access token is invalid or expired",
         };
       }
-
-      // Check if the user is disabled on the Jellyfin server
-      if (jellyfinUser.IsDisabled) {
-        return {
-          type: ResultType.Error,
-          error: "User account is disabled on Jellyfin server",
-        };
-      }
-
-      return { type: ResultType.Success, data: true };
-    } catch (error) {
-      console.error(
-        "Failed to validate user token with Jellyfin server",
-        error
-      );
-
-      // Check if it's a network/connectivity issue
-      if (
-        error instanceof Error &&
-        (error.name === "AbortError" ||
-          error.message.includes("timeout") ||
-          error.message.includes("connection") ||
-          error.message.includes("ECONNREFUSED") ||
-          error.message.includes("ENOTFOUND"))
-      ) {
-        return {
-          type: ResultType.ServerConnectivityError,
-          error: "Unable to connect to Jellyfin server",
-        };
-      }
-
       return {
-        type: ResultType.Error,
-        error: "Failed to verify user authentication with Jellyfin server",
+        type: ResultType.ServerConnectivityError,
+        error: `Jellyfin server returned ${jellyfinResponse.status}`,
       };
     }
-  } catch (e) {
-    console.error("Failed to validate user auth", e);
 
-    // Check if it's a database connectivity issue
+    const jellyfinUser = await jellyfinResponse.json();
+
+    // Verify the user ID matches the signed session
+    if (jellyfinUser.Id !== session.id) {
+      return {
+        type: ResultType.Error,
+        error: "User ID mismatch - session may be compromised",
+      };
+    }
+
+    if (jellyfinUser.IsDisabled) {
+      return {
+        type: ResultType.Error,
+        error: "User account is disabled on Jellyfin server",
+      };
+    }
+
+    return { type: ResultType.Success, data: true };
+  } catch (error) {
     if (
-      e instanceof Error &&
-      (e.message.includes("connection") ||
-        e.message.includes("timeout") ||
-        e.message.includes("ECONNREFUSED") ||
-        e.message.includes("ENOTFOUND"))
+      error instanceof Error &&
+      (error.name === "AbortError" ||
+        error.message.includes("timeout") ||
+        error.message.includes("connection") ||
+        error.message.includes("ECONNREFUSED") ||
+        error.message.includes("ENOTFOUND"))
     ) {
       return {
         type: ResultType.ServerConnectivityError,
-        error: "Database connectivity issue",
+        error: "Unable to connect to Jellyfin server",
       };
     }
 
     return {
       type: ResultType.Error,
-      error: "Failed to verify user authentication",
+      error: "Failed to verify Jellyfin token",
     };
   }
 };
@@ -380,12 +276,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Get user from cookies if exists
-  const meResult = await getMe(request);
+  // Get user from signed session cookie
+  const sessionResult = await getSessionUser(request);
 
   // Handle server connectivity error
-  if (meResult.type === ResultType.ServerConnectivityError) {
-    console.warn("Server connectivity issue detected.", meResult.error);
+  if (sessionResult.type === ResultType.ServerConnectivityError) {
+    console.warn("Server connectivity issue detected.", sessionResult.error);
 
     // If we're already on the reconnect page, allow access
     if (page === "reconnect") {
@@ -394,30 +290,20 @@ export async function proxy(request: NextRequest) {
 
     // Redirect to reconnect page
     if (id) {
-      const reconnectUrl = new URL(
-        `${basePath}/servers/${id}/reconnect`,
-        request.url
+      return NextResponse.redirect(
+        new URL(`${basePath}/servers/${id}/reconnect`, request.url)
       );
-      return NextResponse.redirect(reconnectUrl);
     } else if (servers.length > 0) {
-      const reconnectUrl = new URL(
-        `${basePath}/servers/${servers[0].id}/reconnect`,
-        request.url
+      return NextResponse.redirect(
+        new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url)
       );
-      return NextResponse.redirect(reconnectUrl);
     } else {
-      // No servers available, redirect to setup
       return NextResponse.redirect(new URL(`${basePath}/setup`, request.url));
     }
   }
 
   // If the user is not logged in or has invalid credentials
-  if (meResult.type === ResultType.Error) {
-    console.error(
-      "User authentication failed, removing cookies.",
-      meResult.error
-    );
-
+  if (sessionResult.type === ResultType.Error) {
     let redirectUrl: URL;
     if (id) {
       redirectUrl = new URL(`${basePath}/servers/${id}/login`, request.url);
@@ -427,68 +313,41 @@ export async function proxy(request: NextRequest) {
         request.url
       );
     } else {
-      // No servers available, redirect to setup
       redirectUrl = new URL(`${basePath}/setup`, request.url);
     }
 
     const response = NextResponse.redirect(redirectUrl);
 
-    // Clear invalid cookies
-    response.cookies.delete("streamystats-user");
+    // Clear all auth cookies
+    response.cookies.delete("streamystats-session");
     response.cookies.delete("streamystats-token");
+    response.cookies.delete("streamystats-user"); // Clean up legacy cookie
 
     return response;
   }
 
+  const session = sessionResult.data;
+
   // If the user is trying to access a server they are not a member of
-  if (meResult.type === ResultType.Success && id) {
-    if (Number(meResult.data.serverId) !== Number(id)) {
-      console.warn(
-        "User is trying to access a server they are not a member of"
-      );
-      return NextResponse.redirect(
-        new URL(`${basePath}/servers/${id}/login`, request.url)
-      );
-    }
-
-    const adminResult = await isUserAdmin(request, meResult.data);
-
-    // Handle server connectivity error when checking admin status
-    if (adminResult.type === ResultType.ServerConnectivityError) {
-      console.warn("Server connectivity issue detected.", adminResult.error);
-
-      // If we're already on the reconnect page, allow access
-      if (page === "reconnect") {
-        return NextResponse.next();
-      }
-
-      // Redirect to reconnect page (id is guaranteed to exist here from parent condition)
-      const reconnectUrl = new URL(
-        `${basePath}/servers/${id}/reconnect`,
-        request.url
-      );
-      return NextResponse.redirect(reconnectUrl);
-    }
-
-    const isAdmin =
-      adminResult.type === ResultType.Success ? adminResult.data : false;
-
-    // Check if user is trying to access another users page (/servers/{x}/users/[userId])
-    // Note: "name" here is actually the userId from URL, not the user's display name
-    if (name && name !== meResult.data.id && !isAdmin) {
-      return NextResponse.redirect(
-        new URL(`${basePath}/not-found`, request.url)
-      );
-    }
-
-    // Check admin permission for restricted paths
-    if (page && !name && ADMIN_ONLY_PATHS.includes(page) && !isAdmin) {
-      return NextResponse.redirect(
-        new URL(`${basePath}/not-found`, request.url)
-      );
-    }
+  if (id && session.serverId !== Number(id)) {
+    return NextResponse.redirect(
+      new URL(`${basePath}/servers/${id}/login`, request.url)
+    );
   }
 
-  // For all other cases, allow the request to proceed
+  // Admin status is stored in the signed session (tamper-proof)
+  const isAdmin = session.isAdmin;
+
+  // Check if user is trying to access another users page (/servers/{x}/users/[userId])
+  if (name && name !== session.id && !isAdmin) {
+    return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+  }
+
+  // Check admin permission for restricted paths
+  if (page && !name && ADMIN_ONLY_PATHS.includes(page) && !isAdmin) {
+    return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+  }
+
+  // Allow the request to proceed
   return NextResponse.next();
 }

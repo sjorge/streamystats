@@ -2,6 +2,7 @@
 
 import { NextRequest } from "next/server";
 import { Server } from "@streamystats/database";
+import { getSession, SessionUser } from "./session";
 
 /**
  * Validates API key from Authorization header against the actual Jellyfin server
@@ -41,8 +42,6 @@ export async function validateApiKey({
         // Short timeout to avoid hanging requests
         signal: AbortSignal.timeout(5000),
       });
-
-      console.log("response", response);
 
       // If the request succeeds, the API key is valid
       if (response.ok) {
@@ -119,4 +118,82 @@ export async function requireApiKey({
   }
 
   return null;
+}
+
+/**
+ * Requires a valid signed session cookie for API routes.
+ * Returns null if valid, Response object with 401 if invalid.
+ */
+export async function requireSession(): Promise<
+  | {
+      error: Response;
+      session: null;
+    }
+  | {
+      error: null;
+      session: SessionUser;
+    }
+> {
+  const session = await getSession();
+
+  if (!session) {
+    return {
+      error: new Response(
+        JSON.stringify({
+          error: "Unauthorized",
+          message: "Valid session required. Please log in.",
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      ),
+      session: null,
+    };
+  }
+
+  return { error: null, session };
+}
+
+/**
+ * Requires the user to be an admin based on the signed session.
+ * Returns null if valid admin, Response object if unauthorized.
+ */
+export async function requireAdmin(): Promise<
+  | {
+      error: Response;
+      session: null;
+    }
+  | {
+      error: null;
+      session: SessionUser;
+    }
+> {
+  const result = await requireSession();
+
+  if (result.error) {
+    return result;
+  }
+
+  if (!result.session.isAdmin) {
+    return {
+      error: new Response(
+        JSON.stringify({
+          error: "Forbidden",
+          message: "Admin privileges required.",
+        }),
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      ),
+      session: null,
+    };
+  }
+
+  return { error: null, session: result.session };
 }
