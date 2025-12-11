@@ -36,7 +36,7 @@
     "postgres": "^3.4.3",
     "uuid": "^11.1.0",
     "winston": "^3.11.0",
-    "drizzle-orm": "0.43.1"
+    "drizzle-orm": "0.45.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
