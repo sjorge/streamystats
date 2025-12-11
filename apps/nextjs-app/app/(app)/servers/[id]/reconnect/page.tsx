@@ -1,5 +1,3 @@
-"use server";
-
 import { Container } from "@/components/Container";
 import { getServer } from "@/lib/db/server";
 import { redirect } from "next/navigation";
@@ -27,4 +25,3 @@ export default async function ReconnectPage(props: {
     </Container>
   );
 }
-
