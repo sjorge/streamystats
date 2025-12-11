@@ -491,6 +491,7 @@ export interface UpdateServerConnectionResult {
   message: string;
   accessToken?: string;
   userId?: string;
+  username?: string;
   isAdmin?: boolean;
 }
 
@@ -500,7 +501,7 @@ export const updateServerConnection = async ({
   apiKey,
   username,
   password,
-  name
+  name,
 }: {
   serverId: number;
   url: string;
@@ -539,7 +540,8 @@ export const updateServerConnection = async ({
         } else if (testResponse.status === 404) {
           errorMessage = "Server not found. Please check the URL.";
         } else if (testResponse.status === 403) {
-          errorMessage = "Access denied. Please check your API key permissions.";
+          errorMessage =
+            "Access denied. Please check your API key permissions.";
         } else if (testResponse.status >= 500) {
           errorMessage =
             "Server error. Please check if Jellyfin server is running properly.";
@@ -570,15 +572,18 @@ export const updateServerConnection = async ({
       }
 
       // Authenticate user credentials against new server
-      const authResponse = await fetch(`${normalizedUrl}/Users/AuthenticateByName`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Emby-Token": apiKey,
-        },
-        body: JSON.stringify({ Username: username, Pw: password }),
-        signal: AbortSignal.timeout(5000),
-      });
+      const authResponse = await fetch(
+        `${normalizedUrl}/Users/AuthenticateByName`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Emby-Token": apiKey,
+          },
+          body: JSON.stringify({ Username: username, Pw: password }),
+          signal: AbortSignal.timeout(5000),
+        }
+      );
 
       if (!authResponse.ok) {
         return {
@@ -591,7 +596,7 @@ export const updateServerConnection = async ({
       }
 
       const authData = await authResponse.json();
-      
+
       // Validate authentication response structure
       if (!authData || !authData["AccessToken"]) {
         return {
@@ -599,25 +604,26 @@ export const updateServerConnection = async ({
           message: "Invalid authentication response from server",
         };
       }
-      
+
       const accessToken = authData["AccessToken"];
       const user = authData["User"];
-      
+
       if (!user || !user["Id"]) {
         return {
           success: false,
           message: "Invalid user data in authentication response",
         };
       }
-      
+
       const policy = user["Policy"];
       if (!policy) {
         return {
           success: false,
-          message: "Unable to verify user permissions. User policy information is missing.",
+          message:
+            "Unable to verify user permissions. User policy information is missing.",
         };
       }
-      
+
       const isAdmin = policy["IsAdministrator"] === true;
 
       // Verify user is an administrator
@@ -651,13 +657,15 @@ export const updateServerConnection = async ({
         message: "Server connection updated successfully",
         accessToken,
         userId: user.Id,
+        username: user.Name,
         isAdmin,
       };
     } catch (fetchError) {
       console.error("Error connecting to Jellyfin server:", fetchError);
       if (
         fetchError instanceof Error &&
-        (fetchError.name === "AbortError" || fetchError.message.includes("timeout"))
+        (fetchError.name === "AbortError" ||
+          fetchError.message.includes("timeout"))
       ) {
         return {
           success: false,
