@@ -175,7 +175,10 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   const handlePresetChange = (preset: PresetKey) => {
     setSelectedPreset(preset);
     const presetConfig = PROVIDER_PRESETS[preset];
-    if (preset !== "custom") {
+    if (preset === "custom") {
+      // Custom defaults to openai-compatible (user can still enter any URL)
+      setProvider("openai-compatible");
+    } else {
       setBaseUrl(presetConfig.baseUrl);
       setModel(presetConfig.defaultModel);
       setDimensions(presetConfig.defaultDimensions);
