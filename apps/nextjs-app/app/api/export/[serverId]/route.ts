@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { getServer } from "@/lib/db/server";
-import { db, sessions, activities, libraries } from "@streamystats/database";
+import { db, sessions } from "@streamystats/database";
 import { eq } from "drizzle-orm";
+import { requireAdmin } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,12 @@ export async function GET(
   { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
+    // Require admin for data export
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { serverId } = await params;
 
-    // Verify server exists and user has access
     const server = await getServer({ serverId });
     if (!server) {
       return new Response(JSON.stringify({ error: "Server not found" }), {
