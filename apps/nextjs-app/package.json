@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "migrate": "node-pg-migrate -T ts --tsconfig ./tsconfig.json",
     "migrate:up": "node-pg-migrate -T ts --tsconfig ./tsconfig.json up",
