@@ -2,6 +2,23 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.hiddenRecommendationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serversRelations = exports.hiddenRecommendations = exports.sessions = exports.items = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
+// Custom vector type that supports variable dimensions
+// This allows storing embeddings of any size without hardcoding dimensions
+const vector = (0, pg_core_1.customType)({
+    dataType() {
+        return "vector";
+    },
+    fromDriver(value) {
+        // pgvector returns vectors as strings like "[1,2,3]"
+        return value
+            .slice(1, -1)
+            .split(",")
+            .map((v) => parseFloat(v));
+    },
+    toDriver(value) {
+        return `[${value.join(",")}]`;
+    },
+});
 const drizzle_orm_1 = require("drizzle-orm");
 // Servers table - main server configurations
 exports.servers = (0, pg_core_1.pgTable)("servers", {
@@ -19,14 +36,16 @@ exports.servers = (0, pg_core_1.pgTable)("servers", {
     startupWizardCompleted: (0, pg_core_1.boolean)("startup_wizard_completed")
         .notNull()
         .default(false),
-    openAiApiToken: (0, pg_core_1.text)("open_ai_api_token"),
     autoGenerateEmbeddings: (0, pg_core_1.boolean)("auto_generate_embeddings")
         .notNull()
         .default(false),
-    ollamaApiToken: (0, pg_core_1.text)("ollama_api_token"),
-    ollamaBaseUrl: (0, pg_core_1.text)("ollama_base_url"),
-    ollamaModel: (0, pg_core_1.text)("ollama_model"),
-    embeddingProvider: (0, pg_core_1.text)("embedding_provider").default("openai"),
+    // Generic embedding configuration
+    // Supports any OpenAI-compatible API: OpenAI, Azure, Together AI, Fireworks, LocalAI, Ollama, vLLM, etc.
+    embeddingProvider: (0, pg_core_1.text)("embedding_provider"), // "openai-compatible" | "ollama"
+    embeddingBaseUrl: (0, pg_core_1.text)("embedding_base_url"),
+    embeddingApiKey: (0, pg_core_1.text)("embedding_api_key"),
+    embeddingModel: (0, pg_core_1.text)("embedding_model"),
+    embeddingDimensions: (0, pg_core_1.integer)("embedding_dimensions").default(1536),
     // Sync status tracking
     syncStatus: (0, pg_core_1.text)("sync_status").notNull().default("pending"), // pending, syncing, completed, failed
     syncProgress: (0, pg_core_1.text)("sync_progress").notNull().default("not_started"), // not_started, users, libraries, items, activities, completed
@@ -153,7 +172,7 @@ exports.jobResults = (0, pg_core_1.pgTable)("job_results", {
     status: (0, pg_core_1.varchar)("status", { length: 50 }).notNull(), // 'completed', 'failed', 'processing'
     result: (0, pg_core_1.jsonb)("result"),
     error: (0, pg_core_1.text)("error"),
-    processingTime: (0, pg_core_1.integer)("processing_time"), // in milliseconds
+    processingTime: (0, pg_core_1.integer)("processing_time"), // in milliseconds (capped at 1 hour)
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
 });
 // Items table - media items within servers
@@ -231,15 +250,18 @@ exports.items = (0, pg_core_1.pgTable)("items", {
     // Hybrid approach - complete BaseItemDto storage
     rawData: (0, pg_core_1.jsonb)("raw_data").notNull(), // Full Jellyfin BaseItemDto
     // AI and processing
-    embedding: (0, pg_core_1.vector)("embedding", { dimensions: 1536 }),
+    // Vector column without fixed dimension - supports any embedding model
+    // Dimension is determined by the server's embeddingDimensions config
+    embedding: vector("embedding"),
     processed: (0, pg_core_1.boolean)("processed").default(false),
     // Timestamps
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => [
-    // Vector index for embedding similarity search
-    (0, pg_core_1.index)("items_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
-]);
+}
+// Note: Vector index must be created manually per dimension using:
+// CREATE INDEX items_embedding_idx ON items USING hnsw ((embedding::vector(N)) vector_cosine_ops)
+// WHERE vector_dims(embedding) = N;
+);
 // Sessions table - user sessions and playback information
 exports.sessions = (0, pg_core_1.pgTable)("sessions", {
     // Primary key and relationships

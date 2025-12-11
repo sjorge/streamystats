@@ -159,25 +159,26 @@ router.post(
       if (!serverConfig.embeddingProvider) {
         return res.status(400).json({
           error:
-            "Embedding provider not configured. Please select either 'openai' or 'ollama' in the server settings.",
+            "Embedding provider not configured. Please configure it in server settings.",
         });
       }
 
       // Validate embedding configuration
-      if (
-        serverConfig.embeddingProvider === "openai" &&
-        !serverConfig.openAiApiToken
-      ) {
-        return res.status(400).json({ error: "OpenAI API key not configured" });
+      if (!serverConfig.embeddingBaseUrl || !serverConfig.embeddingModel) {
+        return res.status(400).json({
+          error:
+            "Embedding configuration incomplete. Please set base URL and model.",
+        });
       }
 
+      // API key required for openai-compatible, optional for ollama
       if (
-        serverConfig.embeddingProvider === "ollama" &&
-        (!serverConfig.ollamaBaseUrl || !serverConfig.ollamaModel)
+        serverConfig.embeddingProvider === "openai-compatible" &&
+        !serverConfig.embeddingApiKey
       ) {
-        return res
-          .status(400)
-          .json({ error: "Ollama configuration incomplete" });
+        return res.status(400).json({
+          error: "API key is required for OpenAI-compatible providers",
+        });
       }
 
       const boss = await getJobQueue();
@@ -185,10 +186,10 @@ router.post(
         serverId,
         provider: serverConfig.embeddingProvider,
         config: {
-          openaiApiKey: serverConfig.openAiApiToken,
-          ollamaBaseUrl: serverConfig.ollamaBaseUrl,
-          ollamaModel: serverConfig.ollamaModel,
-          ollamaApiToken: serverConfig.ollamaApiToken,
+          baseUrl: serverConfig.embeddingBaseUrl,
+          apiKey: serverConfig.embeddingApiKey,
+          model: serverConfig.embeddingModel,
+          dimensions: serverConfig.embeddingDimensions || 1536,
         },
       });
 
