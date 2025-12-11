@@ -19,6 +19,65 @@ const DEFAULT_MAX_TEXT_LENGTH = 8000;
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RATE_LIMIT_DELAY = 500;
 
+// Track if index has been ensured this session (per dimension)
+const indexEnsuredForDimension = new Set<number>();
+
+/**
+ * Ensure HNSW index exists for the given embedding dimension.
+ * pgvector requires indexes to be created with a specific dimension.
+ * This creates the index if it doesn't exist, improving similarity query performance.
+ */
+async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
+  // Skip if already ensured this session
+  if (indexEnsuredForDimension.has(dimensions)) {
+    return;
+  }
+
+  try {
+    // Check if an index exists and get its definition
+    const existingIndex = await db.execute<{
+      indexname: string;
+      indexdef: string;
+    }>(sql`
+      SELECT indexname, indexdef FROM pg_indexes 
+      WHERE tablename = 'items' 
+      AND indexname = 'items_embedding_idx'
+    `);
+
+    if (existingIndex.length > 0) {
+      const indexDef = existingIndex[0].indexdef;
+      // Check if the existing index matches our dimensions
+      const dimensionMatch = indexDef.match(/vector\((\d+)\)/);
+      if (dimensionMatch && parseInt(dimensionMatch[1]) === dimensions) {
+        // Index exists with correct dimensions
+        indexEnsuredForDimension.add(dimensions);
+        return;
+      }
+      // Index exists but with different dimensions - need to recreate
+      console.log(`Dropping existing index (dimension mismatch)...`);
+      await db.execute(sql`DROP INDEX IF EXISTS items_embedding_idx`);
+    }
+
+    // Create HNSW index for cosine similarity
+    // The cast to vector(N) allows the index to work with our variable-dimension column
+    console.log(
+      `Creating HNSW index for ${dimensions}-dimensional embeddings...`
+    );
+    await db.execute(sql`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS items_embedding_idx 
+      ON items 
+      USING hnsw ((embedding::vector(${sql.raw(
+        String(dimensions)
+      )})) vector_cosine_ops)
+    `);
+    console.log(`HNSW index created successfully for ${dimensions} dimensions`);
+    indexEnsuredForDimension.add(dimensions);
+  } catch (error) {
+    // Log but don't fail - queries will work, just slower
+    console.warn("Could not create embedding index:", error);
+  }
+}
+
 // Job: Generate embeddings for media items using different providers
 export async function generateItemEmbeddingsJob(job: any) {
   const startTime = Date.now();
@@ -381,6 +440,11 @@ export async function generateItemEmbeddingsJob(job: any) {
       },
       processingTime
     );
+
+    // Ensure HNSW index exists for similarity queries (only on first batch)
+    if (processedCount > 0) {
+      await ensureEmbeddingIndex(config.dimensions);
+    }
 
     // Check if there are more items to process using an efficient count query
     const remainingCount = await db
