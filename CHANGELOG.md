@@ -1,5 +1,38 @@
 # Changelog
 
+## [2.6.0](https://github.com/fredrikburmester/streamystats/compare/v2.5.0...v2.6.0) (2025-12-11)
+
+
+### Features
+
+* add new dialog to show statistics about the unique users ([0337eab](https://github.com/fredrikburmester/streamystats/commit/0337eab0d8cc59139f598160196a74cd2d7125d7))
+* better auth with signed token ([fec2db9](https://github.com/fredrikburmester/streamystats/commit/fec2db971a22208949e8fb3a9e5e3abd9927e0e1))
+* **database:** add migration to fix stale jobs & auto-cleanup old records ([78e31bf](https://github.com/fredrikburmester/streamystats/commit/78e31bf6f95429d2148eafb3da003320ca07de23))
+* index ([c4022d9](https://github.com/fredrikburmester/streamystats/commit/c4022d9e02ff43685fcb71fce60cae0cf22cc1e1))
+* move unique viewers stats to api ([2f2f416](https://github.com/fredrikburmester/streamystats/commit/2f2f4168c813aa271e5c11089f4393ae86995a14))
+* reconnection form on changed server base url ([776c3bc](https://github.com/fredrikburmester/streamystats/commit/776c3bc44a9196a783397ac7aa9e82eb5681a427))
+* support multiple ai servers / models for embedding ([0939e5a](https://github.com/fredrikburmester/streamystats/commit/0939e5a1a3b68514e1a790c6b1c0a14896a150bb))
+
+
+### Bug Fixes
+
+* add username ([3fbf4c3](https://github.com/fredrikburmester/streamystats/commit/3fbf4c33c0dbd02fc761d5b33ce6e4a0a2260b8b))
+* apply stale job cleanup fix to all cleanup functions ([f92e1d0](https://github.com/fredrikburmester/streamystats/commit/f92e1d0cac91ed834532b3be7f1725c32d2f10f6))
+* build issues ([113ff7a](https://github.com/fredrikburmester/streamystats/commit/113ff7ae03b7bc87bccd2aa3e924a592590387d4))
+* embedding index ([4a2d8d6](https://github.com/fredrikburmester/streamystats/commit/4a2d8d658bf4acd873cdea75744135089a42353d))
+* improve authentication response validation in server connection ([b8e7f72](https://github.com/fredrikburmester/streamystats/commit/b8e7f72983985b0e577bc3ac8068cf9248d5bf3f))
+* job issues ([f13c1c3](https://github.com/fredrikburmester/streamystats/commit/f13c1c3aa17ee07f03ce2af96bc7183fdbd79a9c))
+* **job-server:** update stale jobs instead of inserting duplicates ([c6a7d6a](https://github.com/fredrikburmester/streamystats/commit/c6a7d6a55f23ad897d62935a6a29312eadf46668))
+* logging ([b96fabe](https://github.com/fredrikburmester/streamystats/commit/b96fabe2196cc44d9486ceaf8ad5bcb68e255de3))
+* me issue for non admin users ([dca14de](https://github.com/fredrikburmester/streamystats/commit/dca14de9a21bc38956c26d968adc160df4e14076))
+* normalize server URL by removing trailing slashes ([fe7f6f4](https://github.com/fredrikburmester/streamystats/commit/fe7f6f49da1074e22807a76b2fb6bb07c4a94601))
+* provider name ([55aa421](https://github.com/fredrikburmester/streamystats/commit/55aa421a73b4c9df4d94cef00ac302802b0fa28b))
+* secure endpoint ([d515719](https://github.com/fredrikburmester/streamystats/commit/d515719a3bda087d1e956ce3e61f3f63ad3f99ef))
+* timestamp issue ([51dfffd](https://github.com/fredrikburmester/streamystats/commit/51dfffd0790d81024aee83354e1ebc76bf35c2cc))
+* toast fix ([b209827](https://github.com/fredrikburmester/streamystats/commit/b209827f6e8dd207ca91b95c47ec8288ee756b4a))
+* type issue ([1b57ca0](https://github.com/fredrikburmester/streamystats/commit/1b57ca0c65040e52de6cfdbc14b49b45eb4e565b))
+* username ([507201b](https://github.com/fredrikburmester/streamystats/commit/507201bc2a177d2b62b08ebbaedf709fd0cbbc40))
+
 ## [2.5.0](https://github.com/fredrikburmester/streamystats/compare/v2.4.0...v2.5.0) (2025-10-24)
 
 
