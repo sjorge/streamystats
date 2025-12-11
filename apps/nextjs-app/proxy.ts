@@ -54,7 +54,6 @@ type Result<T> =
     };
 
 export const config = {
-  runtime: "nodejs",
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
@@ -67,17 +66,26 @@ export const config = {
   ],
 };
 
-const ADMIN_ONLY_PATHS = ["history", "settings", "activities", "users", "setup"];
+const ADMIN_ONLY_PATHS = [
+  "history",
+  "settings",
+  "activities",
+  "users",
+  "setup",
+];
 const PUBLIC_PATHS = ["login", "reconnect"];
 
-const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
+const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&");
 
 /**
  * Parse URL pathname to extract server ID, page, and user name
  */
 const parsePathname = (pathname: string) => {
   const segments = basePath
-    ? pathname.replace(new RegExp(`^${BASE_PATH_REGEX}`), '').split("/").filter(Boolean)
+    ? pathname
+        .replace(new RegExp(`^${BASE_PATH_REGEX}`), "")
+        .split("/")
+        .filter(Boolean)
     : pathname.split("/").filter(Boolean);
 
   // Handle /setup
@@ -348,7 +356,7 @@ const validateUserAuth = async (
   }
 };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const { id, page, name } = parsePathname(pathname);
 
@@ -378,18 +386,24 @@ export async function middleware(request: NextRequest) {
   // Handle server connectivity error
   if (meResult.type === ResultType.ServerConnectivityError) {
     console.warn("Server connectivity issue detected.", meResult.error);
-    
+
     // If we're already on the reconnect page, allow access
     if (page === "reconnect") {
       return NextResponse.next();
     }
-    
+
     // Redirect to reconnect page
     if (id) {
-      const reconnectUrl = new URL(`${basePath}/servers/${id}/reconnect`, request.url);
+      const reconnectUrl = new URL(
+        `${basePath}/servers/${id}/reconnect`,
+        request.url
+      );
       return NextResponse.redirect(reconnectUrl);
     } else if (servers.length > 0) {
-      const reconnectUrl = new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url);
+      const reconnectUrl = new URL(
+        `${basePath}/servers/${servers[0].id}/reconnect`,
+        request.url
+      );
       return NextResponse.redirect(reconnectUrl);
     } else {
       // No servers available, redirect to setup
@@ -403,12 +417,15 @@ export async function middleware(request: NextRequest) {
       "User authentication failed, removing cookies.",
       meResult.error
     );
-    
+
     let redirectUrl: URL;
     if (id) {
       redirectUrl = new URL(`${basePath}/servers/${id}/login`, request.url);
     } else if (servers.length > 0) {
-      redirectUrl = new URL(`${basePath}/servers/${servers[0].id}/login`, request.url);
+      redirectUrl = new URL(
+        `${basePath}/servers/${servers[0].id}/login`,
+        request.url
+      );
     } else {
       // No servers available, redirect to setup
       redirectUrl = new URL(`${basePath}/setup`, request.url);
@@ -439,28 +456,36 @@ export async function middleware(request: NextRequest) {
     // Handle server connectivity error when checking admin status
     if (adminResult.type === ResultType.ServerConnectivityError) {
       console.warn("Server connectivity issue detected.", adminResult.error);
-      
+
       // If we're already on the reconnect page, allow access
       if (page === "reconnect") {
         return NextResponse.next();
       }
-      
+
       // Redirect to reconnect page (id is guaranteed to exist here from parent condition)
-      const reconnectUrl = new URL(`${basePath}/servers/${id}/reconnect`, request.url);
+      const reconnectUrl = new URL(
+        `${basePath}/servers/${id}/reconnect`,
+        request.url
+      );
       return NextResponse.redirect(reconnectUrl);
     }
 
     const isAdmin =
       adminResult.type === ResultType.Success ? adminResult.data : false;
 
-    // Check if user is trying to access another users page (/servers/{x}/users/[name])
-    if (name && (name !== meResult.data.name && !isAdmin)) {
-          return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+    // Check if user is trying to access another users page (/servers/{x}/users/[userId])
+    // Note: "name" here is actually the userId from URL, not the user's display name
+    if (name && name !== meResult.data.id && !isAdmin) {
+      return NextResponse.redirect(
+        new URL(`${basePath}/not-found`, request.url)
+      );
     }
 
     // Check admin permission for restricted paths
     if (page && !name && ADMIN_ONLY_PATHS.includes(page) && !isAdmin) {
-          return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+      return NextResponse.redirect(
+        new URL(`${basePath}/not-found`, request.url)
+      );
     }
   }
 

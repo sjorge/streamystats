@@ -19,7 +19,7 @@ export const getServers = async (): Promise<Server[]> => {
 };
 
 export const getServer = async ({
-  serverId
+  serverId,
 }: {
   serverId: number | string;
 }): Promise<Server | undefined> => {
@@ -35,7 +35,7 @@ export const getServer = async ({
  * @returns Promise<{ success: boolean; message: string }>
  */
 export const deleteServer = async ({
-  serverId
+  serverId,
 }: {
   serverId: number;
 }): Promise<{ success: boolean; message: string }> => {
@@ -74,76 +74,44 @@ export const deleteServer = async ({
 
 // Embedding-related functions
 
-export const saveOpenAIKey = async ({
-  serverId,
-  apiKey
-}: {
-  serverId: number;
-  apiKey: string;
-}) => {
-  try {
-    await db
-      .update(servers)
-      .set({ openAiApiToken: apiKey })
-      .where(eq(servers.id, serverId));
-  } catch (error) {
-    console.error(`Error saving OpenAI key for server ${serverId}:`, error);
-    throw new Error("Failed to save OpenAI API key");
-  }
-};
+export type EmbeddingProvider = "openai-compatible" | "ollama";
 
-export const saveOllamaConfig = async ({
+export interface EmbeddingConfig {
+  provider: EmbeddingProvider;
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+  dimensions?: number;
+}
+
+export const saveEmbeddingConfig = async ({
   serverId,
-  config
+  config,
 }: {
   serverId: number;
-  config: {
-    ollama_api_token?: string;
-    ollama_base_url: string;
-    ollama_model: string;
-  };
+  config: EmbeddingConfig;
 }) => {
   try {
     await db
       .update(servers)
       .set({
-        ollamaApiToken: config.ollama_api_token || null,
-        ollamaBaseUrl: config.ollama_base_url,
-        ollamaModel: config.ollama_model,
+        embeddingProvider: config.provider,
+        embeddingBaseUrl: config.baseUrl,
+        embeddingApiKey: config.apiKey || null,
+        embeddingModel: config.model,
+        embeddingDimensions: config.dimensions || 1536,
       })
       .where(eq(servers.id, serverId));
   } catch (error) {
-    console.error(`Error saving Ollama config for server ${serverId}:`, error);
-    throw new Error("Failed to save Ollama configuration");
-  }
-};
-
-export const saveEmbeddingProvider = async ({
-  serverId,
-  provider
-}: {
-  serverId: number;
-  provider: "openai" | "ollama";
-}) => {
-  try {
-    await db
-      .update(servers)
-      .set({ embeddingProvider: provider })
-      .where(eq(servers.id, serverId));
-  } catch (error) {
     console.error(
-      `Error saving embedding provider for server ${serverId}:`,
+      `Error saving embedding config for server ${serverId}:`,
       error
     );
-    throw new Error("Failed to save embedding provider");
+    throw new Error("Failed to save embedding configuration");
   }
 };
 
-export const clearEmbeddings = async ({
-  serverId
-}: {
-  serverId: number;
-}) => {
+export const clearEmbeddings = async ({ serverId }: { serverId: number }) => {
   try {
     // Clear all embeddings for items belonging to this server
     await db
@@ -161,10 +129,43 @@ export interface EmbeddingProgress {
   processed: number;
   percentage: number;
   status: string;
+  existingDimension: number | null;
 }
 
+// Get the dimension of existing embeddings for a server
+export const getExistingEmbeddingDimension = async ({
+  serverId,
+}: {
+  serverId: number;
+}): Promise<number | null> => {
+  try {
+    // Get one item with an embedding to check its dimension
+    const result = await db
+      .select({ embedding: items.embedding })
+      .from(items)
+      .where(
+        and(eq(items.serverId, serverId), sql`${items.embedding} IS NOT NULL`)
+      )
+      .limit(1);
+
+    if (result.length === 0 || !result[0].embedding) {
+      return null;
+    }
+
+    // The embedding is stored as an array
+    const embedding = result[0].embedding as number[];
+    return embedding.length;
+  } catch (error) {
+    console.error(
+      `Error getting embedding dimension for server ${serverId}:`,
+      error
+    );
+    return null;
+  }
+};
+
 export const getEmbeddingProgress = async ({
-  serverId
+  serverId,
 }: {
   serverId: number;
 }): Promise<EmbeddingProgress> => {
@@ -257,11 +258,15 @@ export const getEmbeddingProgress = async ({
 
     const percentage = total > 0 ? (processed / total) * 100 : 0;
 
+    // Get existing embedding dimension
+    const existingDimension = await getExistingEmbeddingDimension({ serverId });
+
     return {
       total,
       processed,
       percentage,
       status,
+      existingDimension,
     };
   } catch (error) {
     console.error(
@@ -303,21 +308,25 @@ export const cleanupStaleEmbeddingJobs = async (): Promise<number> => {
 
           // Only cleanup if no recent heartbeat (older than 2 minutes)
           if (heartbeatAge > 2 * 60 * 1000) {
-            await db.insert(jobResults).values({
-              jobId: `cleanup-${serverId}-${Date.now()}`,
-              jobName: "generate-item-embeddings",
-              status: "failed",
-              result: {
-                serverId,
-                error: "Job cleanup - exceeded maximum processing time",
-                cleanedAt: new Date().toISOString(),
-                originalJobId: staleJob.jobId,
-                staleDuration: heartbeatAge,
-              },
-              processingTime:
-                Date.now() - new Date(staleJob.createdAt).getTime(),
-              error: "Job exceeded maximum processing time without heartbeat",
-            });
+            const processingTime = Math.min(
+              Date.now() - new Date(staleJob.createdAt).getTime(),
+              3600000
+            );
+
+            await db
+              .update(jobResults)
+              .set({
+                status: "failed",
+                error: "Job exceeded maximum processing time without heartbeat",
+                processingTime,
+                result: {
+                  ...result,
+                  error: "Job cleanup - exceeded maximum processing time",
+                  cleanedAt: new Date().toISOString(),
+                  staleDuration: heartbeatAge,
+                },
+              })
+              .where(eq(jobResults.id, staleJob.id));
 
             cleanedCount++;
             console.log(
@@ -341,11 +350,7 @@ export const cleanupStaleEmbeddingJobs = async (): Promise<number> => {
   }
 };
 
-export const startEmbedding = async ({
-  serverId
-}: {
-  serverId: number;
-}) => {
+export const startEmbedding = async ({ serverId }: { serverId: number }) => {
   try {
     // Verify server exists and has valid config
     const server = await getServer({ serverId });
@@ -355,23 +360,32 @@ export const startEmbedding = async ({
 
     // Check if provider is configured
     if (!server.embeddingProvider) {
+      throw new Error("Please configure an embedding provider before starting");
+    }
+
+    if (!server.embeddingBaseUrl || !server.embeddingModel) {
       throw new Error(
-        "Please select an embedding provider (OpenAI or Ollama) before starting the embedding process"
+        "Embedding configuration incomplete. Please configure the base URL and model"
       );
     }
 
-    if (server.embeddingProvider === "openai" && !server.openAiApiToken) {
-      throw new Error(
-        "OpenAI API key not configured. Please add your API key before starting"
-      );
-    }
-
+    // API key is required for openai-compatible but optional for ollama
     if (
-      server.embeddingProvider === "ollama" &&
-      (!server.ollamaBaseUrl || !server.ollamaModel)
+      server.embeddingProvider === "openai-compatible" &&
+      !server.embeddingApiKey
     ) {
+      throw new Error("API key is required for OpenAI-compatible providers");
+    }
+
+    // Check if configured dimension matches existing embeddings
+    const existingDimension = await getExistingEmbeddingDimension({ serverId });
+    const configuredDimension = server.embeddingDimensions || 1536;
+
+    if (existingDimension && existingDimension !== configuredDimension) {
       throw new Error(
-        "Ollama configuration incomplete. Please configure the base URL and model before starting"
+        `Dimension mismatch: existing embeddings have ${existingDimension} dimensions, ` +
+          `but configured dimension is ${configuredDimension}. ` +
+          `Please clear existing embeddings before changing dimensions.`
       );
     }
 
@@ -412,11 +426,7 @@ export const startEmbedding = async ({
   }
 };
 
-export const stopEmbedding = async ({
-  serverId
-}: {
-  serverId: number;
-}) => {
+export const stopEmbedding = async ({ serverId }: { serverId: number }) => {
   try {
     // Construct job server URL with proper fallback
     const jobServerUrl =
@@ -457,7 +467,7 @@ export const stopEmbedding = async ({
 
 export const toggleAutoEmbeddings = async ({
   serverId,
-  enabled
+  enabled,
 }: {
   serverId: number;
   enabled: boolean;

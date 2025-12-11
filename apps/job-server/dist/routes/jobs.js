@@ -113,29 +113,31 @@ router.post("/start-embedding", async (req, res) => {
         // Check if embedding provider is configured
         if (!serverConfig.embeddingProvider) {
             return res.status(400).json({
-                error: "Embedding provider not configured. Please select either 'openai' or 'ollama' in the server settings.",
+                error: "Embedding provider not configured. Please configure it in server settings.",
             });
         }
         // Validate embedding configuration
-        if (serverConfig.embeddingProvider === "openai" &&
-            !serverConfig.openAiApiToken) {
-            return res.status(400).json({ error: "OpenAI API key not configured" });
+        if (!serverConfig.embeddingBaseUrl || !serverConfig.embeddingModel) {
+            return res.status(400).json({
+                error: "Embedding configuration incomplete. Please set base URL and model.",
+            });
         }
-        if (serverConfig.embeddingProvider === "ollama" &&
-            (!serverConfig.ollamaBaseUrl || !serverConfig.ollamaModel)) {
-            return res
-                .status(400)
-                .json({ error: "Ollama configuration incomplete" });
+        // API key required for openai-compatible, optional for ollama
+        if (serverConfig.embeddingProvider === "openai-compatible" &&
+            !serverConfig.embeddingApiKey) {
+            return res.status(400).json({
+                error: "API key is required for OpenAI-compatible providers",
+            });
         }
         const boss = await (0, queue_1.getJobQueue)();
         const jobId = await boss.send("generate-item-embeddings", {
             serverId,
             provider: serverConfig.embeddingProvider,
             config: {
-                openaiApiKey: serverConfig.openAiApiToken,
-                ollamaBaseUrl: serverConfig.ollamaBaseUrl,
-                ollamaModel: serverConfig.ollamaModel,
-                ollamaApiToken: serverConfig.ollamaApiToken,
+                baseUrl: serverConfig.embeddingBaseUrl,
+                apiKey: serverConfig.embeddingApiKey,
+                model: serverConfig.embeddingModel,
+                dimensions: serverConfig.embeddingDimensions || 1536,
             },
         });
         res.json({
@@ -1015,21 +1017,22 @@ router.post("/cleanup-stale", async (req, res) => {
                     const heartbeatAge = Date.now() - lastHeartbeat;
                     // Only cleanup if no recent heartbeat (older than 2 minutes)
                     if (heartbeatAge > 2 * 60 * 1000) {
-                        await database_1.db.insert(database_1.jobResults).values({
-                            jobId: `manual-cleanup-${serverId}-${Date.now()}`,
-                            jobName: "generate-item-embeddings",
+                        const processingTime = Math.min(Date.now() - new Date(staleJob.createdAt).getTime(), 3600000);
+                        await database_1.db
+                            .update(database_1.jobResults)
+                            .set({
                             status: "failed",
+                            error: "Manual cleanup: Job exceeded maximum processing time without heartbeat",
+                            processingTime,
                             result: {
-                                serverId,
+                                ...result,
                                 error: "Manual cleanup - job exceeded maximum processing time",
                                 cleanedAt: new Date().toISOString(),
-                                originalJobId: staleJob.jobId,
                                 staleDuration: heartbeatAge,
                                 cleanupType: "manual",
                             },
-                            processingTime: Date.now() - new Date(staleJob.createdAt).getTime(),
-                            error: "Manual cleanup: Job exceeded maximum processing time without heartbeat",
-                        });
+                        })
+                            .where((0, drizzle_orm_1.eq)(database_1.jobResults.id, staleJob.id));
                         cleanedCount++;
                         console.log(`Manually cleaned up stale embedding job for server ${serverId}`);
                     }

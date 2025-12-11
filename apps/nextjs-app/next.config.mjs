@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
   images: {
     remotePatterns: [
       {
@@ -15,7 +15,6 @@ const nextConfig = {
     ],
   },
   experimental: {
-    nodeMiddleware: true,
     serverActions: {
       bodySizeLimit: "500mb",
     },
