@@ -148,8 +148,17 @@ const getSessionUser = async (
 
     // Validate the Jellyfin token is still valid
     const tokenValidation = await validateJellyfinToken(request, session);
-    if (tokenValidation.type !== ResultType.Success) {
-      return tokenValidation;
+    if (tokenValidation.type === ResultType.Error) {
+      return {
+        type: ResultType.Error,
+        error: tokenValidation.error,
+      };
+    }
+    if (tokenValidation.type === ResultType.ServerConnectivityError) {
+      return {
+        type: ResultType.ServerConnectivityError,
+        error: tokenValidation.error,
+      };
     }
 
     return {
