@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Docker image tag (e.g., 2.2.0)"
+        description: "Docker image tag (e.g., v2.6.0)"
         required: true
         type: string
       push_to_registry:
