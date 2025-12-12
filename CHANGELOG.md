@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.6.1](https://github.com/fredrikburmester/streamystats/compare/v2.6.0...v2.6.1) (2025-12-12)
+
+
+### Bug Fixes
+
+* auth local connect ([97e83f1](https://github.com/fredrikburmester/streamystats/commit/97e83f12736c032a1d8d36c4223fbe8c198c26ca))
+* better logs ([4357274](https://github.com/fredrikburmester/streamystats/commit/435727465e8d676eb74d9581aa931e691b876cca))
+* better size ([d21efa1](https://github.com/fredrikburmester/streamystats/commit/d21efa1cdd382ad64bce46d73ca3d51c5248480b))
+* build ([0eff520](https://github.com/fredrikburmester/streamystats/commit/0eff5205defb83d003558e08a5db6b98cc7befce))
+* can't log in when using locally ([79c32c0](https://github.com/fredrikburmester/streamystats/commit/79c32c06bf428ba03a40e7803ea3cc8f828e0184))
+* colors ([d7486f5](https://github.com/fredrikburmester/streamystats/commit/d7486f523e2892395697c6d238e60a97dcb3fa0b))
+* label clarify ([8519762](https://github.com/fredrikburmester/streamystats/commit/851976292e6b83733cc590dbd19c0319914871ae))
+* logging setup ([cc4fbd0](https://github.com/fredrikburmester/streamystats/commit/cc4fbd0abb5b1854fa48017b8d709c14df0b243e))
+* stuck in sync servers ([50a4020](https://github.com/fredrikburmester/streamystats/commit/50a402000f8350f23c170adc06c40128eefaeb7e))
+* wrong unreachable status in reconnect form ([711b7fe](https://github.com/fredrikburmester/streamystats/commit/711b7fe94ba2d0c0493733bbac5b7a2ce435e148))
+
 ## [2.6.0](https://github.com/fredrikburmester/streamystats/compare/v2.5.0...v2.6.0) (2025-12-11)
 
 
