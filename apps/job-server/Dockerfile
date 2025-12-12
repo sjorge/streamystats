@@ -1,17 +1,17 @@
-# Dependencies stage - Full Bun
+# Dependencies stage - Only job-server deps
 FROM oven/bun:1-alpine AS deps
 
 WORKDIR /app
 
-# Copy workspace configuration
-COPY package.json bun.lock* ./
-
-# Copy all package.json files for workspace structure
+# Create minimal workspace structure
+COPY package.json bun.lock ./
 COPY packages/database/package.json ./packages/database/
 COPY apps/job-server/package.json ./apps/job-server/
-COPY apps/nextjs-app/package.json ./apps/nextjs-app/
 
-# Install dependencies with Bun
+# Create empty nextjs-app package.json to satisfy workspace but skip its deps
+RUN mkdir -p apps/nextjs-app && echo '{"name":"@streamystats/nextjs-app","version":"0.0.0","dependencies":{}}' > apps/nextjs-app/package.json
+
+# Install dependencies - this will only install job-server + database deps now
 RUN bun install --frozen-lockfile || bun install
 
 # Database build stage
@@ -32,7 +32,7 @@ RUN addgroup --system --gid 1001 bunjs && \
 
 WORKDIR /app
 
-# Copy dependencies
+# Copy node_modules (now much smaller without nextjs deps)
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=database-builder /app/packages/database ./packages/database
 
