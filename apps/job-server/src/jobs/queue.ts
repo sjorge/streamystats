@@ -1,11 +1,9 @@
 import PgBoss from "pg-boss";
-import * as dotenv from "dotenv";
 import {
   syncServerDataJob,
   addServerJob,
   generateItemEmbeddingsJob,
   sequentialServerSyncJob,
-  // Import Jellyfin sync workers
   jellyfinFullSyncWorker,
   jellyfinUsersSyncWorker,
   jellyfinLibrariesSyncWorker,
@@ -16,8 +14,6 @@ import {
   JELLYFIN_JOB_NAMES,
 } from "./workers";
 
-dotenv.config();
-
 let bossInstance: PgBoss | null = null;
 
 export async function getJobQueue(): Promise<PgBoss> {
@@ -25,7 +21,7 @@ export async function getJobQueue(): Promise<PgBoss> {
     return bossInstance;
   }
 
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = Bun.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is not set");
   }

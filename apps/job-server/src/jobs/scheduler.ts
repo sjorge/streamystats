@@ -16,7 +16,7 @@ class SyncScheduler {
 
   constructor() {
     // Auto-start if not explicitly disabled
-    const autoStart = process.env.SCHEDULER_AUTO_START !== "false";
+    const autoStart = Bun.env.SCHEDULER_AUTO_START !== "false";
     if (autoStart) {
       this.start();
     }
@@ -66,11 +66,14 @@ class SyncScheduler {
       });
 
       // Old job cleanup task - removes job results older than 10 days
-      const oldJobCleanupTask = cron.schedule(this.oldJobCleanupInterval, () => {
-        this.triggerOldJobCleanup().catch((error) => {
-          console.error("Error during scheduled old job cleanup:", error);
-        });
-      });
+      const oldJobCleanupTask = cron.schedule(
+        this.oldJobCleanupInterval,
+        () => {
+          this.triggerOldJobCleanup().catch((error) => {
+            console.error("Error during scheduled old job cleanup:", error);
+          });
+        }
+      );
 
       // Full sync task - daily complete sync
       const fullSyncTask = cron.schedule(this.fullSyncInterval, () => {
@@ -478,7 +481,8 @@ class SyncScheduler {
                 .update(jobResults)
                 .set({
                   status: "failed",
-                  error: "Job exceeded maximum processing time without heartbeat",
+                  error:
+                    "Job exceeded maximum processing time without heartbeat",
                   processingTime,
                   result: {
                     ...result,

@@ -3,8 +3,6 @@ import Bottleneck from "bottleneck";
 import pRetry from "p-retry";
 import { Server } from "@streamystats/database";
 import { JellyfinSession } from "./types";
-import { createHash } from "crypto";
-import * as dotenv from "dotenv";
 
 export interface JellyfinConfig {
   baseURL: string;

@@ -1,4 +1,4 @@
-import express from "express";
+import { Hono } from "hono";
 import { getJobQueue, JobTypes } from "../jobs/queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
 import {
@@ -6,30 +6,17 @@ import {
   servers,
   activities,
   users,
-  items,
   libraries,
-  sessions,
   jobResults,
-  Server,
-  JobResult,
+  type JobResult,
 } from "@streamystats/database";
 import { activityScheduler } from "../jobs/scheduler";
 import { sessionPoller } from "../jobs/session-poller";
 import { eq, desc, and, sql } from "drizzle-orm";
-import {
-  JobStatus,
-  JobStatusInfo,
-  JobStatusMapResponse,
-} from "../types/job-status";
+import type { JobStatus } from "../types/job-status";
 
-const router = express.Router();
+const app = new Hono();
 
-/**
- * Helper function to cancel jobs by name and optional server filter
- * @param jobName - The name of the job type to cancel
- * @param serverId - Optional server ID to filter jobs by
- * @returns Number of cancelled jobs
- */
 async function cancelJobsByName(
   jobName: string,
   serverId?: number
@@ -40,1289 +27,1141 @@ async function cancelJobsByName(
         serverId ? ` for server ${serverId}` : ""
       }`
     );
-
-    // Since pg-boss doesn't provide a built-in way to cancel jobs by name
-    // and direct database access is problematic, we'll use a different approach:
-    // Just return success and let the workers handle cleanup naturally
-
-    // Note: This is a limitation of pg-boss. The jobs will eventually timeout
-    // or complete naturally. For a production system, you might want to:
-    // 1. Add a cancellation flag to your job data
-    // 2. Have workers check this flag periodically
-    // 3. Use a separate redis/database to track cancellation requests
-
     console.log(`Marked jobs of type "${jobName}" for stopping`);
-    return 1; // Return success indicator
+    return 1;
   } catch (error) {
     console.error(`Error stopping jobs of type "${jobName}":`, error);
     throw new Error(`Failed to stop jobs of type "${jobName}": ${error}`);
   }
 }
 
-// POST /jobs/add-server - Add a new media server
-router.post(
-  "/add-server",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { name, url, apiKey } = req.body;
+app.post("/add-server", async (c) => {
+  try {
+    const { name, url, apiKey } = await c.req.json();
 
-      if (!name || !url || !apiKey) {
-        return res.status(400).json({
-          error: "Name, URL, and API key are required",
-        });
-      }
-
-      const boss = await getJobQueue();
-      const jobId = await boss.send(JobTypes.ADD_SERVER, { name, url, apiKey });
-
-      res.json({
-        success: true,
-        jobId,
-        message: "Add server job queued successfully",
-      });
-    } catch (error) {
-      console.error("Error queuing add server job:", error);
-      res.status(500).json({ error: "Failed to queue job" });
+    if (!name || !url || !apiKey) {
+      return c.json({ error: "Name, URL, and API key are required" }, 400);
     }
+
+    const boss = await getJobQueue();
+    const jobId = await boss.send(JobTypes.ADD_SERVER, { name, url, apiKey });
+
+    return c.json({
+      success: true,
+      jobId,
+      message: "Add server job queued successfully",
+    });
+  } catch (error) {
+    console.error("Error queuing add server job:", error);
+    return c.json({ error: "Failed to queue job" }, 500);
   }
-);
+});
 
-// POST /jobs/sync-server-data - Sync data from a media server
-router.post(
-  "/sync-server-data",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId, endpoint } = req.body;
+app.post("/sync-server-data", async (c) => {
+  try {
+    const { serverId, endpoint } = await c.req.json();
 
-      if (!serverId || !endpoint) {
-        return res.status(400).json({
-          error: "Server ID and endpoint are required",
-        });
-      }
+    if (!serverId || !endpoint) {
+      return c.json({ error: "Server ID and endpoint are required" }, 400);
+    }
 
-      const validEndpoints = [
-        "Users",
-        "Library/VirtualFolders",
-        "System/ActivityLog",
-      ];
-      if (!validEndpoints.includes(endpoint)) {
-        return res.status(400).json({
+    const validEndpoints = [
+      "Users",
+      "Library/VirtualFolders",
+      "System/ActivityLog",
+    ];
+    if (!validEndpoints.includes(endpoint)) {
+      return c.json(
+        {
           error: `Invalid endpoint. Must be one of: ${validEndpoints.join(
             ", "
           )}`,
-        });
-      }
-
-      const boss = await getJobQueue();
-      const jobId = await boss.send(JobTypes.SYNC_SERVER_DATA, {
-        serverId,
-        endpoint,
-      });
-
-      res.json({
-        success: true,
-        jobId,
-        message: `Sync ${endpoint} job queued successfully`,
-      });
-    } catch (error) {
-      console.error("Error queuing sync server data job:", error);
-      res.status(500).json({ error: "Failed to queue job" });
-    }
-  }
-);
-
-// POST /jobs/start-embedding - Start embedding generation for a server
-router.post(
-  "/start-embedding",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.body;
-
-      if (!serverId) {
-        return res.status(400).json({ error: "Server ID is required" });
-      }
-
-      // Get server configuration
-      const server = await db
-        .select()
-        .from(servers)
-        .where(eq(servers.id, serverId))
-        .limit(1);
-
-      if (!server.length) {
-        return res.status(404).json({ error: "Server not found" });
-      }
-
-      const serverConfig = server[0];
-
-      // Check if embedding provider is configured
-      if (!serverConfig.embeddingProvider) {
-        return res.status(400).json({
-          error:
-            "Embedding provider not configured. Please select either 'openai' or 'ollama' in the server settings.",
-        });
-      }
-
-      // Validate embedding configuration
-      if (
-        serverConfig.embeddingProvider === "openai" &&
-        !serverConfig.openAiApiToken
-      ) {
-        return res.status(400).json({ error: "OpenAI API key not configured" });
-      }
-
-      if (
-        serverConfig.embeddingProvider === "ollama" &&
-        (!serverConfig.ollamaBaseUrl || !serverConfig.ollamaModel)
-      ) {
-        return res
-          .status(400)
-          .json({ error: "Ollama configuration incomplete" });
-      }
-
-      const boss = await getJobQueue();
-      const jobId = await boss.send("generate-item-embeddings", {
-        serverId,
-        provider: serverConfig.embeddingProvider,
-        config: {
-          openaiApiKey: serverConfig.openAiApiToken,
-          ollamaBaseUrl: serverConfig.ollamaBaseUrl,
-          ollamaModel: serverConfig.ollamaModel,
-          ollamaApiToken: serverConfig.ollamaApiToken,
         },
-      });
-
-      res.json({
-        success: true,
-        jobId,
-        message: "Embedding generation job started successfully",
-      });
-    } catch (error) {
-      console.error("Error starting embedding job:", error);
-      res.status(500).json({ error: "Failed to start embedding job" });
-    }
-  }
-);
-
-// POST /jobs/stop-embedding - Stop embedding generation for a server
-router.post(
-  "/stop-embedding",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.body;
-
-      if (!serverId) {
-        return res.status(400).json({ error: "Server ID is required" });
-      }
-
-      // Use the helper function to cancel embedding jobs for the specific server
-      const cancelledCount = await cancelJobsByName(
-        "generate-item-embeddings",
-        serverId
+        400
       );
+    }
 
-      res.json({
-        success: true,
-        message: `Embedding jobs stopped successfully. ${cancelledCount} jobs cancelled.`,
-        cancelledCount,
-      });
-    } catch (error) {
-      console.error("Error stopping embedding job:", error);
-      res.status(500).json({
+    const boss = await getJobQueue();
+    const jobId = await boss.send(JobTypes.SYNC_SERVER_DATA, {
+      serverId,
+      endpoint,
+    });
+
+    return c.json({
+      success: true,
+      jobId,
+      message: `Sync ${endpoint} job queued successfully`,
+    });
+  } catch (error) {
+    console.error("Error queuing sync server data job:", error);
+    return c.json({ error: "Failed to queue job" }, 500);
+  }
+});
+
+app.post("/start-embedding", async (c) => {
+  try {
+    const { serverId } = await c.req.json();
+
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
+    }
+
+    const server = await db
+      .select()
+      .from(servers)
+      .where(eq(servers.id, serverId))
+      .limit(1);
+
+    if (!server.length) {
+      return c.json({ error: "Server not found" }, 404);
+    }
+
+    const serverConfig = server[0];
+
+    if (!serverConfig.embeddingProvider) {
+      return c.json(
+        {
+          error:
+            "Embedding provider not configured. Please configure it in server settings.",
+        },
+        400
+      );
+    }
+
+    if (!serverConfig.embeddingBaseUrl || !serverConfig.embeddingModel) {
+      return c.json(
+        {
+          error:
+            "Embedding configuration incomplete. Please set base URL and model.",
+        },
+        400
+      );
+    }
+
+    if (
+      serverConfig.embeddingProvider === "openai-compatible" &&
+      !serverConfig.embeddingApiKey
+    ) {
+      return c.json(
+        { error: "API key is required for OpenAI-compatible providers" },
+        400
+      );
+    }
+
+    const boss = await getJobQueue();
+    const jobId = await boss.send("generate-item-embeddings", {
+      serverId,
+      provider: serverConfig.embeddingProvider,
+      config: {
+        baseUrl: serverConfig.embeddingBaseUrl,
+        apiKey: serverConfig.embeddingApiKey,
+        model: serverConfig.embeddingModel,
+        dimensions: serverConfig.embeddingDimensions || 1536,
+      },
+    });
+
+    return c.json({
+      success: true,
+      jobId,
+      message: "Embedding generation job started successfully",
+    });
+  } catch (error) {
+    console.error("Error starting embedding job:", error);
+    return c.json({ error: "Failed to start embedding job" }, 500);
+  }
+});
+
+app.post("/stop-embedding", async (c) => {
+  try {
+    const { serverId } = await c.req.json();
+
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
+    }
+
+    const cancelledCount = await cancelJobsByName(
+      "generate-item-embeddings",
+      serverId
+    );
+
+    return c.json({
+      success: true,
+      message: `Embedding jobs stopped successfully. ${cancelledCount} jobs cancelled.`,
+      cancelledCount,
+    });
+  } catch (error) {
+    console.error("Error stopping embedding job:", error);
+    return c.json(
+      {
         error: "Failed to stop embedding job",
         details: error instanceof Error ? error.message : String(error),
-      });
-    }
+      },
+      500
+    );
   }
-);
+});
 
-// POST /jobs/cancel-by-type - Cancel all jobs of a specific type
-router.post(
-  "/cancel-by-type",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { jobType, serverId } = req.body;
+app.post("/cancel-by-type", async (c) => {
+  try {
+    const { jobType, serverId } = await c.req.json();
 
-      if (!jobType) {
-        return res.status(400).json({ error: "Job type is required" });
-      }
+    if (!jobType) {
+      return c.json({ error: "Job type is required" }, 400);
+    }
 
-      // Validate job type against known job types
-      const validJobTypes = [
-        JobTypes.SYNC_SERVER_DATA,
-        JobTypes.ADD_SERVER,
-        JobTypes.GENERATE_ITEM_EMBEDDINGS,
-        JobTypes.SEQUENTIAL_SERVER_SYNC,
-        ...Object.values(JELLYFIN_JOB_NAMES),
-      ];
+    const validJobTypes = [
+      JobTypes.SYNC_SERVER_DATA,
+      JobTypes.ADD_SERVER,
+      JobTypes.GENERATE_ITEM_EMBEDDINGS,
+      JobTypes.SEQUENTIAL_SERVER_SYNC,
+      ...Object.values(JELLYFIN_JOB_NAMES),
+    ];
 
-      if (!validJobTypes.includes(jobType)) {
-        return res.status(400).json({
-          error: "Invalid job type",
-          validTypes: validJobTypes,
-        });
-      }
+    if (!validJobTypes.includes(jobType)) {
+      return c.json(
+        { error: "Invalid job type", validTypes: validJobTypes },
+        400
+      );
+    }
 
-      // Use the helper function to cancel jobs
-      const cancelledCount = await cancelJobsByName(jobType, serverId);
+    const cancelledCount = await cancelJobsByName(jobType, serverId);
 
-      res.json({
-        success: true,
-        message: `Jobs of type "${jobType}" cancelled successfully. ${cancelledCount} jobs cancelled.`,
-        cancelledCount,
-        jobType,
-        serverId: serverId || null,
-      });
-    } catch (error) {
-      console.error("Error cancelling jobs by type:", error);
-      res.status(500).json({
+    return c.json({
+      success: true,
+      message: `Jobs of type "${jobType}" cancelled successfully. ${cancelledCount} jobs cancelled.`,
+      cancelledCount,
+      jobType,
+      serverId: serverId || null,
+    });
+  } catch (error) {
+    console.error("Error cancelling jobs by type:", error);
+    return c.json(
+      {
         error: "Failed to cancel jobs",
         details: error instanceof Error ? error.message : String(error),
-      });
-    }
+      },
+      500
+    );
   }
-);
+});
 
-// GET /jobs/servers - Get all servers
-router.get("/servers", async (req: express.Request, res: express.Response) => {
+app.get("/servers", async (c) => {
   try {
     const serversList = await db
       .select()
       .from(servers)
       .orderBy(desc(servers.createdAt));
 
-    res.json({
+    return c.json({
       success: true,
       servers: serversList,
       count: serversList.length,
     });
   } catch (error) {
     console.error("Error fetching servers:", error);
-    res.status(500).json({ error: "Failed to fetch servers" });
+    return c.json({ error: "Failed to fetch servers" }, 500);
   }
 });
 
-// GET /jobs/servers/:serverId/users - Get users for a specific server
-router.get(
-  "/servers/:serverId/users",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.params;
-      const usersList = await db
-        .select()
-        .from(users)
-        .where(eq(users.serverId, parseInt(serverId)))
-        .orderBy(desc(users.createdAt));
-
-      res.json({
-        success: true,
-        users: usersList,
-        count: usersList.length,
-      });
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ error: "Failed to fetch users" });
-    }
-  }
-);
-
-// GET /jobs/servers/:serverId/libraries - Get libraries for a specific server
-router.get(
-  "/servers/:serverId/libraries",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.params;
-      const librariesList = await db
-        .select()
-        .from(libraries)
-        .where(eq(libraries.serverId, parseInt(serverId)))
-        .orderBy(desc(libraries.createdAt));
-
-      res.json({
-        success: true,
-        libraries: librariesList,
-        count: librariesList.length,
-      });
-    } catch (error) {
-      console.error("Error fetching libraries:", error);
-      res.status(500).json({ error: "Failed to fetch libraries" });
-    }
-  }
-);
-
-// GET /jobs/servers/:serverId/activities - Get activities for a specific server
-router.get(
-  "/servers/:serverId/activities",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.params;
-      const { limit = 50 } = req.query;
-
-      const activitiesList = await db
-        .select()
-        .from(activities)
-        .where(eq(activities.serverId, parseInt(serverId)))
-        .orderBy(desc(activities.date))
-        .limit(Number(limit));
-
-      res.json({
-        success: true,
-        activities: activitiesList,
-        count: activitiesList.length,
-      });
-    } catch (error) {
-      console.error("Error fetching activities:", error);
-      res.status(500).json({ error: "Failed to fetch activities" });
-    }
-  }
-);
-
-// GET /jobs/:jobId/status - Get job status
-router.get(
-  "/:jobId/status",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { jobId } = req.params;
-
-      const boss = await getJobQueue();
-      const job = await boss.getJobById(jobId);
-
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-
-      res.json({
-        success: true,
-        job: {
-          id: job.id,
-          name: job.name,
-          state: job.state,
-          data: job.data,
-          output: job.output,
-          createdon: job.createdon,
-          startedon: job.startedon,
-          completedon: job.completedon,
-        },
-      });
-    } catch (error) {
-      console.error("Error fetching job status:", error);
-      res.status(500).json({ error: "Failed to fetch job status" });
-    }
-  }
-);
-
-// GET /jobs/results - Get job results from database
-router.get("/results", async (req: express.Request, res: express.Response) => {
+app.get("/servers/:serverId/users", async (c) => {
   try {
-    const { limit = 20, status, jobName } = req.query;
-
-    let query = db
+    const serverId = c.req.param("serverId");
+    const usersList = await db
       .select()
-      .from(jobResults)
-      .orderBy(desc(jobResults.createdAt));
+      .from(users)
+      .where(eq(users.serverId, parseInt(serverId)))
+      .orderBy(desc(users.createdAt));
+
+    return c.json({
+      success: true,
+      users: usersList,
+      count: usersList.length,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return c.json({ error: "Failed to fetch users" }, 500);
+  }
+});
+
+app.get("/servers/:serverId/libraries", async (c) => {
+  try {
+    const serverId = c.req.param("serverId");
+    const librariesList = await db
+      .select()
+      .from(libraries)
+      .where(eq(libraries.serverId, parseInt(serverId)))
+      .orderBy(desc(libraries.createdAt));
+
+    return c.json({
+      success: true,
+      libraries: librariesList,
+      count: librariesList.length,
+    });
+  } catch (error) {
+    console.error("Error fetching libraries:", error);
+    return c.json({ error: "Failed to fetch libraries" }, 500);
+  }
+});
+
+app.get("/servers/:serverId/activities", async (c) => {
+  try {
+    const serverId = c.req.param("serverId");
+    const limit = parseInt(c.req.query("limit") || "50");
+
+    const activitiesList = await db
+      .select()
+      .from(activities)
+      .where(eq(activities.serverId, parseInt(serverId)))
+      .orderBy(desc(activities.date))
+      .limit(limit);
+
+    return c.json({
+      success: true,
+      activities: activitiesList,
+      count: activitiesList.length,
+    });
+  } catch (error) {
+    console.error("Error fetching activities:", error);
+    return c.json({ error: "Failed to fetch activities" }, 500);
+  }
+});
+
+app.get("/:jobId/status", async (c) => {
+  try {
+    const jobId = c.req.param("jobId");
+
+    const boss = await getJobQueue();
+    const job = await boss.getJobById(jobId);
+
+    if (!job) {
+      return c.json({ error: "Job not found" }, 404);
+    }
+
+    return c.json({
+      success: true,
+      job: {
+        id: job.id,
+        name: job.name,
+        state: job.state,
+        data: job.data,
+        output: job.output,
+        createdon: job.createdon,
+        startedon: job.startedon,
+        completedon: job.completedon,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching job status:", error);
+    return c.json({ error: "Failed to fetch job status" }, 500);
+  }
+});
+
+app.get("/results", async (c) => {
+  try {
+    const limit = parseInt(c.req.query("limit") || "20");
+    const status = c.req.query("status");
+    const jobName = c.req.query("jobName");
 
     if (status) {
       const results = await db
         .select()
         .from(jobResults)
-        .where(eq(jobResults.status, status as string))
+        .where(eq(jobResults.status, status))
         .orderBy(desc(jobResults.createdAt))
-        .limit(Number(limit));
+        .limit(limit);
 
-      return res.json({
-        success: true,
-        results,
-        count: results.length,
-      });
+      return c.json({ success: true, results, count: results.length });
     }
 
     if (jobName) {
       const results = await db
         .select()
         .from(jobResults)
-        .where(eq(jobResults.jobName, jobName as string))
+        .where(eq(jobResults.jobName, jobName))
         .orderBy(desc(jobResults.createdAt))
-        .limit(Number(limit));
+        .limit(limit);
 
-      return res.json({
-        success: true,
-        results,
-        count: results.length,
-      });
+      return c.json({ success: true, results, count: results.length });
     }
 
-    const results = await query.limit(Number(limit));
+    const results = await db
+      .select()
+      .from(jobResults)
+      .orderBy(desc(jobResults.createdAt))
+      .limit(limit);
 
-    res.json({
-      success: true,
-      results,
-      count: results.length,
-    });
+    return c.json({ success: true, results, count: results.length });
   } catch (error) {
     console.error("Error fetching job results:", error);
-    res.status(500).json({ error: "Failed to fetch job results" });
+    return c.json({ error: "Failed to fetch job results" }, 500);
   }
 });
 
-// GET /jobs/queue/stats - Get queue statistics
-router.get(
-  "/queue/stats",
-  async (req: express.Request, res: express.Response) => {
+app.get("/queue/stats", async (c) => {
+  try {
+    const boss = await getJobQueue();
+
+    const stats = await Promise.all([
+      boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
+      boss.getQueueSize(JobTypes.ADD_SERVER),
+      boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
+      boss.getQueueSize(JobTypes.SEQUENTIAL_SERVER_SYNC),
+    ]);
+
+    return c.json({
+      success: true,
+      queueStats: {
+        syncServerData: stats[0],
+        addServer: stats[1],
+        generateItemEmbeddings: stats[2],
+        sequentialServerSync: stats[3],
+        total: stats.reduce((sum: number, stat: number) => sum + stat, 0),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching queue stats:", error);
+    return c.json({ error: "Failed to fetch queue stats" }, 500);
+  }
+});
+
+app.post("/test/add-test-server", async (c) => {
+  try {
+    const boss = await getJobQueue();
+    const jobId = await boss.send(JobTypes.ADD_SERVER, {
+      name: "Test Jellyfin Server",
+      url: "http://localhost:8096",
+      apiKey: "test-api-key",
+    });
+
+    return c.json({
+      success: true,
+      jobId,
+      message: "Test server addition job queued",
+    });
+  } catch (error) {
+    console.error("Error queuing test server job:", error);
+    return c.json({ error: "Failed to queue test job" }, 500);
+  }
+});
+
+app.post("/create-server", async (c) => {
+  console.log("[create-server] Starting server creation process");
+  try {
+    const body = await c.req.json();
+    const { name, url, apiKey, ...otherFields } = body;
+    console.log("[create-server] Received request:", {
+      name,
+      url,
+      apiKey: "[REDACTED]",
+      otherFields,
+    });
+
+    if (!name || !url || !apiKey) {
+      console.warn("[create-server] Missing required fields:", {
+        name: !!name,
+        url: !!url,
+        apiKey: !!apiKey,
+      });
+      return c.json({ error: "Name, URL, and API key are required" }, 400);
+    }
+
     try {
-      const boss = await getJobQueue();
-
-      // Get queue size for each job type
-      const stats = await Promise.all([
-        boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
-        boss.getQueueSize(JobTypes.ADD_SERVER),
-        boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
-        boss.getQueueSize(JobTypes.SEQUENTIAL_SERVER_SYNC),
-      ]);
-
-      res.json({
-        success: true,
-        queueStats: {
-          syncServerData: stats[0],
-          addServer: stats[1],
-          generateItemEmbeddings: stats[2],
-          sequentialServerSync: stats[3],
-          total: stats.reduce((sum: number, stat: number) => sum + stat, 0),
+      console.log("[create-server] Testing connection to server:", url);
+      const testResponse = await fetch(`${url}/System/Info`, {
+        headers: {
+          "X-Emby-Token": apiKey,
+          "Content-Type": "application/json",
         },
       });
-    } catch (error) {
-      console.error("Error fetching queue stats:", error);
-      res.status(500).json({ error: "Failed to fetch queue stats" });
-    }
-  }
-);
 
-// POST /jobs/test/add-test-server - Add a test Jellyfin server
-router.post(
-  "/test/add-test-server",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const boss = await getJobQueue();
-      const jobId = await boss.send(JobTypes.ADD_SERVER, {
-        name: "Test Jellyfin Server",
-        url: "http://localhost:8096",
-        apiKey: "test-api-key",
-      });
-
-      res.json({
-        success: true,
-        jobId,
-        message: "Test server addition job queued",
-      });
-    } catch (error) {
-      console.error("Error queuing test server job:", error);
-      res.status(500).json({ error: "Failed to queue test job" });
-    }
-  }
-);
-
-// POST /jobs/create-server - Create a new server and start full sync
-router.post(
-  "/create-server",
-  async (req: express.Request, res: express.Response) => {
-    console.log("[create-server] Starting server creation process");
-    try {
-      const { name, url, apiKey, ...otherFields } = req.body;
-      console.log("[create-server] Received request:", {
-        name,
-        url,
-        apiKey: "[REDACTED]",
-        otherFields,
-      });
-
-      if (!name || !url || !apiKey) {
-        console.warn("[create-server] Missing required fields:", {
-          name: !!name,
-          url: !!url,
-          apiKey: !!apiKey,
+      if (!testResponse.ok) {
+        console.error("[create-server] Server connection failed:", {
+          status: testResponse.status,
+          statusText: testResponse.statusText,
+          url,
         });
-        return res.status(400).json({
-          error: "Name, URL, and API key are required",
-        });
+
+        let errorMessage = "Failed to connect to server.";
+        if (testResponse.status === 401) {
+          errorMessage = "Invalid API key. Please check your Jellyfin API key.";
+        } else if (testResponse.status === 404) {
+          errorMessage = "Server not found. Please check the URL.";
+        } else if (testResponse.status === 403) {
+          errorMessage =
+            "Access denied. Please check your API key permissions.";
+        } else if (testResponse.status >= 500) {
+          errorMessage =
+            "Server error. Please check if Jellyfin server is running properly.";
+        } else {
+          errorMessage = `Failed to connect to server (${testResponse.status}). Please check URL and API key.`;
+        }
+
+        return c.json({ error: errorMessage }, 400);
       }
 
-      // Test connection to the server first
-      try {
-        console.log("[create-server] Testing connection to server:", url);
-        const testResponse = await fetch(`${url}/System/Info`, {
-          headers: {
-            "X-Emby-Token": apiKey,
-            "Content-Type": "application/json",
-          },
+      const serverInfo = (await testResponse.json()) as {
+        ServerName?: string;
+        Version?: string;
+        ProductName?: string;
+        OperatingSystem?: string;
+        StartupWizardCompleted?: boolean;
+      };
+
+      console.log(
+        "[create-server] Checking for existing server with URL:",
+        url
+      );
+      const existingServer = await db
+        .select({ id: servers.id, name: servers.name })
+        .from(servers)
+        .where(eq(servers.url, url))
+        .limit(1);
+
+      if (existingServer.length > 0) {
+        console.warn("[create-server] Server with this URL already exists:", {
+          existingServerId: existingServer[0].id,
+          existingServerName: existingServer[0].name,
+          url,
         });
-
-        if (!testResponse.ok) {
-          console.error("[create-server] Server connection failed:", {
-            status: testResponse.status,
-            statusText: testResponse.statusText,
-            url,
-          });
-
-          let errorMessage = "Failed to connect to server.";
-          if (testResponse.status === 401) {
-            errorMessage =
-              "Invalid API key. Please check your Jellyfin API key.";
-          } else if (testResponse.status === 404) {
-            errorMessage = "Server not found. Please check the URL.";
-          } else if (testResponse.status === 403) {
-            errorMessage =
-              "Access denied. Please check your API key permissions.";
-          } else if (testResponse.status >= 500) {
-            errorMessage =
-              "Server error. Please check if Jellyfin server is running properly.";
-          } else {
-            errorMessage = `Failed to connect to server (${testResponse.status}). Please check URL and API key.`;
-          }
-
-          return res.status(400).json({
-            error: errorMessage,
-          });
-        }
-
-        const serverInfo = (await testResponse.json()) as {
-          ServerName?: string;
-          Version?: string;
-          ProductName?: string;
-          OperatingSystem?: string;
-          StartupWizardCompleted?: boolean;
-        };
-
-        // Check if a server with this URL already exists
-        console.log(
-          "[create-server] Checking for existing server with URL:",
-          url
-        );
-        const existingServer = await db
-          .select({ id: servers.id, name: servers.name })
-          .from(servers)
-          .where(eq(servers.url, url))
-          .limit(1);
-
-        if (existingServer.length > 0) {
-          console.warn("[create-server] Server with this URL already exists:", {
-            existingServerId: existingServer[0].id,
-            existingServerName: existingServer[0].name,
-            url,
-          });
-          return res.status(409).json({
+        return c.json(
+          {
             error: "A server with this URL already exists",
             existingServer: existingServer[0],
-          });
-        }
+          },
+          409
+        );
+      }
 
-        // Create server record with additional info from server
-        const newServer = {
-          name: serverInfo.ServerName || name, // Use Jellyfin server name if available, fallback to provided name
-          url,
-          apiKey,
-          version: serverInfo.Version,
-          productName: serverInfo.ProductName,
-          operatingSystem: serverInfo.OperatingSystem,
-          startupWizardCompleted: serverInfo.StartupWizardCompleted || false,
-          syncStatus: "pending" as const,
-          syncProgress: "not_started" as const,
-          ...otherFields,
-        };
+      const newServer = {
+        name: serverInfo.ServerName || name,
+        url,
+        apiKey,
+        version: serverInfo.Version,
+        productName: serverInfo.ProductName,
+        operatingSystem: serverInfo.OperatingSystem,
+        startupWizardCompleted: serverInfo.StartupWizardCompleted || false,
+        syncStatus: "pending" as const,
+        syncProgress: "not_started" as const,
+        ...otherFields,
+      };
 
-        const [createdServer] = await db
-          .insert(servers)
-          .values(newServer)
-          .returning();
+      const [createdServer] = await db
+        .insert(servers)
+        .values(newServer)
+        .returning();
 
-        // Queue the sequential sync job
-        const boss = await getJobQueue();
-        const jobId = await boss.send(JobTypes.SEQUENTIAL_SERVER_SYNC, {
-          serverId: createdServer.id,
-        });
+      const boss = await getJobQueue();
+      const jobId = await boss.send(JobTypes.SEQUENTIAL_SERVER_SYNC, {
+        serverId: createdServer.id,
+      });
 
-        res.status(201).json({
+      return c.json(
+        {
           success: true,
           server: createdServer,
           syncJobId: jobId,
           message: "Server created successfully. Sync has been started.",
-        });
-      } catch (connectionError) {
-        console.error("[create-server] Connection error:", {
-          error:
-            connectionError instanceof Error
-              ? connectionError.message
-              : String(connectionError),
-          stack:
-            connectionError instanceof Error
-              ? connectionError.stack
-              : undefined,
-          url,
-        });
-        let errorMessage = "Failed to connect to server.";
-
-        if (connectionError instanceof Error) {
-          const message = connectionError.message.toLowerCase();
-          if (
-            message.includes("fetch failed") ||
-            message.includes("econnrefused")
-          ) {
-            errorMessage =
-              "Cannot reach server. Please check the URL and ensure the server is running.";
-          } else if (
-            message.includes("getaddrinfo notfound") ||
-            message.includes("dns")
-          ) {
-            errorMessage = "Server hostname not found. Please check the URL.";
-          } else if (message.includes("timeout")) {
-            errorMessage =
-              "Connection timeout. Please check the URL and server status.";
-          } else if (
-            message.includes("certificate") ||
-            message.includes("ssl") ||
-            message.includes("tls")
-          ) {
-            errorMessage =
-              "SSL/TLS certificate error. Please verify the server's certificate.";
-          } else {
-            errorMessage = `Connection failed: ${connectionError.message}`;
-          }
-        }
-
-        return res.status(400).json({
-          error: errorMessage,
-        });
-      }
-    } catch (error) {
-      console.error("[create-server] Unexpected error:", {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        },
+        201
+      );
+    } catch (connectionError) {
+      console.error("[create-server] Connection error:", {
+        error:
+          connectionError instanceof Error
+            ? connectionError.message
+            : String(connectionError),
+        stack:
+          connectionError instanceof Error ? connectionError.stack : undefined,
+        url,
       });
-      res.status(500).json({
+      let errorMessage = "Failed to connect to server.";
+
+      if (connectionError instanceof Error) {
+        const message = connectionError.message.toLowerCase();
+        if (
+          message.includes("fetch failed") ||
+          message.includes("econnrefused")
+        ) {
+          errorMessage =
+            "Cannot reach server. Please check the URL and ensure the server is running.";
+        } else if (
+          message.includes("getaddrinfo notfound") ||
+          message.includes("dns")
+        ) {
+          errorMessage = "Server hostname not found. Please check the URL.";
+        } else if (message.includes("timeout")) {
+          errorMessage =
+            "Connection timeout. Please check the URL and server status.";
+        } else if (
+          message.includes("certificate") ||
+          message.includes("ssl") ||
+          message.includes("tls")
+        ) {
+          errorMessage =
+            "SSL/TLS certificate error. Please verify the server's certificate.";
+        } else {
+          errorMessage = `Connection failed: ${connectionError.message}`;
+        }
+      }
+
+      return c.json({ error: errorMessage }, 400);
+    }
+  } catch (error) {
+    console.error("[create-server] Unexpected error:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return c.json(
+      {
         error: "Failed to create server",
         details: error instanceof Error ? error.message : String(error),
-      });
-    }
+      },
+      500
+    );
   }
-);
+});
 
-// GET /jobs/servers/:serverId/sync-status - Check sync status of a server
-router.get(
-  "/servers/:serverId/sync-status",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.params;
+app.get("/servers/:serverId/sync-status", async (c) => {
+  try {
+    const serverId = c.req.param("serverId");
 
-      const server = await db
-        .select({
-          id: servers.id,
-          name: servers.name,
-          syncStatus: servers.syncStatus,
-          syncProgress: servers.syncProgress,
-          syncError: servers.syncError,
-          lastSyncStarted: servers.lastSyncStarted,
-          lastSyncCompleted: servers.lastSyncCompleted,
-        })
-        .from(servers)
-        .where(eq(servers.id, parseInt(serverId)))
-        .limit(1);
+    const server = await db
+      .select({
+        id: servers.id,
+        name: servers.name,
+        syncStatus: servers.syncStatus,
+        syncProgress: servers.syncProgress,
+        syncError: servers.syncError,
+        lastSyncStarted: servers.lastSyncStarted,
+        lastSyncCompleted: servers.lastSyncCompleted,
+      })
+      .from(servers)
+      .where(eq(servers.id, parseInt(serverId)))
+      .limit(1);
 
-      if (!server.length) {
-        return res.status(404).json({
-          error: "Server not found",
-        });
-      }
+    if (!server.length) {
+      return c.json({ error: "Server not found" }, 404);
+    }
 
-      const serverData = server[0];
+    const serverData = server[0];
 
-      // Calculate sync progress percentage
-      const progressSteps = [
-        "not_started",
-        "users",
-        "libraries",
-        "items",
-        "activities",
-        "completed",
-      ];
-      const currentStepIndex = progressSteps.indexOf(serverData.syncProgress);
-      const progressPercentage =
-        currentStepIndex >= 0
-          ? (currentStepIndex / (progressSteps.length - 1)) * 100
-          : 0;
+    const progressSteps = [
+      "not_started",
+      "users",
+      "libraries",
+      "items",
+      "activities",
+      "completed",
+    ];
+    const currentStepIndex = progressSteps.indexOf(serverData.syncProgress);
+    const progressPercentage =
+      currentStepIndex >= 0
+        ? (currentStepIndex / (progressSteps.length - 1)) * 100
+        : 0;
 
-      // Determine if sync is complete and ready for redirect
-      const isReady =
-        serverData.syncStatus === "completed" &&
-        serverData.syncProgress === "completed";
+    const isReady =
+      serverData.syncStatus === "completed" &&
+      serverData.syncProgress === "completed";
 
-      res.json({
-        success: true,
-        server: {
-          ...serverData,
-          progressPercentage: Math.round(progressPercentage),
-          isReady,
-          canRedirect: isReady,
-        },
-      });
-    } catch (error) {
-      console.error("Error getting sync status:", error);
-      res.status(500).json({
+    return c.json({
+      success: true,
+      server: {
+        ...serverData,
+        progressPercentage: Math.round(progressPercentage),
+        isReady,
+        canRedirect: isReady,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting sync status:", error);
+    return c.json(
+      {
         error: "Failed to get sync status",
         details: error instanceof Error ? error.message : String(error),
-      });
-    }
+      },
+      500
+    );
   }
-);
+});
 
-// GET /jobs/scheduler/status - Get scheduler status
-router.get(
-  "/scheduler/status",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const status = activityScheduler.getStatus();
-      res.json({
-        success: true,
-        scheduler: status,
-      });
-    } catch (error) {
-      console.error("Error getting scheduler status:", error);
-      res.status(500).json({ error: "Failed to get scheduler status" });
-    }
+app.get("/scheduler/status", async (c) => {
+  try {
+    const status = activityScheduler.getStatus();
+    return c.json({ success: true, scheduler: status });
+  } catch (error) {
+    console.error("Error getting scheduler status:", error);
+    return c.json({ error: "Failed to get scheduler status" }, 500);
   }
-);
+});
 
-// POST /jobs/scheduler/trigger - Manually trigger activity sync for a server
-router.post(
-  "/scheduler/trigger",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.body;
+app.post("/scheduler/trigger", async (c) => {
+  try {
+    const { serverId } = await c.req.json();
 
-      if (!serverId) {
-        return res.status(400).json({ error: "Server ID is required" });
-      }
-
-      // Verify server exists
-      const server = await db
-        .select({ id: servers.id, name: servers.name })
-        .from(servers)
-        .where(eq(servers.id, parseInt(serverId)))
-        .limit(1);
-
-      if (!server.length) {
-        return res.status(404).json({ error: "Server not found" });
-      }
-
-      await activityScheduler.triggerServerActivitySync(parseInt(serverId));
-
-      res.json({
-        success: true,
-        message: `Activity sync triggered for server: ${server[0].name}`,
-      });
-    } catch (error) {
-      console.error("Error triggering activity sync:", error);
-      res.status(500).json({ error: "Failed to trigger activity sync" });
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
     }
-  }
-);
 
-// POST /jobs/scheduler/trigger-user-sync - Manually trigger user sync for a server
-router.post(
-  "/scheduler/trigger-user-sync",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.body;
+    const server = await db
+      .select({ id: servers.id, name: servers.name })
+      .from(servers)
+      .where(eq(servers.id, parseInt(serverId)))
+      .limit(1);
 
-      if (!serverId) {
-        return res.status(400).json({ error: "Server ID is required" });
-      }
-
-      // Verify server exists
-      const server = await db
-        .select({ id: servers.id, name: servers.name })
-        .from(servers)
-        .where(eq(servers.id, parseInt(serverId)))
-        .limit(1);
-
-      if (!server.length) {
-        return res.status(404).json({ error: "Server not found" });
-      }
-
-      await activityScheduler.triggerServerUserSync(parseInt(serverId));
-
-      res.json({
-        success: true,
-        message: `User sync triggered for server: ${server[0].name}`,
-      });
-    } catch (error) {
-      console.error("Error triggering user sync:", error);
-      res.status(500).json({ error: "Failed to trigger user sync" });
+    if (!server.length) {
+      return c.json({ error: "Server not found" }, 404);
     }
+
+    await activityScheduler.triggerServerActivitySync(parseInt(serverId));
+
+    return c.json({
+      success: true,
+      message: `Activity sync triggered for server: ${server[0].name}`,
+    });
+  } catch (error) {
+    console.error("Error triggering activity sync:", error);
+    return c.json({ error: "Failed to trigger activity sync" }, 500);
   }
-);
+});
 
-// POST /jobs/scheduler/trigger-full-sync - Manually trigger full sync for a server
-router.post(
-  "/scheduler/trigger-full-sync",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { serverId } = req.body;
+app.post("/scheduler/trigger-user-sync", async (c) => {
+  try {
+    const { serverId } = await c.req.json();
 
-      if (!serverId) {
-        return res.status(400).json({ error: "Server ID is required" });
-      }
-
-      // Verify server exists
-      const server = await db
-        .select({ id: servers.id, name: servers.name })
-        .from(servers)
-        .where(eq(servers.id, parseInt(serverId)))
-        .limit(1);
-
-      if (!server.length) {
-        return res.status(404).json({ error: "Server not found" });
-      }
-
-      await activityScheduler.triggerServerFullSync(parseInt(serverId));
-
-      res.json({
-        success: true,
-        message: `Full sync triggered for server: ${server[0].name}`,
-      });
-    } catch (error) {
-      console.error("Error triggering full sync:", error);
-      res.status(500).json({ error: "Failed to trigger full sync" });
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
     }
+
+    const server = await db
+      .select({ id: servers.id, name: servers.name })
+      .from(servers)
+      .where(eq(servers.id, parseInt(serverId)))
+      .limit(1);
+
+    if (!server.length) {
+      return c.json({ error: "Server not found" }, 404);
+    }
+
+    await activityScheduler.triggerServerUserSync(parseInt(serverId));
+
+    return c.json({
+      success: true,
+      message: `User sync triggered for server: ${server[0].name}`,
+    });
+  } catch (error) {
+    console.error("Error triggering user sync:", error);
+    return c.json({ error: "Failed to trigger user sync" }, 500);
   }
-);
+});
 
-// POST /jobs/scheduler/config - Update scheduler configuration
-router.post(
-  "/scheduler/config",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const {
-        activitySyncInterval,
-        recentItemsSyncInterval,
-        userSyncInterval,
-        fullSyncInterval,
-        enabled,
-      } = req.body;
+app.post("/scheduler/trigger-full-sync", async (c) => {
+  try {
+    const { serverId } = await c.req.json();
 
-      const config: any = {};
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
+    }
 
-      // Validate cron expression helper
-      const isValidCron = (expr: string) =>
-        /^(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)$/.test(
-          expr
+    const server = await db
+      .select({ id: servers.id, name: servers.name })
+      .from(servers)
+      .where(eq(servers.id, parseInt(serverId)))
+      .limit(1);
+
+    if (!server.length) {
+      return c.json({ error: "Server not found" }, 404);
+    }
+
+    await activityScheduler.triggerServerFullSync(parseInt(serverId));
+
+    return c.json({
+      success: true,
+      message: `Full sync triggered for server: ${server[0].name}`,
+    });
+  } catch (error) {
+    console.error("Error triggering full sync:", error);
+    return c.json({ error: "Failed to trigger full sync" }, 500);
+  }
+});
+
+app.post("/scheduler/config", async (c) => {
+  try {
+    const body = await c.req.json();
+    const {
+      activitySyncInterval,
+      recentItemsSyncInterval,
+      userSyncInterval,
+      fullSyncInterval,
+      enabled,
+    } = body;
+
+    const config: Record<string, string | boolean> = {};
+
+    const isValidCron = (expr: string) =>
+      /^(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)\s+(\*|[0-9,-/\*]+)$/.test(
+        expr
+      );
+
+    if (typeof activitySyncInterval === "string") {
+      if (!isValidCron(activitySyncInterval)) {
+        return c.json(
+          { error: "Invalid activity sync cron expression format" },
+          400
         );
-
-      if (typeof activitySyncInterval === "string") {
-        if (!isValidCron(activitySyncInterval)) {
-          return res.status(400).json({
-            error: "Invalid activity sync cron expression format",
-          });
-        }
-        config.activitySyncInterval = activitySyncInterval;
       }
-
-      if (typeof recentItemsSyncInterval === "string") {
-        if (!isValidCron(recentItemsSyncInterval)) {
-          return res.status(400).json({
-            error: "Invalid recent items sync cron expression format",
-          });
-        }
-        config.recentItemsSyncInterval = recentItemsSyncInterval;
-      }
-
-      if (typeof userSyncInterval === "string") {
-        if (!isValidCron(userSyncInterval)) {
-          return res.status(400).json({
-            error: "Invalid user sync cron expression format",
-          });
-        }
-        config.userSyncInterval = userSyncInterval;
-      }
-
-      if (typeof fullSyncInterval === "string") {
-        if (!isValidCron(fullSyncInterval)) {
-          return res.status(400).json({
-            error: "Invalid full sync cron expression format",
-          });
-        }
-        config.fullSyncInterval = fullSyncInterval;
-      }
-
-      if (typeof enabled === "boolean") {
-        config.enabled = enabled;
-      }
-
-      if (Object.keys(config).length === 0) {
-        return res.status(400).json({
-          error: "No valid configuration provided",
-        });
-      }
-
-      activityScheduler.updateConfig(config);
-      const newStatus = activityScheduler.getStatus();
-
-      res.json({
-        success: true,
-        message: "Scheduler configuration updated",
-        scheduler: newStatus,
-      });
-    } catch (error) {
-      console.error("Error updating scheduler config:", error);
-      res
-        .status(500)
-        .json({ error: "Failed to update scheduler configuration" });
+      config.activitySyncInterval = activitySyncInterval;
     }
+
+    if (typeof recentItemsSyncInterval === "string") {
+      if (!isValidCron(recentItemsSyncInterval)) {
+        return c.json(
+          { error: "Invalid recent items sync cron expression format" },
+          400
+        );
+      }
+      config.recentItemsSyncInterval = recentItemsSyncInterval;
+    }
+
+    if (typeof userSyncInterval === "string") {
+      if (!isValidCron(userSyncInterval)) {
+        return c.json(
+          { error: "Invalid user sync cron expression format" },
+          400
+        );
+      }
+      config.userSyncInterval = userSyncInterval;
+    }
+
+    if (typeof fullSyncInterval === "string") {
+      if (!isValidCron(fullSyncInterval)) {
+        return c.json(
+          { error: "Invalid full sync cron expression format" },
+          400
+        );
+      }
+      config.fullSyncInterval = fullSyncInterval;
+    }
+
+    if (typeof enabled === "boolean") {
+      config.enabled = enabled;
+    }
+
+    if (Object.keys(config).length === 0) {
+      return c.json({ error: "No valid configuration provided" }, 400);
+    }
+
+    activityScheduler.updateConfig(config);
+    const newStatus = activityScheduler.getStatus();
+
+    return c.json({
+      success: true,
+      message: "Scheduler configuration updated",
+      scheduler: newStatus,
+    });
+  } catch (error) {
+    console.error("Error updating scheduler config:", error);
+    return c.json({ error: "Failed to update scheduler configuration" }, 500);
   }
-);
+});
 
-// GET /jobs/server-status - Get comprehensive server status and monitoring info
-router.get(
-  "/server-status",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const boss = await getJobQueue();
+app.get("/server-status", async (c) => {
+  try {
+    const boss = await getJobQueue();
 
-      // Get basic queue statistics for all job types
-      const queueSizes = await Promise.all([
-        boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
-        boss.getQueueSize(JobTypes.ADD_SERVER),
-        boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
-        boss.getQueueSize(JobTypes.SEQUENTIAL_SERVER_SYNC),
-      ]);
+    const queueSizes = await Promise.all([
+      boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
+      boss.getQueueSize(JobTypes.ADD_SERVER),
+      boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
+      boss.getQueueSize(JobTypes.SEQUENTIAL_SERVER_SYNC),
+    ]);
 
-      // Get Jellyfin job queue sizes
-      const jellyfinQueueSizes = await Promise.all([
-        boss.getQueueSize(JELLYFIN_JOB_NAMES.FULL_SYNC),
-        boss.getQueueSize(JELLYFIN_JOB_NAMES.USERS_SYNC),
-        boss.getQueueSize(JELLYFIN_JOB_NAMES.LIBRARIES_SYNC),
-        boss.getQueueSize(JELLYFIN_JOB_NAMES.ITEMS_SYNC),
-        boss.getQueueSize(JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC),
-        boss.getQueueSize(JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC),
-        boss.getQueueSize(JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC),
-      ]);
+    const jellyfinQueueSizes = await Promise.all([
+      boss.getQueueSize(JELLYFIN_JOB_NAMES.FULL_SYNC),
+      boss.getQueueSize(JELLYFIN_JOB_NAMES.USERS_SYNC),
+      boss.getQueueSize(JELLYFIN_JOB_NAMES.LIBRARIES_SYNC),
+      boss.getQueueSize(JELLYFIN_JOB_NAMES.ITEMS_SYNC),
+      boss.getQueueSize(JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC),
+      boss.getQueueSize(JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC),
+      boss.getQueueSize(JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC),
+    ]);
 
-      // Get server status from database
-      const allServers = await db
-        .select({
-          id: servers.id,
-          name: servers.name,
-          url: servers.url,
-          syncStatus: servers.syncStatus,
-          syncProgress: servers.syncProgress,
-          syncError: servers.syncError,
-          lastSyncStarted: servers.lastSyncStarted,
-          lastSyncCompleted: servers.lastSyncCompleted,
-          createdAt: servers.createdAt,
-          updatedAt: servers.updatedAt,
-        })
-        .from(servers);
+    const allServers = await db
+      .select({
+        id: servers.id,
+        name: servers.name,
+        url: servers.url,
+        syncStatus: servers.syncStatus,
+        syncProgress: servers.syncProgress,
+        syncError: servers.syncError,
+        lastSyncStarted: servers.lastSyncStarted,
+        lastSyncCompleted: servers.lastSyncCompleted,
+        createdAt: servers.createdAt,
+        updatedAt: servers.updatedAt,
+      })
+      .from(servers);
 
-      // Get scheduler and session poller status
-      const schedulerStatus = activityScheduler.getStatus();
-      const sessionPollerStatus = sessionPoller.getStatus();
+    const schedulerStatus = activityScheduler.getStatus();
+    const sessionPollerStatus = sessionPoller.getStatus();
 
-      // Get recent job results
-      const recentJobResults = await db
-        .select()
-        .from(jobResults)
-        .orderBy(desc(jobResults.createdAt))
-        .limit(10);
+    const recentJobResults = await db
+      .select()
+      .from(jobResults)
+      .orderBy(desc(jobResults.createdAt))
+      .limit(10);
 
-      // Build simple job status map (job-name: status)
-      const jobStatusMap: Record<string, JobStatus> = {};
+    const jobStatusMap: Record<string, JobStatus> = {};
 
-      // Get recent job results for the status map
-      const dbJobResults = await db
-        .select()
-        .from(jobResults)
-        .orderBy(desc(jobResults.createdAt))
-        .limit(100);
+    const dbJobResults = await db
+      .select()
+      .from(jobResults)
+      .orderBy(desc(jobResults.createdAt))
+      .limit(100);
 
-      // Group jobs by job name and get the most recent status for each
-      const jobGroups: Record<string, { status: JobStatus; createdAt: Date }> =
-        {};
+    const jobGroups: Record<string, { status: JobStatus; createdAt: Date }> =
+      {};
 
-      for (const result of dbJobResults) {
-        const jobName = result.jobName;
-        const resultDate = new Date(result.createdAt);
+    for (const result of dbJobResults) {
+      const resultJobName = result.jobName;
+      const resultDate = new Date(result.createdAt);
 
-        // Only keep the most recent job for each job type
-        if (!jobGroups[jobName] || resultDate > jobGroups[jobName].createdAt) {
-          jobGroups[jobName] = {
-            status: result.status as JobStatus,
-            createdAt: resultDate,
-          };
-        }
+      if (
+        !jobGroups[resultJobName] ||
+        resultDate > jobGroups[resultJobName].createdAt
+      ) {
+        jobGroups[resultJobName] = {
+          status: result.status as JobStatus,
+          createdAt: resultDate,
+        };
       }
+    }
 
-      // Set status based on most recent job for each type
-      for (const [jobName, jobInfo] of Object.entries(jobGroups)) {
-        jobStatusMap[jobName] = jobInfo.status;
-      }
+    for (const [resultJobName, jobInfo] of Object.entries(jobGroups)) {
+      jobStatusMap[resultJobName] = jobInfo.status;
+    }
 
-      const response = {
-        success: true,
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-
-        // Queue Statistics
-        queueStats: {
-          // Standard job types
-          syncServerData: queueSizes[0],
-          addServer: queueSizes[1],
-          generateItemEmbeddings: queueSizes[2],
-          sequentialServerSync: queueSizes[3],
-
-          // Jellyfin job types
-          jellyfinFullSync: jellyfinQueueSizes[0],
-          jellyfinUsersSync: jellyfinQueueSizes[1],
-          jellyfinLibrariesSync: jellyfinQueueSizes[2],
-          jellyfinItemsSync: jellyfinQueueSizes[3],
-          jellyfinActivitiesSync: jellyfinQueueSizes[4],
-          jellyfinRecentItemsSync: jellyfinQueueSizes[5],
-          jellyfinRecentActivitiesSync: jellyfinQueueSizes[6],
-
-          // Totals
-          totalQueued: [...queueSizes, ...jellyfinQueueSizes].reduce(
-            (sum, stat) => sum + stat,
-            0
-          ),
-          standardJobsQueued: queueSizes.reduce((sum, stat) => sum + stat, 0),
-          jellyfinJobsQueued: jellyfinQueueSizes.reduce(
-            (sum, stat) => sum + stat,
-            0
-          ),
+    const response = {
+      success: true,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      queueStats: {
+        syncServerData: queueSizes[0],
+        addServer: queueSizes[1],
+        generateItemEmbeddings: queueSizes[2],
+        sequentialServerSync: queueSizes[3],
+        jellyfinFullSync: jellyfinQueueSizes[0],
+        jellyfinUsersSync: jellyfinQueueSizes[1],
+        jellyfinLibrariesSync: jellyfinQueueSizes[2],
+        jellyfinItemsSync: jellyfinQueueSizes[3],
+        jellyfinActivitiesSync: jellyfinQueueSizes[4],
+        jellyfinRecentItemsSync: jellyfinQueueSizes[5],
+        jellyfinRecentActivitiesSync: jellyfinQueueSizes[6],
+        totalQueued: [...queueSizes, ...jellyfinQueueSizes].reduce(
+          (sum, stat) => sum + stat,
+          0
+        ),
+        standardJobsQueued: queueSizes.reduce((sum, stat) => sum + stat, 0),
+        jellyfinJobsQueued: jellyfinQueueSizes.reduce(
+          (sum, stat) => sum + stat,
+          0
+        ),
+      },
+      jobStatusMap,
+      servers: {
+        total: allServers.length,
+        byStatus: {
+          pending: allServers.filter((s) => s.syncStatus === "pending").length,
+          syncing: allServers.filter((s) => s.syncStatus === "syncing").length,
+          completed: allServers.filter((s) => s.syncStatus === "completed")
+            .length,
+          failed: allServers.filter((s) => s.syncStatus === "failed").length,
         },
-
-        // Simple job status map: job-name -> status
-        jobStatusMap,
-
-        // Server Status
-        servers: {
-          total: allServers.length,
-          byStatus: {
-            pending: allServers.filter((s) => s.syncStatus === "pending")
-              .length,
-            syncing: allServers.filter((s) => s.syncStatus === "syncing")
-              .length,
-            completed: allServers.filter((s) => s.syncStatus === "completed")
-              .length,
-            failed: allServers.filter((s) => s.syncStatus === "failed").length,
-          },
-          list: allServers.map((server) => ({
-            id: server.id,
-            name: server.name,
-            url: server.url,
-            syncStatus: server.syncStatus,
-            syncProgress: server.syncProgress,
-            syncError: server.syncError,
-            lastSyncStarted: server.lastSyncStarted,
-            lastSyncCompleted: server.lastSyncCompleted,
-            isHealthy: server.syncStatus !== "failed",
-            needsAttention:
-              server.syncStatus === "failed" ||
-              (server.syncStatus === "syncing" &&
-                server.lastSyncStarted &&
-                Date.now() - new Date(server.lastSyncStarted).getTime() >
-                  30 * 60 * 1000), // 30 minutes
-          })),
-        },
-
-        // Scheduler Status
-        scheduler: {
-          ...schedulerStatus,
-          healthCheck:
-            schedulerStatus.enabled && schedulerStatus.runningTasks.length > 0,
-        },
-
-        // Session Poller Status
-        sessionPoller: {
-          ...sessionPollerStatus,
-          healthCheck:
-            sessionPollerStatus.enabled && sessionPollerStatus.isRunning,
-        },
-
-        // Recent Job Results (kept for backward compatibility)
-        recentResults: recentJobResults.map((result: JobResult) => ({
-          id: result.id,
-          jobName: result.jobName,
-          status: result.status,
-          createdAt: result.createdAt,
-          error: result.error,
-          processingTime: result.processingTime,
+        list: allServers.map((server) => ({
+          id: server.id,
+          name: server.name,
+          url: server.url,
+          syncStatus: server.syncStatus,
+          syncProgress: server.syncProgress,
+          syncError: server.syncError,
+          lastSyncStarted: server.lastSyncStarted,
+          lastSyncCompleted: server.lastSyncCompleted,
+          isHealthy: server.syncStatus !== "failed",
+          needsAttention:
+            server.syncStatus === "failed" ||
+            (server.syncStatus === "syncing" &&
+              server.lastSyncStarted &&
+              Date.now() - new Date(server.lastSyncStarted).getTime() >
+                30 * 60 * 1000),
         })),
+      },
+      scheduler: {
+        ...schedulerStatus,
+        healthCheck:
+          schedulerStatus.enabled && schedulerStatus.runningTasks.length > 0,
+      },
+      sessionPoller: {
+        ...sessionPollerStatus,
+        healthCheck:
+          sessionPollerStatus.enabled && sessionPollerStatus.isRunning,
+      },
+      recentResults: recentJobResults.map((result: JobResult) => ({
+        id: result.id,
+        jobName: result.jobName,
+        status: result.status,
+        createdAt: result.createdAt,
+        error: result.error,
+        processingTime: result.processingTime,
+      })),
+      systemHealth: {
+        overall: "healthy" as "healthy" | "warning" | "unhealthy",
+        issues: [] as string[],
+        warnings: [] as string[],
+      },
+    };
 
-        // System Health
-        systemHealth: {
-          overall: "healthy", // Will be calculated based on various factors
-          issues: [] as string[],
-          warnings: [] as string[],
-        },
-      };
+    const issues: string[] = [];
+    const warnings: string[] = [];
 
-      // Calculate system health
-      const issues: string[] = [];
-      const warnings: string[] = [];
+    const failedServers = allServers.filter((s) => s.syncStatus === "failed");
+    if (failedServers.length > 0) {
+      issues.push(`${failedServers.length} server(s) have failed sync status`);
+    }
 
-      // Check for failed servers
-      const failedServers = allServers.filter((s) => s.syncStatus === "failed");
-      if (failedServers.length > 0) {
-        issues.push(
-          `${failedServers.length} server(s) have failed sync status`
-        );
-      }
-
-      // Check for stuck jobs
-      const stuckSyncingServers = allServers.filter(
-        (s) =>
-          s.syncStatus === "syncing" &&
-          s.lastSyncStarted &&
-          Date.now() - new Date(s.lastSyncStarted).getTime() > 30 * 60 * 1000
+    const stuckSyncingServers = allServers.filter(
+      (s) =>
+        s.syncStatus === "syncing" &&
+        s.lastSyncStarted &&
+        Date.now() - new Date(s.lastSyncStarted).getTime() > 30 * 60 * 1000
+    );
+    if (stuckSyncingServers.length > 0) {
+      warnings.push(
+        `${stuckSyncingServers.length} server(s) may be stuck in syncing state`
       );
-      if (stuckSyncingServers.length > 0) {
-        warnings.push(
-          `${stuckSyncingServers.length} server(s) may be stuck in syncing state`
-        );
-      }
+    }
 
-      // Check scheduler health
-      if (!schedulerStatus.enabled) {
-        issues.push("Activity scheduler is disabled");
-      }
+    if (!schedulerStatus.enabled) {
+      issues.push("Activity scheduler is disabled");
+    }
 
-      // Check session poller health
-      if (!sessionPollerStatus.enabled || !sessionPollerStatus.isRunning) {
-        issues.push("Session poller is not running");
-      }
+    if (!sessionPollerStatus.enabled || !sessionPollerStatus.isRunning) {
+      issues.push("Session poller is not running");
+    }
 
-      // Check for high queue volumes
-      const totalQueuedJobs = response.queueStats.totalQueued;
-      if (totalQueuedJobs > 100) {
-        warnings.push(`High job queue volume: ${totalQueuedJobs} jobs queued`);
-      }
+    const totalQueuedJobs = response.queueStats.totalQueued;
+    if (totalQueuedJobs > 100) {
+      warnings.push(`High job queue volume: ${totalQueuedJobs} jobs queued`);
+    }
 
-      // Check for failed job results in recent results
-      const recentFailedJobs = recentJobResults.filter(
-        (result: JobResult) => result.status === "failed"
+    const recentFailedJobs = recentJobResults.filter(
+      (result: JobResult) => result.status === "failed"
+    );
+    if (recentFailedJobs.length > 5) {
+      warnings.push(
+        `High number of recent failed jobs: ${recentFailedJobs.length}`
       );
-      if (recentFailedJobs.length > 5) {
-        warnings.push(
-          `High number of recent failed jobs: ${recentFailedJobs.length}`
-        );
-      }
+    }
 
-      // Check job status map for failed jobs
-      const failedJobsInMap = Object.values(jobStatusMap).filter(
-        (status) => status === "failed"
-      ).length;
-      if (failedJobsInMap > 10) {
-        warnings.push(`High number of failed jobs: ${failedJobsInMap}`);
-      }
+    const failedJobsInMap = Object.values(jobStatusMap).filter(
+      (status) => status === "failed"
+    ).length;
+    if (failedJobsInMap > 10) {
+      warnings.push(`High number of failed jobs: ${failedJobsInMap}`);
+    }
 
-      // Update system health
-      response.systemHealth.issues = issues;
-      response.systemHealth.warnings = warnings;
-      response.systemHealth.overall =
-        issues.length > 0
-          ? "unhealthy"
-          : warnings.length > 0
-          ? "warning"
-          : "healthy";
+    response.systemHealth.issues = issues;
+    response.systemHealth.warnings = warnings;
+    response.systemHealth.overall =
+      issues.length > 0
+        ? "unhealthy"
+        : warnings.length > 0
+        ? "warning"
+        : "healthy";
 
-      res.json(response);
-    } catch (error) {
-      console.error("Error fetching server status:", error);
-      res.status(500).json({
+    return c.json(response);
+  } catch (error) {
+    console.error("Error fetching server status:", error);
+    return c.json(
+      {
         error: "Failed to fetch server status",
         details: error instanceof Error ? error.message : String(error),
-      });
-    }
+      },
+      500
+    );
   }
-);
+});
 
-// POST /jobs/cleanup-stale - Manually trigger cleanup of stale embedding jobs
-router.post(
-  "/cleanup-stale",
-  async (req: express.Request, res: express.Response) => {
-    try {
-      console.log("Manual cleanup of stale embedding jobs triggered");
+app.post("/cleanup-stale", async (c) => {
+  try {
+    console.log("Manual cleanup of stale embedding jobs triggered");
 
-      // Find all processing embedding jobs older than 10 minutes
-      const staleJobs = await db
-        .select()
-        .from(jobResults)
-        .where(
-          and(
-            eq(jobResults.jobName, "generate-item-embeddings"),
-            eq(jobResults.status, "processing"),
-            sql`${jobResults.createdAt} < NOW() - INTERVAL '10 minutes'`
-          )
-        );
+    const staleJobs = await db
+      .select()
+      .from(jobResults)
+      .where(
+        and(
+          eq(jobResults.jobName, "generate-item-embeddings"),
+          eq(jobResults.status, "processing"),
+          sql`${jobResults.createdAt} < NOW() - INTERVAL '10 minutes'`
+        )
+      );
 
-      let cleanedCount = 0;
+    let cleanedCount = 0;
 
-      for (const staleJob of staleJobs) {
-        try {
-          const result = staleJob.result as any;
-          const serverId = result?.serverId;
+    for (const staleJob of staleJobs) {
+      try {
+        const result = staleJob.result as Record<string, unknown> | null;
+        const serverId = result?.serverId;
 
-          if (serverId) {
-            // Check if there's been recent heartbeat activity
-            const lastHeartbeat = result?.lastHeartbeat
-              ? new Date(result.lastHeartbeat).getTime()
-              : new Date(staleJob.createdAt).getTime();
-            const heartbeatAge = Date.now() - lastHeartbeat;
+        if (serverId) {
+          const lastHeartbeat = result?.lastHeartbeat
+            ? new Date(result.lastHeartbeat as string).getTime()
+            : new Date(staleJob.createdAt).getTime();
+          const heartbeatAge = Date.now() - lastHeartbeat;
 
-            // Only cleanup if no recent heartbeat (older than 2 minutes)
-            if (heartbeatAge > 2 * 60 * 1000) {
-              const processingTime = Math.min(
-                Date.now() - new Date(staleJob.createdAt).getTime(),
-                3600000
-              );
+          if (heartbeatAge > 2 * 60 * 1000) {
+            const processingTime = Math.min(
+              Date.now() - new Date(staleJob.createdAt).getTime(),
+              3600000
+            );
 
-              await db
-                .update(jobResults)
-                .set({
-                  status: "failed",
+            await db
+              .update(jobResults)
+              .set({
+                status: "failed",
+                error:
+                  "Manual cleanup: Job exceeded maximum processing time without heartbeat",
+                processingTime,
+                result: {
+                  ...result,
                   error:
-                    "Manual cleanup: Job exceeded maximum processing time without heartbeat",
-                  processingTime,
-                  result: {
-                    ...result,
-                    error:
-                      "Manual cleanup - job exceeded maximum processing time",
-                    cleanedAt: new Date().toISOString(),
-                    staleDuration: heartbeatAge,
-                    cleanupType: "manual",
-                  },
-                })
-                .where(eq(jobResults.id, staleJob.id));
+                    "Manual cleanup - job exceeded maximum processing time",
+                  cleanedAt: new Date().toISOString(),
+                  staleDuration: heartbeatAge,
+                  cleanupType: "manual",
+                },
+              })
+              .where(eq(jobResults.id, staleJob.id));
 
-              cleanedCount++;
-              console.log(
-                `Manually cleaned up stale embedding job for server ${serverId}`
-              );
-            }
+            cleanedCount++;
+            console.log(
+              `Manually cleaned up stale embedding job for server ${serverId}`
+            );
           }
-        } catch (error) {
-          console.error("Error cleaning up stale job:", staleJob.jobId, error);
         }
+      } catch (error) {
+        console.error("Error cleaning up stale job:", staleJob.jobId, error);
       }
-
-      res.json({
-        success: true,
-        message: `Cleanup completed successfully`,
-        cleanedJobs: cleanedCount,
-        totalStaleJobs: staleJobs.length,
-      });
-    } catch (error) {
-      console.error("Error during manual job cleanup:", error);
-      res.status(500).json({ error: "Failed to cleanup stale jobs" });
     }
-  }
-);
 
-export default router;
+    return c.json({
+      success: true,
+      message: `Cleanup completed successfully`,
+      cleanedJobs: cleanedCount,
+      totalStaleJobs: staleJobs.length,
+    });
+  } catch (error) {
+    console.error("Error during manual job cleanup:", error);
+    return c.json({ error: "Failed to cleanup stale jobs" }, 500);
+  }
+});
+
+export default app;
