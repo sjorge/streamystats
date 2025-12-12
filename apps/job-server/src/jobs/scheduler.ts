@@ -1,5 +1,5 @@
 import * as cron from "node-cron";
-import { db, servers, jobResults } from "@streamystats/database";
+import { db, servers, jobResults, items } from "@streamystats/database";
 import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
@@ -10,13 +10,15 @@ class SyncScheduler {
   private activitySyncInterval: string = "*/5 * * * *"; // Every 5 minutes
   private recentItemsSyncInterval: string = "*/5 * * * *"; // Every 5 minutes
   private userSyncInterval: string = "*/5 * * * *"; // Every 5 minutes
+  private peopleSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
+  private embeddingsSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
   private jobCleanupInterval: string = "*/5 * * * *"; // Every 5 minutes
   private oldJobCleanupInterval: string = "0 3 * * *"; // Daily at 3 AM
   private fullSyncInterval: string = "0 2 * * *"; // Daily at 2 AM
 
   constructor() {
     // Auto-start if not explicitly disabled
-    const autoStart = process.env.SCHEDULER_AUTO_START !== "false";
+    const autoStart = Bun.env.SCHEDULER_AUTO_START !== "false";
     if (autoStart) {
       this.startWithCleanup();
     }
@@ -101,6 +103,23 @@ class SyncScheduler {
         });
       });
 
+      // People sync task (background backfill)
+      const peopleSyncTask = cron.schedule(this.peopleSyncInterval, () => {
+        this.triggerPeopleSync().catch((error) => {
+          console.error("Error during scheduled people sync:", error);
+        });
+      });
+
+      // Embeddings sync task (background backfill)
+      const embeddingsSyncTask = cron.schedule(
+        this.embeddingsSyncInterval,
+        () => {
+          this.triggerEmbeddingsSync().catch((error) => {
+            console.error("Error during scheduled embeddings sync:", error);
+          });
+        }
+      );
+
       // Job cleanup task for stale embedding jobs
       const jobCleanupTask = cron.schedule(this.jobCleanupInterval, () => {
         this.triggerJobCleanup().catch((error) => {
@@ -128,6 +147,8 @@ class SyncScheduler {
       this.scheduledTasks.set("activity-sync", activityTask);
       this.scheduledTasks.set("recent-items-sync", recentItemsTask);
       this.scheduledTasks.set("user-sync", userSyncTask);
+      this.scheduledTasks.set("people-sync", peopleSyncTask);
+      this.scheduledTasks.set("embeddings-sync", embeddingsSyncTask);
       this.scheduledTasks.set("job-cleanup", jobCleanupTask);
       this.scheduledTasks.set("old-job-cleanup", oldJobCleanupTask);
       this.scheduledTasks.set("full-sync", fullSyncTask);
@@ -136,6 +157,8 @@ class SyncScheduler {
       activityTask.start();
       recentItemsTask.start();
       userSyncTask.start();
+      peopleSyncTask.start();
+      embeddingsSyncTask.start();
       jobCleanupTask.start();
       oldJobCleanupTask.start();
       fullSyncTask.start();
@@ -144,6 +167,8 @@ class SyncScheduler {
       console.log(`Activity sync: ${this.activitySyncInterval}`);
       console.log(`Recent items sync: ${this.recentItemsSyncInterval}`);
       console.log(`User sync: ${this.userSyncInterval}`);
+      console.log(`People sync: ${this.peopleSyncInterval}`);
+      console.log(`Embeddings sync: ${this.embeddingsSyncInterval}`);
       console.log(`Job cleanup: ${this.jobCleanupInterval}`);
       console.log(`Old job cleanup: ${this.oldJobCleanupInterval}`);
       console.log(`Full sync: ${this.fullSyncInterval}`);
@@ -187,6 +212,8 @@ class SyncScheduler {
     activitySyncInterval?: string;
     recentItemsSyncInterval?: string;
     userSyncInterval?: string;
+    peopleSyncInterval?: string;
+    embeddingsSyncInterval?: string;
     jobCleanupInterval?: string;
     oldJobCleanupInterval?: string;
     fullSyncInterval?: string;
@@ -203,6 +230,14 @@ class SyncScheduler {
 
     if (config.userSyncInterval) {
       this.userSyncInterval = config.userSyncInterval;
+    }
+
+    if (config.peopleSyncInterval) {
+      this.peopleSyncInterval = config.peopleSyncInterval;
+    }
+
+    if (config.embeddingsSyncInterval) {
+      this.embeddingsSyncInterval = config.embeddingsSyncInterval;
     }
 
     if (config.jobCleanupInterval) {
@@ -258,7 +293,7 @@ class SyncScheduler {
    */
   private async triggerActivitySync(): Promise<void> {
     try {
-      console.log("Triggering periodic activity sync...");
+      console.log("[scheduler] trigger=activity-sync");
 
       // Get all servers that are not currently syncing (or stale syncing)
       const activeServers = await this.getServersForPeriodicSync();
@@ -291,7 +326,7 @@ class SyncScheduler {
           );
 
           console.log(
-            `Queued periodic activity sync for server: ${server.name} (ID: ${server.id})`
+            `[scheduler] queued=activity-sync server=${server.name} serverId=${server.id}`
           );
         } catch (error) {
           console.error(
@@ -302,7 +337,7 @@ class SyncScheduler {
       }
 
       console.log(
-        `Periodic activity sync queued for ${activeServers.length} servers`
+        `[scheduler] completed=activity-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
       console.error("Error during periodic activity sync trigger:", error);
@@ -314,7 +349,7 @@ class SyncScheduler {
    */
   private async triggerRecentItemsSync(): Promise<void> {
     try {
-      console.log("Triggering periodic recently added items sync...");
+      console.log("[scheduler] trigger=recent-items-sync");
 
       // Get all servers that are not currently syncing (or stale syncing)
       const activeServers = await this.getServersForPeriodicSync();
@@ -347,7 +382,7 @@ class SyncScheduler {
           );
 
           console.log(
-            `Queued periodic recently added items sync for server: ${server.name} (ID: ${server.id})`
+            `[scheduler] queued=recent-items-sync server=${server.name} serverId=${server.id}`
           );
         } catch (error) {
           console.error(
@@ -358,7 +393,7 @@ class SyncScheduler {
       }
 
       console.log(
-        `Periodic recently added items sync queued for ${activeServers.length} servers`
+        `[scheduler] completed=recent-items-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
       console.error(
@@ -373,7 +408,7 @@ class SyncScheduler {
    */
   private async triggerUserSync(): Promise<void> {
     try {
-      console.log("Triggering periodic user sync...");
+      console.log("[scheduler] trigger=user-sync");
 
       // Get all servers that are not currently syncing (or stale syncing)
       const activeServers = await this.getServersForPeriodicSync();
@@ -406,7 +441,7 @@ class SyncScheduler {
           );
 
           console.log(
-            `Queued periodic user sync for server: ${server.name} (ID: ${server.id})`
+            `[scheduler] queued=user-sync server=${server.name} serverId=${server.id}`
           );
         } catch (error) {
           console.error(
@@ -417,10 +452,150 @@ class SyncScheduler {
       }
 
       console.log(
-        `Periodic user sync queued for ${activeServers.length} servers`
+        `[scheduler] completed=user-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
       console.error("Error during periodic user sync trigger:", error);
+    }
+  }
+
+  /**
+   * Trigger people sync for all active servers (background backfill).
+   * Uses a per-server singletonKey so it can be scheduled frequently without enqueuing duplicates.
+   */
+  private async triggerPeopleSync(): Promise<void> {
+    try {
+      const activeServers = await this.getServersForPeriodicSync();
+
+      if (activeServers.length === 0) {
+        return;
+      }
+
+      const boss = await getJobQueue();
+
+      for (const server of activeServers) {
+        try {
+          await boss.send(
+            JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+            { serverId: server.id },
+            {
+              singletonKey: `jellyfin-people-sync-${server.id}`,
+              expireInMinutes: 60,
+              retryLimit: 1,
+              retryDelay: 60,
+            }
+          );
+        } catch (error) {
+          console.error(
+            `Failed to queue people sync for server ${server.name}:`,
+            error
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error during periodic people sync trigger:", error);
+    }
+  }
+
+  /**
+   * Trigger embeddings generation for all eligible servers.
+   * Only runs for servers with autoGenerateEmbeddings enabled and valid embedding config.
+   * Skips if there is already a queued/active embeddings job for that server.
+   */
+  private async triggerEmbeddingsSync(): Promise<void> {
+    try {
+      const activeServers = await this.getServersForPeriodicSync();
+
+      const eligibleServers = activeServers.filter(
+        (server) => server.autoGenerateEmbeddings
+      );
+
+      if (eligibleServers.length === 0) {
+        return;
+      }
+
+      const boss = await getJobQueue();
+
+      for (const server of eligibleServers) {
+        try {
+          if (!server.embeddingProvider) {
+            continue;
+          }
+
+          if (!server.embeddingBaseUrl || !server.embeddingModel) {
+            continue;
+          }
+
+          if (
+            server.embeddingProvider === "openai-compatible" &&
+            !server.embeddingApiKey
+          ) {
+            continue;
+          }
+
+          const remainingCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(items)
+            .where(
+              and(
+                eq(items.serverId, server.id),
+                eq(items.processed, false),
+                sql`${items.type} IN ('Movie', 'Series')`
+              )
+            );
+
+          const remaining = Number(remainingCount[0]?.count ?? 0);
+          if (remaining <= 0) {
+            continue;
+          }
+
+          let hasActiveJob = false;
+          try {
+            const existing = await db.execute(sql`
+              SELECT 1
+              FROM pgboss.job
+              WHERE name = 'generate-item-embeddings'
+                AND state IN ('created', 'active', 'retry')
+                AND data->>'serverId' = ${server.id.toString()}
+              LIMIT 1
+            `);
+            hasActiveJob = existing.length > 0;
+          } catch {
+            // If pgboss schema isn't available for some reason, fall back to enqueuing.
+            hasActiveJob = false;
+          }
+
+          if (hasActiveJob) {
+            continue;
+          }
+
+          await boss.send(
+            "generate-item-embeddings",
+            {
+              serverId: server.id,
+              provider: server.embeddingProvider,
+              config: {
+                baseUrl: server.embeddingBaseUrl,
+                apiKey: server.embeddingApiKey ?? undefined,
+                model: server.embeddingModel,
+                dimensions: server.embeddingDimensions || 1536,
+              },
+            },
+            {
+              expireInMinutes: 60,
+              retryLimit: 1,
+              retryDelay: 60,
+            }
+          );
+        } catch (error) {
+          console.error(
+            `Failed to queue embeddings sync for server ${server.name}:`,
+            error
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error during periodic embeddings sync trigger:", error);
     }
   }
 
@@ -453,15 +628,11 @@ class SyncScheduler {
                 userOptions: {},
                 libraryOptions: {},
                 itemOptions: {
-                  itemPageSize: 500,
-                  batchSize: 1000,
-                  maxLibraryConcurrency: 2,
-                  itemConcurrency: 10,
-                  apiRequestDelayMs: 100,
+                  // Use job-server defaults (and env overrides) to avoid hammering Jellyfin
                 },
                 activityOptions: {
-                  pageSize: 100,
-                  maxPages: 1000,
+                  pageSize: 5000,
+                  maxPages: 5000,
                   concurrency: 5,
                   apiRequestDelayMs: 100,
                 },
@@ -588,7 +759,7 @@ class SyncScheduler {
 
               cleanedCount++;
               console.log(
-                `Cleaned up stale embedding job for server ${serverId}`
+                `[cleanup] type=stale-embedding serverId=${serverId}`
               );
             }
           }
@@ -598,9 +769,7 @@ class SyncScheduler {
       }
 
       if (cleanedCount > 0) {
-        console.log(
-          `Job cleanup completed: cleaned ${cleanedCount} stale embedding jobs`
-        );
+        console.log(`[cleanup] type=stale-embedding cleanedCount=${cleanedCount}`);
       }
     } catch (error) {
       console.error("Error during job cleanup:", error);
@@ -727,17 +896,13 @@ class SyncScheduler {
             userOptions: {},
             libraryOptions: {},
             itemOptions: {
-              itemPageSize: 500,
-              batchSize: 1000,
-              maxLibraryConcurrency: 2,
-              itemConcurrency: 10,
-              apiRequestDelayMs: 100,
+              // Use job-server defaults (and env overrides) to avoid hammering Jellyfin
             },
             activityOptions: {
-              pageSize: 100,
+              pageSize: 5000,
               maxPages: 1000,
               concurrency: 5,
-              apiRequestDelayMs: 100,
+              apiRequestDelayMs: 1000,
             },
           },
         },
@@ -801,6 +966,8 @@ class SyncScheduler {
       activitySyncInterval: this.activitySyncInterval,
       recentItemsSyncInterval: this.recentItemsSyncInterval,
       userSyncInterval: this.userSyncInterval,
+      peopleSyncInterval: this.peopleSyncInterval,
+      embeddingsSyncInterval: this.embeddingsSyncInterval,
       jobCleanupInterval: this.jobCleanupInterval,
       oldJobCleanupInterval: this.oldJobCleanupInterval,
       fullSyncInterval: this.fullSyncInterval,

@@ -1,11 +1,12 @@
 "use server";
 
 import { Container } from "@/components/Container";
+import { ServerJobStatusCard } from "@/components/ServerJobStatusCard";
 import { getServer } from "@/lib/db/server";
+import { isUserAdmin } from "@/lib/db/users";
 import { redirect } from "next/navigation";
 import { DeleteServer } from "../DeleteServer";
 import { VersionSection } from "../VersionSection";
-import { SystemStatsDisplay } from "@/components/SystemStatsDisplay";
 import { SyncManager } from "../SyncManager";
 import { UpdateConnection } from "../UpdateConnection";
 
@@ -17,6 +18,7 @@ export default async function GeneralSettings(props: {
   if (!server) {
     redirect("/setup");
   }
+  const isAdmin = await isUserAdmin();
 
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
@@ -24,7 +26,7 @@ export default async function GeneralSettings(props: {
 
       <div className="space-y-8">
         <VersionSection />
-        <SystemStatsDisplay />
+        {isAdmin ? <ServerJobStatusCard serverId={server.id} /> : null}
         <UpdateConnection serverId={server.id} />
         <SyncManager serverId={server.id} serverName={server.name} />
         <DeleteServer server={server} />

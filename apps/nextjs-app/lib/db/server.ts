@@ -118,6 +118,19 @@ export const clearEmbeddings = async ({ serverId }: { serverId: number }) => {
       .update(items)
       .set({ embedding: null, processed: false })
       .where(eq(items.serverId, serverId));
+
+    // Check if any other servers still have embeddings
+    const otherEmbeddings = await db
+      .select({ count: count() })
+      .from(items)
+      .where(sql`${items.embedding} IS NOT NULL`);
+
+    const hasOtherEmbeddings = (otherEmbeddings[0]?.count ?? 0) > 0;
+
+    // If no embeddings remain, drop the index so it can be recreated with new dimensions
+    if (!hasOtherEmbeddings) {
+      await db.execute(sql`DROP INDEX IF EXISTS items_embedding_idx`);
+    }
   } catch (error) {
     console.error(`Error clearing embeddings for server ${serverId}:`, error);
     throw new Error("Failed to clear embeddings");
@@ -685,6 +698,155 @@ export const updateServerConnection = async ({
         error instanceof Error
           ? error.message
           : "Failed to update server connection",
+    };
+  }
+};
+
+// Chat AI configuration functions
+
+export type ChatProvider = "openai-compatible" | "ollama" | "anthropic";
+
+export interface ChatAIConfig {
+  provider: ChatProvider;
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+}
+
+export const saveChatConfig = async ({
+  serverId,
+  config,
+}: {
+  serverId: number;
+  config: ChatAIConfig;
+}) => {
+  try {
+    await db
+      .update(servers)
+      .set({
+        chatProvider: config.provider,
+        chatBaseUrl: config.baseUrl,
+        chatApiKey: config.apiKey || null,
+        chatModel: config.model,
+      })
+      .where(eq(servers.id, serverId));
+  } catch (error) {
+    console.error(`Error saving chat config for server ${serverId}:`, error);
+    throw new Error("Failed to save chat configuration");
+  }
+};
+
+export const getChatConfig = async ({
+  serverId,
+}: {
+  serverId: number;
+}): Promise<ChatAIConfig | null> => {
+  try {
+    const server = await getServer({ serverId });
+    if (!server || !server.chatProvider || !server.chatModel) {
+      return null;
+    }
+    return {
+      provider: server.chatProvider as ChatProvider,
+      baseUrl: server.chatBaseUrl || "",
+      apiKey: server.chatApiKey || undefined,
+      model: server.chatModel,
+    };
+  } catch (error) {
+    console.error(`Error getting chat config for server ${serverId}:`, error);
+    return null;
+  }
+};
+
+export const clearChatConfig = async ({ serverId }: { serverId: number }) => {
+  try {
+    await db
+      .update(servers)
+      .set({
+        chatProvider: null,
+        chatBaseUrl: null,
+        chatApiKey: null,
+        chatModel: null,
+      })
+      .where(eq(servers.id, serverId));
+  } catch (error) {
+    console.error(`Error clearing chat config for server ${serverId}:`, error);
+    throw new Error("Failed to clear chat configuration");
+  }
+};
+
+export const testChatConnection = async ({
+  config,
+}: {
+  config: ChatAIConfig;
+}): Promise<{ success: boolean; message: string }> => {
+  try {
+    if (config.provider === "anthropic") {
+      const response = await fetch(
+        `${config.baseUrl || "https://api.anthropic.com"}/v1/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": config.apiKey || "",
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: config.model,
+            max_tokens: 10,
+            messages: [{ role: "user", content: "Hi" }],
+          }),
+          signal: AbortSignal.timeout(10000),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        return { success: false, message: `Anthropic API error: ${error}` };
+      }
+      return { success: true, message: "Connection successful" };
+    }
+
+    if (config.provider === "ollama") {
+      const response = await fetch(
+        `${config.baseUrl || "http://localhost:11434"}/api/tags`,
+        {
+          method: "GET",
+          signal: AbortSignal.timeout(5000),
+        }
+      );
+
+      if (!response.ok) {
+        return { success: false, message: "Failed to connect to Ollama" };
+      }
+
+      const data = await response.json();
+      const models = data.models?.map((m: any) => m.name) || [];
+      if (!models.some((m: string) => m.includes(config.model))) {
+        return {
+          success: false,
+          message: `Model "${config.model}" not found. Available: ${models.join(", ")}`,
+        };
+      }
+      return { success: true, message: "Connection successful" };
+    }
+
+    const response = await fetch(`${config.baseUrl}/models`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${config.apiKey || ""}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      return { success: false, message: "Failed to connect to API" };
+    }
+    return { success: true, message: "Connection successful" };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Connection failed",
     };
   }
 };

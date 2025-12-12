@@ -13,6 +13,8 @@ import {
   createSyncResult,
 } from "../sync-metrics";
 import pMap from "p-map";
+import { sleep } from "../../utils/sleep";
+import { formatSyncLogLine } from "./sync-log";
 
 export interface ActivitySyncOptions {
   pageSize?: number;
@@ -29,15 +31,15 @@ export interface ActivitySyncData {
   pagesFetched: number;
 }
 
-const ACTIVITYLOG_SYSTEM_USERID = '00000000000000000000000000000000';
+const ACTIVITYLOG_SYSTEM_USERID = "00000000000000000000000000000000";
 
 export async function syncActivities(
   server: Server,
   options: ActivitySyncOptions = {}
 ): Promise<SyncResult<ActivitySyncData>> {
   const {
-    pageSize = 100,
-    maxPages = 1000, // Prevent infinite loops
+    pageSize = 5000,
+    maxPages = 5000, // Prevent infinite loops
     concurrency = 5,
     apiRequestDelayMs = 100,
   } = options;
@@ -47,30 +49,36 @@ export async function syncActivities(
   const errors: string[] = [];
 
   try {
-    console.log(`Starting activities sync for server ${server.name}`);
+    console.info(
+      `Starting activities sync for server ${server.name} (pageSize: ${pageSize}, concurrency: ${concurrency}, apiRequestDelayMs: ${apiRequestDelayMs})`
+    );
 
     let startIndex = 0;
     let pagesFetched = 0;
     let hasMoreActivities = true;
 
     while (hasMoreActivities && pagesFetched < maxPages) {
-      // Add delay between API requests
-      if (pagesFetched > 0) {
-        await new Promise((resolve) => setTimeout(resolve, apiRequestDelayMs));
-      }
-
       try {
+        const page = pagesFetched + 1;
+        const beforePageMetrics = metrics.getCurrentMetrics();
+        const fetchStart = Date.now();
         metrics.incrementApiRequests();
         const jellyfinActivities = await client.getActivities(
           startIndex,
           pageSize
         );
+        const fetchMs = Date.now() - fetchStart;
 
         if (jellyfinActivities.length === 0) {
           hasMoreActivities = false;
           break;
         }
 
+        console.info(
+          `[activities-sync] server=${server.name} page=${page} startIndex=${startIndex} fetched=${jellyfinActivities.length} fetchMs=${fetchMs}`
+        );
+
+        const processStart = Date.now();
         // Process activities with controlled concurrency
         await pMap(
           jellyfinActivities,
@@ -92,9 +100,31 @@ export async function syncActivities(
           },
           { concurrency }
         );
+        const processMs = Date.now() - processStart;
+
+        const afterPageMetrics = metrics.getCurrentMetrics();
+        const processedDelta =
+          afterPageMetrics.activitiesProcessed -
+          beforePageMetrics.activitiesProcessed;
+        const insertedDelta =
+          afterPageMetrics.activitiesInserted -
+          beforePageMetrics.activitiesInserted;
+        const updatedDelta =
+          afterPageMetrics.activitiesUpdated -
+          beforePageMetrics.activitiesUpdated;
+        const errorsDelta = afterPageMetrics.errors - beforePageMetrics.errors;
+
+        console.info(
+          `[activities-sync] server=${server.name} page=${page} processed=${processedDelta} inserted=${insertedDelta} updated=${updatedDelta} errors=${errorsDelta} processMs=${processMs} totalProcessed=${afterPageMetrics.activitiesProcessed}`
+        );
 
         startIndex += jellyfinActivities.length;
         pagesFetched++;
+
+        // Add delay between API requests
+        if (pagesFetched > 0 && apiRequestDelayMs > 0) {
+          await sleep(apiRequestDelayMs);
+        }
 
         // Stop if we got fewer activities than requested (indicates end of data)
         if (jellyfinActivities.length < pageSize) {
@@ -123,7 +153,19 @@ export async function syncActivities(
       pagesFetched,
     };
 
-    console.log(`Activities sync completed for server ${server.name}:`, data);
+    console.info(
+      formatSyncLogLine("activities-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: finalMetrics.activitiesInserted,
+        updated: finalMetrics.activitiesUpdated,
+        errors: errors.length,
+        processMs: finalMetrics.duration ?? 0,
+        totalProcessed: finalMetrics.activitiesProcessed,
+        pagesFetched,
+      })
+    );
 
     if (errors.length > 0) {
       return createSyncResult("partial", data, finalMetrics, undefined, errors);
@@ -131,7 +173,20 @@ export async function syncActivities(
 
     return createSyncResult("success", data, finalMetrics);
   } catch (error) {
-    console.error(`Activities sync failed for server ${server.name}:`, error);
+    console.error(
+      formatSyncLogLine("activities-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 1,
+        processMs: 0,
+        totalProcessed: metrics.getCurrentMetrics().activitiesProcessed,
+        message: "Activities sync failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    );
     const finalMetrics = metrics.finish();
     const errorData: ActivitySyncData = {
       activitiesProcessed: finalMetrics.activitiesProcessed,
@@ -153,8 +208,8 @@ export async function syncRecentActivities(
   options: ActivitySyncOptions = {}
 ): Promise<SyncResult<ActivitySyncData>> {
   const {
-    pageSize = 100,
-    maxPages = 10,
+    pageSize = 5000,
+    maxPages = 5000,
     concurrency = 5,
     apiRequestDelayMs = 100,
     intelligent = false,
@@ -165,7 +220,7 @@ export async function syncRecentActivities(
   const errors: string[] = [];
 
   try {
-    console.log(
+    console.info(
       `Starting recent activities sync for server ${server.name} (intelligent: ${intelligent})`
     );
 
@@ -183,11 +238,11 @@ export async function syncRecentActivities(
 
       if (lastActivity.length > 0) {
         mostRecentDbActivityId = lastActivity[0].id;
-        console.log(
+        console.info(
           `Most recent activity in DB: ${mostRecentDbActivityId} (${lastActivity[0].date})`
         );
       } else {
-        console.log(
+        console.info(
           "No activities found in database, performing full recent sync"
         );
       }
@@ -204,16 +259,24 @@ export async function syncRecentActivities(
       }
 
       try {
+        const page = pagesFetched + 1;
+        const beforePageMetrics = metrics.getCurrentMetrics();
+        const fetchStart = Date.now();
         metrics.incrementApiRequests();
         const jellyfinActivities = await client.getActivities(
           startIndex,
           pageSize
         );
+        const fetchMs = Date.now() - fetchStart;
 
         if (jellyfinActivities.length === 0) {
-          console.log("No more activities to fetch");
+          console.info("No more activities to fetch");
           break;
         }
+
+        console.info(
+          `[recent-activities-sync] server=${server.name} page=${page} startIndex=${startIndex} fetched=${jellyfinActivities.length} fetchMs=${fetchMs} intelligent=${intelligent}`
+        );
 
         // In intelligent mode, check if we've found our last known activity
         if (intelligent && mostRecentDbActivityId) {
@@ -222,12 +285,13 @@ export async function syncRecentActivities(
           );
 
           if (foundIndex >= 0) {
-            console.log(
+            console.info(
               `Found last known activity at index ${foundIndex}, stopping intelligent sync`
             );
             // Only process activities before the found index (newer activities)
             const newActivities = jellyfinActivities.slice(0, foundIndex);
             if (newActivities.length > 0) {
+              const processStart = Date.now();
               await pMap(
                 newActivities,
                 async (jellyfinActivity) => {
@@ -249,12 +313,31 @@ export async function syncRecentActivities(
                 },
                 { concurrency }
               );
+
+              const processMs = Date.now() - processStart;
+              const afterPageMetrics = metrics.getCurrentMetrics();
+              const processedDelta =
+                afterPageMetrics.activitiesProcessed -
+                beforePageMetrics.activitiesProcessed;
+              const insertedDelta =
+                afterPageMetrics.activitiesInserted -
+                beforePageMetrics.activitiesInserted;
+              const updatedDelta =
+                afterPageMetrics.activitiesUpdated -
+                beforePageMetrics.activitiesUpdated;
+              const errorsDelta =
+                afterPageMetrics.errors - beforePageMetrics.errors;
+
+              console.info(
+                `[recent-activities-sync] server=${server.name} page=${page} processed=${processedDelta} inserted=${insertedDelta} updated=${updatedDelta} errors=${errorsDelta} processMs=${processMs} totalProcessed=${afterPageMetrics.activitiesProcessed} intelligentStop=true`
+              );
             }
             foundLastKnownActivity = true;
             break;
           }
         }
 
+        const processStart = Date.now();
         // Process all activities in the current page
         await pMap(
           jellyfinActivities,
@@ -277,6 +360,23 @@ export async function syncRecentActivities(
           },
           { concurrency }
         );
+        const processMs = Date.now() - processStart;
+
+        const afterPageMetrics = metrics.getCurrentMetrics();
+        const processedDelta =
+          afterPageMetrics.activitiesProcessed -
+          beforePageMetrics.activitiesProcessed;
+        const insertedDelta =
+          afterPageMetrics.activitiesInserted -
+          beforePageMetrics.activitiesInserted;
+        const updatedDelta =
+          afterPageMetrics.activitiesUpdated -
+          beforePageMetrics.activitiesUpdated;
+        const errorsDelta = afterPageMetrics.errors - beforePageMetrics.errors;
+
+        console.info(
+          `[recent-activities-sync] server=${server.name} page=${page} processed=${processedDelta} inserted=${insertedDelta} updated=${updatedDelta} errors=${errorsDelta} processMs=${processMs} totalProcessed=${afterPageMetrics.activitiesProcessed}`
+        );
 
         startIndex += jellyfinActivities.length;
         pagesFetched++;
@@ -288,7 +388,7 @@ export async function syncRecentActivities(
           !foundLastKnownActivity &&
           activitiesProcessed >= pageSize * 3
         ) {
-          console.log(
+          console.info(
             `Intelligent sync processed ${activitiesProcessed} activities without finding last known activity, stopping`
           );
           break;
@@ -296,7 +396,7 @@ export async function syncRecentActivities(
 
         // Stop if we got fewer activities than requested (indicates end of data)
         if (jellyfinActivities.length < pageSize) {
-          console.log("Reached end of available activities");
+          console.info("Reached end of available activities");
           break;
         }
       } catch (error) {
@@ -322,16 +422,36 @@ export async function syncRecentActivities(
       pagesFetched,
     };
 
-    const syncType = intelligent ? "intelligent recent" : "recent";
-    console.log(
-      `${syncType} activities sync completed for server ${server.name}:`,
-      data
+    console.info(
+      formatSyncLogLine("recent-activities-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: finalMetrics.activitiesInserted,
+        updated: finalMetrics.activitiesUpdated,
+        errors: errors.length,
+        processMs: finalMetrics.duration ?? 0,
+        totalProcessed: finalMetrics.activitiesProcessed,
+        pagesFetched,
+        intelligent,
+      })
     );
 
     if (intelligent && mostRecentDbActivityId && !foundLastKnownActivity) {
-      console.log(
-        `Warning: Intelligent sync did not find the last known activity (${mostRecentDbActivityId}). ` +
-          `This might indicate the activity is older than the sync window.`
+      console.info(
+        formatSyncLogLine("recent-activities-sync", {
+          server: server.name,
+          page: -1,
+          processed: 0,
+          inserted: 0,
+          updated: 0,
+          errors: 0,
+          processMs: 0,
+          totalProcessed: finalMetrics.activitiesProcessed,
+          intelligent,
+          message: "Intelligent sync did not find last known activity",
+          lastKnownActivityId: mostRecentDbActivityId,
+        })
       );
     }
 
@@ -342,8 +462,19 @@ export async function syncRecentActivities(
     return createSyncResult("success", data, finalMetrics);
   } catch (error) {
     console.error(
-      `Recent activities sync failed for server ${server.name}:`,
-      error
+      formatSyncLogLine("recent-activities-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 1,
+        processMs: 0,
+        totalProcessed: metrics.getCurrentMetrics().activitiesProcessed,
+        intelligent,
+        message: "Recent activities sync failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
     );
     const finalMetrics = metrics.finish();
     const errorData: ActivitySyncData = {
@@ -389,10 +520,6 @@ async function processActivity(
         validUserId = jellyfinActivity.UserId;
       } else if (jellyfinActivity.UserId == ACTIVITYLOG_SYSTEM_USERID) {
         // this is a system event (plugin install/uninstall, ...) we do not print a warning
-      } else {
-        console.warn(
-          `Activity ${jellyfinActivity.Id} references non-existent user ${jellyfinActivity.UserId}, setting to null`
-        );
       }
     } catch (error) {
       console.warn(

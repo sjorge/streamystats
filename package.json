@@ -8,25 +8,25 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "pnpm run dev:all",
-    "build": "pnpm run build:all",
-    "start": "pnpm run start:all",
-    "dev:job-server": "pnpm --filter @streamystats/job-server dev",
-    "dev:nextjs": "pnpm --filter @streamystats/nextjs-app dev",
-    "dev:all": "pnpm run dev:job-server & pnpm run dev:nextjs",
-    "start:job-server": "pnpm --filter @streamystats/job-server start",
-    "start:nextjs": "pnpm --filter @streamystats/nextjs-app start",
-    "start:all": "pnpm run start:job-server & pnpm run start:nextjs",
-    "build:database": "pnpm --filter @streamystats/database build",
-    "build:job-server": "pnpm --filter @streamystats/job-server build",
-    "build:nextjs": "pnpm --filter @streamystats/nextjs-app build",
-    "build:all": "pnpm run build:database && pnpm run build:job-server && pnpm run build:nextjs",
+    "dev": "bun run dev:all",
+    "build": "bun run build:all",
+    "start": "bun run start:all",
+    "dev:job-server": "cd apps/job-server && bun run dev",
+    "dev:nextjs": "cd apps/nextjs-app && bun run dev",
+    "dev:all": "bun run dev:job-server & bun run dev:nextjs",
+    "start:job-server": "cd apps/job-server && bun run start",
+    "start:nextjs": "cd apps/nextjs-app && bun run start",
+    "start:all": "bun run start:job-server & bun run start:nextjs",
+    "build:database": "cd packages/database && bun run build",
+    "build:nextjs": "cd apps/nextjs-app && bun run build",
+    "build:all": "bun run build:database && bun run build:nextjs",
     "docker:build": "./build-and-push.sh",
-    "db:generate": "pnpm --filter @streamystats/database db:generate",
-    "db:migrate": "pnpm --filter @streamystats/database db:migrate",
-    "db:studio": "pnpm --filter @streamystats/database db:studio",
-    "lint": "pnpm --filter @streamystats/nextjs-app lint",
-    "lint:fix": "pnpm --filter @streamystats/nextjs-app lint:fix"
+    "db:generate": "cd packages/database && bun run db:generate",
+    "db:migrate": "cd packages/database && bun run db:migrate",
+    "db:studio": "cd packages/database && bun run db:studio",
+    "lint": "cd apps/nextjs-app && bun run lint",
+    "lint:fix": "cd apps/nextjs-app && bun run lint:fix",
+    "install:bun": "bun install"
   },
   "keywords": [
     "jellyfin",
@@ -42,15 +42,14 @@
     "@types/node": "^20.10.4",
     "typescript": "^5.3.3"
   },
-  "engines": {
-    "node": ">=20.9.0",
-    "pnpm": ">=8.0.0"
+  "overrides": {
+    "drizzle-orm": "0.45.1",
+    "@types/react": "19.1.5",
+    "@types/react-dom": "19.1.5"
   },
-  "pnpm": {
-    "overrides": {
-      "drizzle-orm": "0.45.1",
-      "@types/react": "19.1.5",
-      "@types/react-dom": "19.1.5"
-    }
-  }
+  "trustedDependencies": [
+    "sharp",
+    "esbuild",
+    "@biomejs/biome"
+  ]
 }

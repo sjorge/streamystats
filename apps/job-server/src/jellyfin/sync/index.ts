@@ -23,6 +23,7 @@ import {
   SyncMetricsTracker,
   createSyncResult,
 } from "../sync-metrics";
+import { formatSyncLogLine } from "./sync-log";
 
 export interface SyncOptions {
   // Global options
@@ -69,83 +70,202 @@ export async function performFullSync(
   const globalMetrics = new SyncMetricsTracker();
   const errors: string[] = [];
 
-  console.log(`Starting full sync for server ${server.name}`);
+  const fullSyncStart = Date.now();
+  console.info(
+    formatSyncLogLine("full-sync", {
+      server: server.name,
+      page: 0,
+      processed: 0,
+      inserted: 0,
+      updated: 0,
+      errors: 0,
+      processMs: 0,
+      totalProcessed: 0,
+      phase: "start",
+    })
+  );
 
   try {
     // 1. Sync Users
-    console.log("Step 1/4: Syncing users...");
+    const usersStart = Date.now();
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        step: "users",
+        phase: "start",
+      })
+    );
     const usersResult = await syncUsers(server, finalOptions.userOptions);
     if (usersResult.status === "error") {
-      console.error("Users sync failed:", usersResult.error);
       errors.push(`Users: ${usersResult.error}`);
     } else if (usersResult.status === "partial") {
-      console.warn("Users sync completed with errors:", usersResult.errors);
       errors.push(...usersResult.errors.map((e) => `Users: ${e}`));
     }
-    console.log(
-      "Users sync completed:",
-      usersResult.status === "error" ? "FAILED" : usersResult.data
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors:
+          usersResult.status === "partial"
+            ? usersResult.errors.length
+            : usersResult.status === "error"
+              ? 1
+              : 0,
+        processMs: Date.now() - usersStart,
+        totalProcessed: 0,
+        step: "users",
+        phase: "done",
+        status: usersResult.status,
+      })
     );
 
     // 2. Sync Libraries
-    console.log("Step 2/4: Syncing libraries...");
+    const librariesStart = Date.now();
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 2,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        step: "libraries",
+        phase: "start",
+      })
+    );
     const librariesResult = await syncLibraries(
       server,
       finalOptions.libraryOptions
     );
     if (librariesResult.status === "error") {
-      console.error("Libraries sync failed:", librariesResult.error);
       errors.push(`Libraries: ${librariesResult.error}`);
     } else if (librariesResult.status === "partial") {
-      console.warn(
-        "Libraries sync completed with errors:",
-        librariesResult.errors
-      );
       errors.push(...librariesResult.errors.map((e) => `Libraries: ${e}`));
     }
-    console.log(
-      "Libraries sync completed:",
-      librariesResult.status === "error" ? "FAILED" : librariesResult.data
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 2,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors:
+          librariesResult.status === "partial"
+            ? librariesResult.errors.length
+            : librariesResult.status === "error"
+              ? 1
+              : 0,
+        processMs: Date.now() - librariesStart,
+        totalProcessed: 0,
+        step: "libraries",
+        phase: "done",
+        status: librariesResult.status,
+      })
     );
 
     // 3. Sync Items (this will take the longest)
-    console.log("Step 3/4: Syncing items...");
+    const itemsStart = Date.now();
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 3,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        step: "items",
+        phase: "start",
+      })
+    );
     const itemsResult = await syncItems(server, {
       ...finalOptions.itemOptions,
       maxLibraryConcurrency: finalOptions.maxLibraryConcurrency,
       apiRequestDelayMs: finalOptions.apiRequestDelayMs,
     });
     if (itemsResult.status === "error") {
-      console.error("Items sync failed:", itemsResult.error);
       errors.push(`Items: ${itemsResult.error}`);
     } else if (itemsResult.status === "partial") {
-      console.warn("Items sync completed with errors:", itemsResult.errors);
       errors.push(...itemsResult.errors.map((e) => `Items: ${e}`));
     }
-    console.log(
-      "Items sync completed:",
-      itemsResult.status === "error" ? "FAILED" : itemsResult.data
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 3,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors:
+          itemsResult.status === "partial"
+            ? itemsResult.errors.length
+            : itemsResult.status === "error"
+              ? 1
+              : 0,
+        processMs: Date.now() - itemsStart,
+        totalProcessed: 0,
+        step: "items",
+        phase: "done",
+        status: itemsResult.status,
+      })
     );
 
     // 4. Sync Activities
-    console.log("Step 4/4: Syncing activities...");
+    const activitiesStart = Date.now();
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 4,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        step: "activities",
+        phase: "start",
+      })
+    );
     const activitiesResult = await syncActivities(
       server,
       finalOptions.activityOptions
     );
     if (activitiesResult.status === "error") {
-      console.error("Activities sync failed:", activitiesResult.error);
       errors.push(`Activities: ${activitiesResult.error}`);
     } else if (activitiesResult.status === "partial") {
-      console.warn(
-        "Activities sync completed with errors:",
-        activitiesResult.errors
-      );
       errors.push(...activitiesResult.errors.map((e) => `Activities: ${e}`));
     }
-    console.log(
-      "Activities sync completed:",
-      activitiesResult.status === "error" ? "FAILED" : activitiesResult.data
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: 4,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors:
+          activitiesResult.status === "partial"
+            ? activitiesResult.errors.length
+            : activitiesResult.status === "error"
+              ? 1
+              : 0,
+        processMs: Date.now() - activitiesStart,
+        totalProcessed: 0,
+        step: "activities",
+        phase: "done",
+        status: activitiesResult.status,
+      })
     );
 
     const finalMetrics = globalMetrics.finish();
@@ -182,10 +302,19 @@ export async function performFullSync(
       totalDuration: finalMetrics.duration || 0,
     };
 
-    console.log(`Full sync completed for server ${server.name}:`, {
-      totalDuration: `${finalMetrics.duration || 0}ms`,
-      errors: errors.length,
-    });
+    console.info(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: errors.length,
+        processMs: finalMetrics.duration ?? Date.now() - fullSyncStart,
+        totalProcessed: 0,
+        phase: "done",
+      })
+    );
 
     // Determine overall result
     const hasErrors = [
@@ -222,7 +351,20 @@ export async function performFullSync(
       return createSyncResult("success", fullSyncData, finalMetrics);
     }
   } catch (error) {
-    console.error(`Full sync failed for server ${server.name}:`, error);
+    console.error(
+      formatSyncLogLine("full-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 1,
+        processMs: Date.now() - fullSyncStart,
+        totalProcessed: 0,
+        phase: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    );
     const finalMetrics = globalMetrics.finish();
     const errorData: FullSyncData = {
       users: { usersProcessed: 0, usersInserted: 0, usersUpdated: 0 },
@@ -255,29 +397,12 @@ export async function performFullSync(
   }
 }
 
-// Re-export all sync functions for convenience
-export {
-  syncUsers,
-  syncLibraries,
-  syncItems,
-  syncRecentlyAddedItems,
-  syncActivities,
-  syncRecentActivities,
-};
+export * from "./users";
+export * from "./libraries";
+export * from "./items";
+export * from "./activities";
 
-// Re-export types
-export type {
-  UserSyncOptions,
-  UserSyncData,
-  LibrarySyncOptions,
-  LibrarySyncData,
-  ItemSyncOptions,
-  ItemSyncData,
-  ActivitySyncOptions,
-  ActivitySyncData,
-  SyncResult,
-  SyncMetrics,
-};
+export type { SyncResult, SyncMetrics };
 
 /**
  * Returns the default synchronization options.

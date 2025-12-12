@@ -13,6 +13,17 @@ import {
 } from "../jellyfin/types";
 import { v4 as uuidv4 } from "uuid";
 import { eq } from "drizzle-orm";
+import { formatError } from "../utils/format-error";
+
+function log(prefix: string, data: Record<string, string | number | boolean | null | undefined>): void {
+  const parts = [`[${prefix}]`];
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined && value !== null) {
+      parts.push(`${key}=${value}`);
+    }
+  }
+  console.log(parts.join(" "));
+}
 
 interface SessionPollerConfig {
   intervalMs?: number;
@@ -42,13 +53,11 @@ class SessionPoller {
    */
   async start(): Promise<void> {
     if (!this.config.enabled) {
-      console.log("Session poller is disabled");
+      log("session-poller", { action: "disabled" });
       return;
     }
 
-    console.log(
-      `Starting session poller with interval: ${this.config.intervalMs}ms`
-    );
+    log("session-poller", { action: "start", intervalMs: this.config.intervalMs });
 
     // Initial poll
     await this.pollSessions();
@@ -58,25 +67,25 @@ class SessionPoller {
       try {
         await this.pollSessions();
       } catch (error) {
-        console.error("Error during session polling:", error);
+        console.error(`Error during session polling: ${formatError(error)}`);
       }
     }, this.config.intervalMs);
 
-    console.log("Session poller started successfully");
+    log("session-poller", { action: "started" });
   }
 
   /**
    * Stop the session poller
    */
   stop(): void {
-    console.log("Stopping session poller...");
+    log("session-poller", { action: "stopping" });
 
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
 
-    console.log("Session poller stopped");
+    log("session-poller", { action: "stopped" });
   }
 
   /**
@@ -119,7 +128,7 @@ class SessionPoller {
         await this.pollServer(server);
       }
     } catch (error) {
-      console.error("Error polling sessions:", error);
+      console.error(`[session-poller] action=error error=${formatError(error)}`);
     }
   }
 
@@ -139,7 +148,7 @@ class SessionPoller {
       const currentSessions = await client.getSessions();
       await this.processSessions(server, currentSessions);
     } catch (error) {
-      console.error(`Failed to fetch sessions for server ${server.id}:`, error);
+      console.error(`[session-poller] action=fetch-error serverId=${server.id} error=${formatError(error)}`);
     }
   }
 
@@ -328,10 +337,14 @@ class SessionPoller {
         transcodeReasons: transcodingInfo?.TranscodeReasons,
       };
 
-      console.info(
-        `New session for server ${server.id}: User: ${session.UserName}, ` +
-          `Content: ${item.Name}, Paused: ${isPaused}, Duration: 0s`
-      );
+      log("session", { 
+        action: "new", 
+        serverId: server.id, 
+        user: session.UserName, 
+        content: item.Name, 
+        paused: isPaused, 
+        durationSec: 0 
+      });
 
       tracked.set(sessionKey, trackingRecord);
     }
@@ -372,13 +385,15 @@ class SessionPoller {
       const durationIncreased = updatedDuration > tracked.playDuration + 10;
 
       if (pauseStateChanged || durationIncreased) {
-        console.debug(
-          `Updated session for server ${server.id}: User: ${tracked.userName}, ` +
-            `Content: ${tracked.itemName}, Paused: ${currentPaused}, ` +
-            `Duration: ${updatedDuration}s, Position: ${this.formatTicksAsTime(
-              currentPosition
-            )}`
-        );
+        log("session", { 
+          action: "update", 
+          serverId: server.id, 
+          user: tracked.userName, 
+          content: tracked.itemName, 
+          paused: currentPaused, 
+          durationSec: updatedDuration, 
+          position: this.formatTicksAsTime(currentPosition) 
+        });
       }
 
       const transcodingInfo = session.TranscodingInfo;
@@ -472,13 +487,15 @@ class SessionPoller {
 
         const completed = percentComplete > 90.0;
 
-        console.info(
-          `Ended session for server ${server.id}: User: ${tracked.userName}, ` +
-            `Content: ${tracked.itemName}, Final duration: ${finalDuration}s, ` +
-            `Progress: ${
-              Math.round(percentComplete * 10) / 10
-            }%, Completed: ${completed}`
-        );
+        log("session", { 
+          action: "ended", 
+          serverId: server.id, 
+          user: tracked.userName, 
+          content: tracked.itemName, 
+          durationSec: finalDuration, 
+          progressPct: Math.round(percentComplete * 10) / 10, 
+          completed 
+        });
 
         await this.savePlaybackRecord(
           server,
@@ -607,11 +624,9 @@ class SessionPoller {
       };
 
       await db.insert(sessions).values(playbackRecord);
-      console.info(
-        `Successfully saved playback session for server ${server.id}`
-      );
+      log("session", { action: "saved", serverId: server.id, user: tracked.userName });
     } catch (error) {
-      console.error("Failed to save playback session:", error);
+      console.error(`[session] action=save-error serverId=${server.id} error=${formatError(error)}`);
     }
   }
 

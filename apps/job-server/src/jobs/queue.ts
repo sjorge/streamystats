@@ -1,11 +1,9 @@
 import PgBoss from "pg-boss";
-import * as dotenv from "dotenv";
 import {
   syncServerDataJob,
   addServerJob,
   generateItemEmbeddingsJob,
   sequentialServerSyncJob,
-  // Import Jellyfin sync workers
   jellyfinFullSyncWorker,
   jellyfinUsersSyncWorker,
   jellyfinLibrariesSyncWorker,
@@ -13,10 +11,9 @@ import {
   jellyfinActivitiesSyncWorker,
   jellyfinRecentItemsSyncWorker,
   jellyfinRecentActivitiesSyncWorker,
+  jellyfinPeopleSyncWorker,
   JELLYFIN_JOB_NAMES,
 } from "./workers";
-
-dotenv.config();
 
 let bossInstance: PgBoss | null = null;
 
@@ -25,7 +22,7 @@ export async function getJobQueue(): Promise<PgBoss> {
     return bossInstance;
   }
 
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = Bun.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is not set");
   }
@@ -107,6 +104,12 @@ async function registerJobHandlers(boss: PgBoss) {
     JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
     { teamSize: 3, teamConcurrency: 3 }, // Higher concurrency for lighter operations
     jellyfinRecentActivitiesSyncWorker
+  );
+
+  await boss.work(
+    JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+    { teamSize: 1, teamConcurrency: 1 },
+    jellyfinPeopleSyncWorker
   );
 
   console.log("All job handlers registered successfully");

@@ -1,14 +1,14 @@
 "use server";
 
+import { ChatDialogWrapper } from "@/components/ChatDialogWrapper";
 import { DynamicBreadcrumbs } from "@/components/DynamicBreadcrumbs";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { JobStatusMonitor } from "@/components/JobStatusMonitor";
 import { SideBar } from "@/components/SideBar";
 import { SuspenseLoading } from "@/components/SuspenseLoading";
 import { UpdateNotifier } from "@/components/UpdateNotifier";
 import { Separator } from "@/components/ui/separator";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { getServers } from "@/lib/db/server";
+import { getServer, getServers } from "@/lib/db/server";
 import { getMe, isUserAdmin } from "@/lib/db/users";
 import { redirect } from "next/navigation";
 import { PropsWithChildren, Suspense } from "react";
@@ -20,14 +20,18 @@ interface Props extends PropsWithChildren {
 export default async function layout({ children, params }: Props) {
   const { id } = await params;
 
-  const servers = await getServers();
-
-  const me = await getMe();
-  const isAdmin = await isUserAdmin();
+  const [servers, server, me, isAdmin] = await Promise.all([
+    getServers(),
+    getServer({ serverId: id }),
+    getMe(),
+    isUserAdmin(),
+  ]);
 
   if (!me) {
     redirect(`/servers/${id}/login`);
   }
+
+  const chatConfigured = !!(server?.chatProvider && server?.chatModel);
 
   return (
     <SidebarProvider>
@@ -39,6 +43,9 @@ export default async function layout({ children, params }: Props) {
               <SidebarTrigger />
               <Separator orientation="vertical" />
               <DynamicBreadcrumbs />
+              <div className="ml-auto">
+                <ChatDialogWrapper chatConfigured={chatConfigured} me={me} serverUrl={server?.url} />
+              </div>
             </div>
             {children}
           </main>
@@ -47,7 +54,6 @@ export default async function layout({ children, params }: Props) {
       {isAdmin ? (
         <>
           <UpdateNotifier />
-          <JobStatusMonitor />
         </>
       ) : null}
     </SidebarProvider>

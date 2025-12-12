@@ -19,6 +19,7 @@ import {
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
 import { getMe } from "./users";
+import { unstable_cache, revalidateTag } from "next/cache";
 
 const enableDebug = false;
 
@@ -39,10 +40,12 @@ export interface SeriesRecommendationItem {
   basedOn: Item[];
 }
 
-export const getSimilarSeries = async (
-  serverId: string | number,
-  userId?: string,
-  limit: number = 10
+const CACHE_TTL = 60 * 30; // 30 minutes
+
+const getSimilarSeriesUncached = async (
+  serverId: number,
+  userId: string | undefined,
+  limit: number
 ): Promise<SeriesRecommendationItem[]> => {
   try {
     debugLog(
@@ -51,31 +54,13 @@ export const getSimilarSeries = async (
       }, limit ${limit}`
     );
 
-    // Convert serverId to number
-    const serverIdNum = Number(serverId);
-
-    // Get the user ID to use for recommendations
-    let targetUserId = userId;
-    if (!targetUserId) {
-      const currentUser = await getMe();
-      if (currentUser && currentUser.serverId === serverIdNum) {
-        targetUserId = currentUser.id;
-        debugLog(`🔍 Using current user: ${targetUserId}`);
-      } else {
-        debugLog(`❌ No valid user found for series recommendations`);
-      }
-    } else {
-      debugLog(`👤 Using provided user: ${targetUserId}`);
-    }
-
     let recommendations: SeriesRecommendationItem[] = [];
 
-    if (targetUserId) {
-      // Get user-specific series recommendations
+    if (userId) {
       debugLog(`\n📺 Getting user-specific series recommendations...`);
       recommendations = await getUserSpecificSeriesRecommendations(
-        serverIdNum,
-        targetUserId,
+        serverId,
+        userId,
         limit
       );
       debugLog(
@@ -83,16 +68,15 @@ export const getSimilarSeries = async (
       );
     }
 
-    // If we don't have enough user-specific recommendations, supplement with popular series
     if (recommendations.length < limit) {
       const remainingLimit = limit - recommendations.length;
       debugLog(
         `\n🔥 Need ${remainingLimit} more series recommendations, getting popular series...`
       );
       const popularRecommendations = await getPopularSeriesRecommendations(
-        serverIdNum,
+        serverId,
         remainingLimit,
-        targetUserId
+        userId
       );
       debugLog(
         `✅ Got ${popularRecommendations.length} popular series recommendations`
@@ -107,6 +91,55 @@ export const getSimilarSeries = async (
   } catch (error) {
     debugLog("❌ Error getting similar series:", error);
     return [];
+  }
+};
+
+const getCachedSimilarSeries = (
+  serverId: number,
+  userId: string,
+  limit: number
+) =>
+  unstable_cache(
+    () => getSimilarSeriesUncached(serverId, userId, limit),
+    [`similar-series`, String(serverId), userId, String(limit)],
+    {
+      revalidate: CACHE_TTL,
+      tags: [
+        `series-recommendations-${serverId}`,
+        `series-recommendations-${serverId}-${userId}`,
+      ],
+    }
+  )();
+
+export const getSimilarSeries = async (
+  serverId: string | number,
+  userId?: string,
+  limit: number = 10
+): Promise<SeriesRecommendationItem[]> => {
+  const serverIdNum = Number(serverId);
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const currentUser = await getMe();
+    if (currentUser && currentUser.serverId === serverIdNum) {
+      targetUserId = currentUser.id;
+      debugLog(`🔍 Using current user: ${targetUserId}`);
+    } else {
+      debugLog(`❌ No valid user found for series recommendations`);
+      return [];
+    }
+  }
+
+  return getCachedSimilarSeries(serverIdNum, targetUserId, limit);
+};
+
+export const revalidateSeriesRecommendations = async (
+  serverId: number,
+  userId?: string
+) => {
+  revalidateTag(`series-recommendations-${serverId}`, "hours");
+  if (userId) {
+    revalidateTag(`series-recommendations-${serverId}-${userId}`, "hours");
   }
 };
 
@@ -624,6 +657,9 @@ export const hideSeriesRecommendation = async (
       userId: currentUser.id,
       itemId: itemId,
     });
+
+    // Revalidate series recommendations cache
+    await revalidateSeriesRecommendations(serverIdNum, currentUser.id);
 
     return {
       success: true,

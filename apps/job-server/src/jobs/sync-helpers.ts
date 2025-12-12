@@ -84,7 +84,7 @@ export async function syncUsers(
       });
       syncedCount++;
     } catch (error) {
-      console.error(`Error syncing user ${userData.Id}:`, error);
+      console.error(`[user-sync] action=error userId=${userData.Id} error=${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -113,7 +113,7 @@ export async function syncLibraries(
       });
       syncedCount++;
     } catch (error) {
-      console.error(`Error syncing library ${libraryData.ItemId}:`, error);
+      console.error(`[library-sync] action=error libraryId=${libraryData.ItemId} error=${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -147,7 +147,7 @@ export async function syncActivities(
       });
       syncedCount++;
     } catch (error) {
-      console.error(`Error syncing activity ${activityData.Id}:`, error);
+      console.error(`[activity-sync] action=error activityId=${activityData.Id} error=${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -216,7 +216,7 @@ export async function syncItems(
       });
       syncedCount++;
     } catch (error) {
-      console.error(`Error syncing item ${itemData.Id}:`, error);
+      console.error(`[item-sync] action=error itemId=${itemData.Id} error=${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

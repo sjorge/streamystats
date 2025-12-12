@@ -10,6 +10,9 @@ import {
   syncRecentActivities,
   SyncOptions,
 } from "./sync";
+import { syncPeopleForServer } from "./sync/people";
+import { getJobQueue } from "../jobs/queue";
+import { logJobResult } from "../jobs/job-logger";
 
 export interface JellyfinSyncJobData {
   serverId: number;
@@ -27,6 +30,10 @@ export interface JellyfinSyncJobData {
 export interface JellyfinServerSyncJobData {
   serverId: number;
   options?: SyncOptions;
+}
+
+export interface JellyfinPeopleSyncJobData {
+  serverId: number;
 }
 
 /**
@@ -107,6 +114,23 @@ export async function jellyfinSyncWorker(job: {
       );
     } else {
       await updateServerSyncStatus(serverId, "failed", syncType, result.error);
+    }
+
+    // Kick off People sync after items sync completes (runs in background)
+    if (syncType === "items" && result.status !== "error") {
+      try {
+        const boss = await getJobQueue();
+        await boss.send(
+          JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+          { serverId },
+          { singletonKey: `jellyfin-people-sync-${serverId}` }
+        );
+      } catch (error) {
+        console.error(
+          `Failed to enqueue people sync for server ${serverId}:`,
+          error
+        );
+      }
     }
 
     return {
@@ -236,6 +260,56 @@ export async function jellyfinRecentActivitiesSyncWorker(job: {
   });
 }
 
+/**
+ * People sync job worker - backfills items.people in the background
+ */
+export async function jellyfinPeopleSyncWorker(job: {
+  id: string;
+  data: JellyfinPeopleSyncJobData;
+}): Promise<any> {
+  const startTime = Date.now();
+  const { serverId } = job.data;
+
+  try {
+    await logJobResult(
+      job.id,
+      JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+      "processing",
+      { serverId, status: "starting" },
+      Date.now() - startTime
+    );
+
+    const { processed, remaining } = await syncPeopleForServer(
+      job.id,
+      { serverId },
+      { maxRuntimeMs: 14 * 60 * 1000 }
+    );
+
+    await logJobResult(
+      job.id,
+      JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+      "completed",
+      { serverId, processed, remaining },
+      Date.now() - startTime
+    );
+
+    return { success: true, processed, remaining };
+  } catch (error) {
+    await logJobResult(
+      job.id,
+      JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+      "failed",
+      {
+        serverId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      Date.now() - startTime,
+      error
+    );
+    throw error;
+  }
+}
+
 // Helper functions
 
 async function getServer(serverId: number): Promise<Server | null> {
@@ -282,4 +356,5 @@ export const JELLYFIN_JOB_NAMES = {
   ACTIVITIES_SYNC: "jellyfin-activities-sync",
   RECENT_ITEMS_SYNC: "jellyfin-recent-items-sync",
   RECENT_ACTIVITIES_SYNC: "jellyfin-recent-activities-sync",
+  PEOPLE_SYNC: "jellyfin-people-sync",
 } as const;

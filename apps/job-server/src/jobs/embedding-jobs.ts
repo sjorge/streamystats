@@ -1,10 +1,11 @@
-import { db, Item, items } from "@streamystats/database";
+import { db, Item, items, servers } from "@streamystats/database";
 import axios from "axios";
 import { and, eq, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import { TIMEOUT_CONFIG } from "./config";
 import { logJobResult } from "./job-logger";
 import { getJobQueue } from "./queue";
+import { sleep } from "../utils/sleep";
 
 // Embedding configuration passed from job data
 interface EmbeddingConfig {
@@ -26,10 +27,23 @@ const indexEnsuredForDimension = new Set<number>();
  * Ensure HNSW index exists for the given embedding dimension.
  * pgvector requires indexes to be created with a specific dimension.
  * This creates the index if it doesn't exist, improving similarity query performance.
+ * Note: HNSW index max is 2000 dimensions - for larger dimensions, queries work without index.
  */
 async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
   // Skip if already ensured this session
   if (indexEnsuredForDimension.has(dimensions)) {
+    return;
+  }
+
+  // pgvector HNSW index has a max of 2000 dimensions
+  // For larger dimensions, skip index - queries still work via sequential scan
+  if (dimensions > 2000) {
+    console.log(
+      `Skipping HNSW index for ${dimensions} dimensions (exceeds 2000 limit). Queries will use sequential scan.`
+    );
+    // Drop any existing index with different dimensions
+    await db.execute(sql`DROP INDEX IF EXISTS items_embedding_idx`);
+    indexEnsuredForDimension.add(dimensions);
     return;
   }
 
@@ -85,10 +99,12 @@ export async function generateItemEmbeddingsJob(job: any) {
     serverId,
     provider: rawProvider,
     config,
+    manualStart = false, // If true, continue until complete even if auto-embeddings is disabled
   } = job.data as {
     serverId: number;
     provider: "openai-compatible" | "openai" | "ollama"; // "openai" is legacy alias
     config: EmbeddingConfig;
+    manualStart?: boolean;
   };
 
   // Normalize legacy "openai" provider to "openai-compatible"
@@ -290,7 +306,7 @@ export async function generateItemEmbeddingsJob(job: any) {
           const textsToEmbed = batchData.map((data) => data.textToEmbed);
 
           console.log(
-            `Processing batch: ${batchData.length} items via ${config.baseUrl}`
+            `[embeddings] serverId=${serverId} batchIndex=${Math.floor(i / BATCH_SIZE)} batchItems=${batchData.length} model=${config.model} baseUrl=${config.baseUrl}`
           );
 
           // Call embedding API
@@ -330,7 +346,10 @@ export async function generateItemEmbeddingsJob(job: any) {
             try {
               await db
                 .update(items)
-                .set({ embedding, processed: true })
+                .set({
+                  embedding,
+                  processed: true,
+                })
                 .where(eq(items.id, item.id));
               processedCount++;
             } catch (dbError) {
@@ -339,9 +358,7 @@ export async function generateItemEmbeddingsJob(job: any) {
             }
           }
 
-          await new Promise((resolve) =>
-            setTimeout(resolve, DEFAULT_RATE_LIMIT_DELAY)
-          );
+          await sleep(DEFAULT_RATE_LIMIT_DELAY);
         } catch (batchError) {
           console.error(`Error processing batch at index ${i}:`, batchError);
 
@@ -416,13 +433,16 @@ export async function generateItemEmbeddingsJob(job: any) {
 
           await db
             .update(items)
-            .set({ embedding, processed: true })
+            .set({
+              embedding,
+              processed: true,
+            })
             .where(eq(items.id, item.id));
 
           processedCount++;
 
           // Ollama is typically self-hosted, use shorter delay
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await sleep(100);
         } catch (itemError) {
           console.error(`Error processing item ${item.id}:`, itemError);
           errorCount++;
@@ -468,34 +488,65 @@ export async function generateItemEmbeddingsJob(job: any) {
     const remaining = Number(remainingCount[0]?.count ?? 0);
 
     if (remaining > 0) {
-      console.log(
-        `Queueing next batch for server ${serverId}, ${remaining} items remaining`
-      );
+      // Check if we should continue: either manual start or auto-embeddings enabled
+      const serverCheck = await db
+        .select({ autoGenerateEmbeddings: servers.autoGenerateEmbeddings })
+        .from(servers)
+        .where(eq(servers.id, serverId))
+        .limit(1);
 
-      // Queue next batch (no singleton - chained jobs need to run sequentially)
-      try {
-        const boss = await getJobQueue();
-        const nextJobId = await boss.send(
-          "generate-item-embeddings",
-          {
-            serverId,
-            provider,
-            config,
-          },
-          {
-            retryLimit: 3,
-            retryDelay: 30, // 30 seconds
-          }
+      const autoEnabled = serverCheck[0]?.autoGenerateEmbeddings === true;
+      const shouldContinue = manualStart || autoEnabled;
+
+      if (!shouldContinue) {
+        console.log(
+          `Auto-embeddings disabled for server ${serverId} and not a manual start, not queueing next batch`
+        );
+      } else {
+        console.log(
+          `Queueing next batch for server ${serverId}, ${remaining} items remaining (manual: ${manualStart}, auto: ${autoEnabled})`
         );
 
-        console.log(`Queued next embedding batch with job ID: ${nextJobId}`);
-      } catch (queueError) {
-        console.error("Failed to queue next embedding batch:", queueError);
+        // Queue next batch (no singleton - chained jobs need to run sequentially)
+        try {
+          const boss = await getJobQueue();
+          const nextJobId = await boss.send(
+            "generate-item-embeddings",
+            {
+              serverId,
+              provider,
+              config,
+              manualStart, // Preserve the manual start flag for subsequent batches
+            },
+            {
+              retryLimit: 3,
+              retryDelay: 30, // 30 seconds
+            }
+          );
+
+          console.log(`Queued next embedding batch with job ID: ${nextJobId}`);
+        } catch (queueError) {
+          console.error("Failed to queue next embedding batch:", queueError);
+        }
       }
     } else {
       console.log(
         `Embedding job complete for server ${serverId}. Processed: ${processedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`
       );
+
+      // Revalidate recommendations cache since embeddings have changed
+      try {
+        const nextjsUrl = process.env.NEXTJS_URL || "http://localhost:3000";
+        await axios.post(`${nextjsUrl}/api/revalidate-recommendations`, {
+          serverId,
+        });
+        console.log(`Recommendations cache revalidated for server ${serverId}`);
+      } catch (revalidateError) {
+        console.warn(
+          "Failed to revalidate recommendations cache:",
+          revalidateError
+        );
+      }
     }
 
     return {

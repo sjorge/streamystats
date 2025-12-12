@@ -41,6 +41,9 @@ const _map = {
   users: "Users",
   library: "Library",
   dashboard: "Dashboard",
+  chat: "Chat AI",
+  ai: "AI Recommendations",
+  general: "General",
 };
 
 export const DynamicBreadcrumbs: React.FC = () => {
