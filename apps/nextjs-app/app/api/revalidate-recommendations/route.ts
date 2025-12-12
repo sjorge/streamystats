@@ -1,4 +1,5 @@
 import { revalidateSeriesRecommendations } from "@/lib/db/similar-series-statistics";
+import { revalidateRecommendations } from "@/lib/db/similar-statistics";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -14,7 +15,10 @@ export async function POST(req: NextRequest) {
 
     const serverIdNum = Number(serverId);
 
-    await revalidateSeriesRecommendations(serverIdNum, userId);
+    await Promise.all([
+      revalidateSeriesRecommendations(serverIdNum, userId),
+      revalidateRecommendations(serverIdNum, userId),
+    ]);
 
     return NextResponse.json({
       success: true,

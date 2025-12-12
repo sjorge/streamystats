@@ -293,7 +293,7 @@ class SyncScheduler {
    */
   private async triggerActivitySync(): Promise<void> {
     try {
-      console.log("Triggering periodic activity sync...");
+      console.log("[scheduler] trigger=activity-sync");
 
       // Get all servers that are not currently syncing (or stale syncing)
       const activeServers = await this.getServersForPeriodicSync();
@@ -326,7 +326,7 @@ class SyncScheduler {
           );
 
           console.log(
-            `Queued periodic activity sync for server: ${server.name} (ID: ${server.id})`
+            `[scheduler] queued=activity-sync server=${server.name} serverId=${server.id}`
           );
         } catch (error) {
           console.error(
@@ -337,7 +337,7 @@ class SyncScheduler {
       }
 
       console.log(
-        `Periodic activity sync queued for ${activeServers.length} servers`
+        `[scheduler] completed=activity-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
       console.error("Error during periodic activity sync trigger:", error);
@@ -349,7 +349,7 @@ class SyncScheduler {
    */
   private async triggerRecentItemsSync(): Promise<void> {
     try {
-      console.log("Triggering periodic recently added items sync...");
+      console.log("[scheduler] trigger=recent-items-sync");
 
       // Get all servers that are not currently syncing (or stale syncing)
       const activeServers = await this.getServersForPeriodicSync();
@@ -382,7 +382,7 @@ class SyncScheduler {
           );
 
           console.log(
-            `Queued periodic recently added items sync for server: ${server.name} (ID: ${server.id})`
+            `[scheduler] queued=recent-items-sync server=${server.name} serverId=${server.id}`
           );
         } catch (error) {
           console.error(
@@ -393,7 +393,7 @@ class SyncScheduler {
       }
 
       console.log(
-        `Periodic recently added items sync queued for ${activeServers.length} servers`
+        `[scheduler] completed=recent-items-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
       console.error(
@@ -408,7 +408,7 @@ class SyncScheduler {
    */
   private async triggerUserSync(): Promise<void> {
     try {
-      console.log("Triggering periodic user sync...");
+      console.log("[scheduler] trigger=user-sync");
 
       // Get all servers that are not currently syncing (or stale syncing)
       const activeServers = await this.getServersForPeriodicSync();
@@ -441,7 +441,7 @@ class SyncScheduler {
           );
 
           console.log(
-            `Queued periodic user sync for server: ${server.name} (ID: ${server.id})`
+            `[scheduler] queued=user-sync server=${server.name} serverId=${server.id}`
           );
         } catch (error) {
           console.error(
@@ -452,7 +452,7 @@ class SyncScheduler {
       }
 
       console.log(
-        `Periodic user sync queued for ${activeServers.length} servers`
+        `[scheduler] completed=user-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
       console.error("Error during periodic user sync trigger:", error);
@@ -759,7 +759,7 @@ class SyncScheduler {
 
               cleanedCount++;
               console.log(
-                `Cleaned up stale embedding job for server ${serverId}`
+                `[cleanup] type=stale-embedding serverId=${serverId}`
               );
             }
           }
@@ -769,9 +769,7 @@ class SyncScheduler {
       }
 
       if (cleanedCount > 0) {
-        console.log(
-          `Job cleanup completed: cleaned ${cleanedCount} stale embedding jobs`
-        );
+        console.log(`[cleanup] type=stale-embedding cleanedCount=${cleanedCount}`);
       }
     } catch (error) {
       console.error("Error during job cleanup:", error);

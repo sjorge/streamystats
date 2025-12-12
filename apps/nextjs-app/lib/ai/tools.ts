@@ -29,6 +29,9 @@ function formatItem(
     rating: item.communityRating,
     genres: item.genres,
     overview: item.overview?.slice(0, 200),
+    primaryImageTag: item.primaryImageTag,
+    seriesId: item.seriesId,
+    seriesPrimaryImageTag: item.seriesPrimaryImageTag,
   };
   if (stats) {
     return {

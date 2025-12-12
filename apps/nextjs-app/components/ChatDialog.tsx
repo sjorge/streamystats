@@ -10,77 +10,133 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Loader,
-  Send,
   Sparkles,
-  User,
   Bot,
   AlertCircle,
-  Brain,
-  ChevronDown,
+  Film,
+  Tv,
+  ExternalLink,
 } from "lucide-react";
+import type { User } from "@/lib/types";
+import JellyfinAvatar from "./JellyfinAvatar";
+import Link from "next/link";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import { Message, MessageContent } from "@/components/ai-elements/message";
+import {
+  Reasoning,
+  ReasoningTrigger,
+  ReasoningContent,
+} from "@/components/ai-elements/reasoning";
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputSubmit,
+} from "@/components/ai-elements/prompt-input";
+import { Loader } from "@/components/ai-elements/loader";
+import { Streamdown } from "streamdown";
 
 interface ChatDialogProps {
   chatConfigured: boolean;
+  me?: User;
+  serverUrl?: string;
 }
 
-interface ThinkingBlockProps {
-  text: string;
-  isStreaming?: boolean;
+interface ChatItemData {
+  id: string;
+  name: string;
+  type?: string;
+  year?: number;
+  rating?: number;
+  primaryImageTag?: string;
+  seriesId?: string;
+  seriesPrimaryImageTag?: string;
 }
 
-function ThinkingBlock({ text, isStreaming }: ThinkingBlockProps) {
-  const [isOpen, setIsOpen] = useState(true);
+interface ItemCardProps {
+  item: ChatItemData;
+  serverId: string;
+  serverUrl: string;
+}
+
+function ItemCard({ item, serverId, serverUrl }: ItemCardProps) {
+  const [imageError, setImageError] = useState(false);
+
+  const imageUrl = useMemo(() => {
+    if (item.primaryImageTag) {
+      return `${serverUrl}/Items/${item.id}/Images/Primary?fillHeight=120&fillWidth=80&quality=96&tag=${item.primaryImageTag}`;
+    }
+    if (item.seriesId && item.seriesPrimaryImageTag) {
+      return `${serverUrl}/Items/${item.seriesId}/Images/Primary?fillHeight=120&fillWidth=80&quality=96&tag=${item.seriesPrimaryImageTag}`;
+    }
+    // Fallback: try to load image without tag (Jellyfin will return it if it exists)
+    return `${serverUrl}/Items/${item.id}/Images/Primary?fillHeight=120&fillWidth=80&quality=96`;
+  }, [item, serverUrl]);
+
+  const isMovie = item.type === "Movie";
+  const Icon = isMovie ? Film : Tv;
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="my-2">
-      <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group w-full">
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 flex-1">
-          {isStreaming ? (
-            <Loader className="h-3 w-3 animate-spin text-amber-500" />
-          ) : (
-            <Brain className="h-3 w-3 text-amber-500" />
-          )}
-          <span className="text-amber-600 dark:text-amber-400 font-medium">
-            {isStreaming ? "Thinking..." : "Thought process"}
-          </span>
-          <ChevronDown
-            className={`h-3 w-3 ml-auto transition-transform duration-200 ${
-              isOpen ? "rotate-180" : ""
-            }`}
+    <Link
+      href={`/servers/${serverId}/library/${item.id}`}
+      className="inline-flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border hover:bg-accent transition-colors group max-w-xs"
+    >
+      <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-muted">
+        {imageUrl && !imageError ? (
+          <img
+            src={imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
           />
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-        <div className="mt-2 pl-3 border-l-2 border-amber-500/30">
-          <div className="text-xs text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
-            {text}
-            {isStreaming && (
-              <span className="inline-block w-1.5 h-3 ml-0.5 bg-amber-500/50 animate-pulse" />
-            )}
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Icon className="h-4 w-4 text-muted-foreground" />
           </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+          {item.name}
         </div>
-      </CollapsibleContent>
-    </Collapsible>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {item.type && (
+            <span className="flex items-center gap-1">
+              <Icon className="h-3 w-3" />
+              {item.type}
+            </span>
+          )}
+          {item.year && (
+            <>
+              {item.type && <span>•</span>}
+              <span>{item.year}</span>
+            </>
+          )}
+          {item.rating && (
+            <>
+              <span>•</span>
+              <span className="text-yellow-500">★</span>
+              <span>{item.rating.toFixed(1)}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+    </Link>
   );
 }
 
-export function ChatDialog({ chatConfigured }: ChatDialogProps) {
+export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
   const [open, setOpen] = useState(false);
-  const [input, setInput] = useState("");
   const params = useParams();
   const serverId = params.id as string;
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const transport = useMemo(
     () =>
@@ -96,6 +152,68 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
   });
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  const itemsCache = useMemo(() => {
+    const cache = new Map<string, ChatItemData>();
+
+    for (const message of messages) {
+      for (const part of message.parts) {
+        if (
+          part.type === "tool-result" ||
+          (part as any).type?.startsWith("tool-")
+        ) {
+          const toolPart = part as any;
+          if (toolPart.result) {
+            const extractItems = (data: any) => {
+              if (!data) return;
+              const itemArrays = [
+                data.movies,
+                data.series,
+                data.items,
+                data.recommendations,
+                data.similar,
+              ];
+              for (const arr of itemArrays) {
+                if (Array.isArray(arr)) {
+                  for (const item of arr) {
+                    const itemData = item.item || item;
+                    if (itemData?.id && !cache.has(itemData.id)) {
+                      cache.set(itemData.id, {
+                        id: itemData.id,
+                        name: itemData.name,
+                        type: itemData.type,
+                        year: itemData.year || itemData.productionYear,
+                        rating: itemData.rating || itemData.communityRating,
+                        primaryImageTag: itemData.primaryImageTag,
+                        seriesId: itemData.seriesId,
+                        seriesPrimaryImageTag: itemData.seriesPrimaryImageTag,
+                      });
+                    }
+                  }
+                }
+              }
+              if (data.sourceItem && !cache.has(data.sourceItem.id)) {
+                cache.set(data.sourceItem.id, {
+                  id: data.sourceItem.id,
+                  name: data.sourceItem.name,
+                  type: data.sourceItem.type,
+                  year: data.sourceItem.year || data.sourceItem.productionYear,
+                  rating:
+                    data.sourceItem.rating || data.sourceItem.communityRating,
+                  primaryImageTag: data.sourceItem.primaryImageTag,
+                  seriesId: data.sourceItem.seriesId,
+                  seriesPrimaryImageTag: data.sourceItem.seriesPrimaryImageTag,
+                });
+              }
+            };
+            extractItems(toolPart.result);
+          }
+        }
+      }
+    }
+
+    return cache;
+  }, [messages]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -115,204 +233,77 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
     }
   }, [open]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, status]);
-
-  const onSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!input.trim() || isLoading) return;
-      sendMessage({ text: input });
-      setInput("");
+  const handleSubmit = useCallback(
+    async (message: { text: string }) => {
+      if (!message.text.trim() || isLoading) return;
+      await sendMessage({ text: message.text });
     },
-    [input, isLoading, sendMessage]
+    [isLoading, sendMessage]
   );
 
-  const renderInlineMarkdown = (text: string) => {
-    const parts: React.ReactNode[] = [];
-    let remaining = text;
-    let keyIndex = 0;
+  const markdownComponents = useMemo(
+    () => ({
+      a: ({
+        href,
+        children,
+      }: {
+        href?: string;
+        children?: React.ReactNode;
+      }) => {
+        if (href?.startsWith("item://")) {
+          const itemId = href.replace("item://", "");
+          const cachedItem = itemsCache.get(itemId);
+          const itemName = typeof children === "string" ? children : "Unknown";
 
-    while (remaining.length > 0) {
-      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-      const italicMatch = remaining.match(/(?<!\*)\*([^*]+?)\*(?!\*)/);
-      const codeMatch = remaining.match(/`(.+?)`/);
+          if (serverUrl) {
+            return (
+              <span className="block my-2">
+                <ItemCard
+                  item={cachedItem || { id: itemId, name: itemName }}
+                  serverId={serverId}
+                  serverUrl={serverUrl}
+                />
+              </span>
+            );
+          }
 
-      type MatchType = { index: number; length: number; node: React.ReactNode };
-      let nextMatch: MatchType | null = null;
-
-      if (boldMatch?.index !== undefined) {
-        nextMatch = {
-          index: boldMatch.index,
-          length: boldMatch[0].length,
-          node: (
-            <strong
-              key={`b-${keyIndex++}`}
-              className="font-semibold text-foreground"
+          return (
+            <Link
+              href={`/servers/${serverId}/library/${itemId}`}
+              className="inline-flex items-center gap-1 text-primary hover:underline font-semibold"
             >
-              {boldMatch[1]}
-            </strong>
-          ),
-        };
-      }
-
-      if (italicMatch?.index !== undefined) {
-        if (!nextMatch || italicMatch.index < nextMatch.index) {
-          nextMatch = {
-            index: italicMatch.index,
-            length: italicMatch[0].length,
-            node: (
-              <em key={`i-${keyIndex++}`} className="italic">
-                {italicMatch[1]}
-              </em>
-            ),
-          };
-        }
-      }
-
-      if (codeMatch?.index !== undefined) {
-        if (!nextMatch || codeMatch.index < nextMatch.index) {
-          nextMatch = {
-            index: codeMatch.index,
-            length: codeMatch[0].length,
-            node: (
-              <code
-                key={`c-${keyIndex++}`}
-                className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-mono"
-              >
-                {codeMatch[1]}
-              </code>
-            ),
-          };
-        }
-      }
-
-      if (nextMatch) {
-        if (nextMatch.index > 0) {
-          parts.push(remaining.slice(0, nextMatch.index));
-        }
-        parts.push(nextMatch.node);
-        remaining = remaining.slice(nextMatch.index + nextMatch.length);
-      } else {
-        parts.push(remaining);
-        break;
-      }
-    }
-
-    return parts;
-  };
-
-  const renderMessageContent = (content: string) => {
-    const lines = content.split("\n");
-    const elements: React.ReactNode[] = [];
-    let inList = false;
-    let listItems: React.ReactNode[] = [];
-    let listType: "ul" | "ol" = "ul";
-
-    const flushList = () => {
-      if (listItems.length > 0) {
-        if (listType === "ol") {
-          elements.push(
-            <ol
-              key={`ol-${elements.length}`}
-              className="list-decimal pl-5 space-y-1.5 my-2"
-            >
-              {listItems}
-            </ol>
-          );
-        } else {
-          elements.push(
-            <ul
-              key={`ul-${elements.length}`}
-              className="list-disc pl-5 space-y-1.5 my-2"
-            >
-              {listItems}
-            </ul>
+              {children || "View Item"}
+              <ExternalLink className="h-3 w-3" />
+            </Link>
           );
         }
-        listItems = [];
-        inList = false;
-      }
-    };
 
-    lines.forEach((line, i) => {
-      const trimmedLine = line.trim();
-
-      if (trimmedLine.startsWith("- ") || trimmedLine.startsWith("* ")) {
-        if (!inList || listType !== "ul") {
-          flushList();
-          inList = true;
-          listType = "ul";
-        }
-        listItems.push(
-          <li key={`li-${i}`} className="leading-relaxed">
-            {renderInlineMarkdown(trimmedLine.slice(2))}
-          </li>
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            {children}
+          </a>
         );
-        return;
-      }
+      },
+    }),
+    [itemsCache, serverUrl, serverId]
+  );
 
-      if (trimmedLine.match(/^\d+[\.\)]\s/)) {
-        if (!inList || listType !== "ol") {
-          flushList();
-          inList = true;
-          listType = "ol";
-        }
-        listItems.push(
-          <li key={`li-${i}`} className="leading-relaxed">
-            {renderInlineMarkdown(trimmedLine.replace(/^\d+[\.\)]\s*/, ""))}
-          </li>
-        );
-        return;
-      }
-
-      flushList();
-
-      if (trimmedLine === "") {
-        elements.push(<div key={`br-${i}`} className="h-3" />);
-        return;
-      }
-
-      if (trimmedLine.startsWith("### ")) {
-        elements.push(
-          <h4 key={`h4-${i}`} className="font-semibold text-sm mt-3 mb-1">
-            {renderInlineMarkdown(trimmedLine.slice(4))}
-          </h4>
-        );
-        return;
-      }
-
-      if (trimmedLine.startsWith("## ")) {
-        elements.push(
-          <h3 key={`h3-${i}`} className="font-semibold mt-3 mb-1">
-            {renderInlineMarkdown(trimmedLine.slice(3))}
-          </h3>
-        );
-        return;
-      }
-
-      if (trimmedLine.startsWith("# ")) {
-        elements.push(
-          <h2 key={`h2-${i}`} className="font-bold text-base mt-3 mb-1">
-            {renderInlineMarkdown(trimmedLine.slice(2))}
-          </h2>
-        );
-        return;
-      }
-
-      elements.push(
-        <p key={`p-${i}`} className="leading-relaxed">
-          {renderInlineMarkdown(trimmedLine)}
-        </p>
-      );
-    });
-
-    flushList();
-    return elements;
-  };
+  const renderMessageText = useCallback(
+    (text: string): React.ReactNode => (
+      <Streamdown
+        components={markdownComponents}
+        className="size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+      >
+        {text}
+      </Streamdown>
+    ),
+    [markdownComponents]
+  );
 
   return (
     <>
@@ -329,8 +320,8 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl h-[600px] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-4 py-3 border-b">
+        <DialogContent className="max-w-2xl h-[600px] flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-4 py-3 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
               AI Assistant
@@ -350,77 +341,52 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
             </div>
           ) : (
             <>
-              <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-                {messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-8">
-                    <Sparkles className="h-12 w-12 text-muted-foreground" />
-                    <div className="space-y-2">
-                      <h3 className="font-semibold">
-                        Ask me about your media library
-                      </h3>
-                      <p className="text-sm text-muted-foreground max-w-sm">
-                        Try asking things like:
-                      </p>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        {[
-                          "What's my most watched movie?",
-                          "Recommend something new",
-                          "Recently added movies",
-                          "Top rated series",
-                        ].map((suggestion) => (
-                          <Button
-                            key={suggestion}
-                            variant="outline"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => setInput(suggestion)}
-                          >
-                            {suggestion}
-                          </Button>
-                        ))}
+              <Conversation className="flex-1 min-h-0">
+                <ConversationContent className="gap-6 px-4 py-4">
+                  {messages.length === 0 ? (
+                    <div className="flex size-full flex-col items-center justify-center gap-4 p-8 text-center">
+                      <Sparkles className="h-12 w-12 text-muted-foreground" />
+                      <div className="space-y-2">
+                        <h3 className="font-semibold">
+                          Ask me about your media library
+                        </h3>
+                        <p className="text-sm text-muted-foreground max-w-sm">
+                          Try asking things like:
+                        </p>
+                        <div className="flex flex-wrap gap-2 justify-center pt-2">
+                          {[
+                            "What's my most watched movie?",
+                            "Recommend something new",
+                            "Recently added movies",
+                            "Top rated series",
+                          ].map((suggestion) => (
+                            <Button
+                              key={suggestion}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => handleSubmit({ text: suggestion })}
+                            >
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.map((message, messageIndex) => {
+                  ) : (
+                    messages.map((message, messageIndex) => {
                       const isLastMessage =
                         messageIndex === messages.length - 1;
-                      const hasTextContent = message.parts.some(
-                        (p) => p.type === "text" && p.text.trim()
-                      );
-                      const hasToolCalls = message.parts.some((p) =>
-                        p.type.startsWith("tool-")
-                      );
-                      const hasReasoningContent = message.parts.some(
-                        (p) => p.type === "reasoning"
-                      );
-                      const isAssistantThinking =
-                        isLoading &&
-                        isLastMessage &&
-                        message.role === "assistant" &&
-                        !hasTextContent;
 
                       return (
-                        <div
-                          key={message.id}
-                          className={`flex gap-3 ${
-                            message.role === "user" ? "justify-end" : ""
-                          }`}
-                        >
-                          {message.role === "assistant" && (
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                              <Bot className="h-4 w-4 text-primary" />
-                            </div>
-                          )}
-                          <div
-                            className={`rounded-xl px-4 py-3 max-w-[85%] shadow-sm ${
-                              message.role === "user"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted/80 border border-border/50"
-                            }`}
-                          >
-                            <div className="text-sm">
+                        <Message key={message.id} from={message.role}>
+                          <div className="flex gap-3">
+                            {message.role === "assistant" && (
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Bot className="h-4 w-4 text-primary" />
+                              </div>
+                            )}
+                            <MessageContent className="flex-1">
                               {message.parts.map((part, partIndex) => {
                                 if (part.type === "reasoning") {
                                   const reasoningPart = part as {
@@ -430,19 +396,23 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
                                   };
                                   if (!reasoningPart.text.trim()) return null;
                                   return (
-                                    <ThinkingBlock
+                                    <Reasoning
                                       key={partIndex}
-                                      text={reasoningPart.text}
                                       isStreaming={
                                         reasoningPart.state === "streaming"
                                       }
-                                    />
+                                    >
+                                      <ReasoningTrigger />
+                                      <ReasoningContent>
+                                        {reasoningPart.text}
+                                      </ReasoningContent>
+                                    </Reasoning>
                                   );
                                 }
                                 if (part.type === "text" && part.text.trim()) {
                                   return (
                                     <div key={partIndex}>
-                                      {renderMessageContent(part.text)}
+                                      {renderMessageText(part.text)}
                                     </div>
                                   );
                                 }
@@ -466,7 +436,7 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
                                         key={partIndex}
                                         className="flex items-center gap-2 text-xs text-muted-foreground py-1"
                                       >
-                                        <Loader className="h-3 w-3 animate-spin" />
+                                        <Loader size={12} />
                                         Looking up {toolDisplayName}...
                                       </div>
                                     );
@@ -487,71 +457,77 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
                                 }
                                 return null;
                               })}
-                              {isAssistantThinking &&
-                                !hasToolCalls &&
-                                !hasReasoningContent && (
+                              {isLoading &&
+                                isLastMessage &&
+                                message.role === "assistant" &&
+                                !message.parts.some(
+                                  (p) => p.type === "text" && p.text.trim()
+                                ) &&
+                                !message.parts.some((p) =>
+                                  p.type.startsWith("tool-")
+                                ) &&
+                                !message.parts.some(
+                                  (p) => p.type === "reasoning"
+                                ) && (
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                                    <Loader className="h-3 w-3 animate-spin" />
+                                    <Loader size={12} />
                                     Thinking...
                                   </div>
                                 )}
-                              {isAssistantThinking && hasToolCalls && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                                  <Loader className="h-3 w-3 animate-spin" />
-                                  Generating response...
-                                </div>
-                              )}
-                            </div>
+                            </MessageContent>
+                            {message.role === "user" && me && serverUrl && (
+                              <JellyfinAvatar
+                                user={me}
+                                serverUrl={serverUrl}
+                                className="flex-shrink-0 w-8 h-8"
+                              />
+                            )}
                           </div>
-                          {message.role === "user" && (
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                              <User className="h-4 w-4 text-primary-foreground" />
-                            </div>
-                          )}
-                        </div>
+                        </Message>
                       );
-                    })}
-                    {isLoading &&
-                      messages[messages.length - 1]?.role === "user" && (
+                    })
+                  )}
+                  {isLoading &&
+                    messages[messages.length - 1]?.role === "user" && (
+                      <Message from="assistant">
                         <div className="flex gap-3">
                           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                             <Bot className="h-4 w-4 text-primary" />
                           </div>
-                          <div className="rounded-xl px-4 py-3 bg-muted/80 border border-border/50 shadow-sm">
+                          <MessageContent>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Loader className="h-3 w-3 animate-spin" />
+                              <Loader size={12} />
                               Thinking...
                             </div>
-                          </div>
+                          </MessageContent>
                         </div>
-                      )}
-                  </div>
-                )}
-              </ScrollArea>
+                      </Message>
+                    )}
+                </ConversationContent>
+                <ConversationScrollButton />
+              </Conversation>
 
               {error && (
-                <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20">
+                <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 shrink-0">
                   <p className="text-sm text-destructive">{error.message}</p>
                 </div>
               )}
 
-              <form onSubmit={onSubmit} className="p-4 border-t flex gap-2">
-                <Input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about your watch history..."
-                  disabled={isLoading}
-                  className="flex-1"
-                />
-                <Button type="submit" disabled={isLoading || !input.trim()}>
-                  {isLoading ? (
-                    <Loader className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </form>
+              <div className="p-4 border-t shrink-0">
+                <PromptInput
+                  onSubmit={handleSubmit}
+                  className="rounded-lg border"
+                >
+                  <PromptInputTextarea
+                    placeholder="Ask about your watch history..."
+                    disabled={isLoading}
+                  />
+                  <PromptInputFooter>
+                    <div />
+                    <PromptInputSubmit status={status} disabled={isLoading} />
+                  </PromptInputFooter>
+                </PromptInput>
+              </div>
             </>
           )}
         </DialogContent>

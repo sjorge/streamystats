@@ -306,7 +306,7 @@ export async function generateItemEmbeddingsJob(job: any) {
           const textsToEmbed = batchData.map((data) => data.textToEmbed);
 
           console.log(
-            `Processing batch: ${batchData.length} items via ${config.baseUrl}`
+            `[embeddings] serverId=${serverId} batchIndex=${Math.floor(i / BATCH_SIZE)} batchItems=${batchData.length} model=${config.model} baseUrl=${config.baseUrl}`
           );
 
           // Call embedding API

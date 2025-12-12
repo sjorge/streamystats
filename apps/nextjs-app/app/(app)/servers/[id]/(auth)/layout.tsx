@@ -44,7 +44,7 @@ export default async function layout({ children, params }: Props) {
               <Separator orientation="vertical" />
               <DynamicBreadcrumbs />
               <div className="ml-auto">
-                <ChatDialogWrapper chatConfigured={chatConfigured} />
+                <ChatDialogWrapper chatConfigured={chatConfigured} me={me} serverUrl={server?.url} />
               </div>
             </div>
             {children}

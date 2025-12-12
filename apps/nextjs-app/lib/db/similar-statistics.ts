@@ -19,6 +19,7 @@ import {
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
 import { getMe } from "./users";
+import { unstable_cache, revalidateTag } from "next/cache";
 
 const enableDebug = false;
 
@@ -39,10 +40,12 @@ export interface RecommendationItem {
   basedOn: Item[];
 }
 
-export const getSimilarStatistics = async (
-  serverId: string | number,
-  userId?: string,
-  limit: number = 10
+const CACHE_TTL = 60 * 30; // 30 minutes
+
+const getSimilarStatisticsUncached = async (
+  serverId: number,
+  userId: string | undefined,
+  limit: number
 ): Promise<RecommendationItem[]> => {
   try {
     debugLog(
@@ -51,31 +54,14 @@ export const getSimilarStatistics = async (
       }, limit ${limit}`
     );
 
-    // Convert serverId to number
-    const serverIdNum = Number(serverId);
-
-    // Get the user ID to use for recommendations
-    let targetUserId = userId;
-    if (!targetUserId) {
-      const currentUser = await getMe();
-      if (currentUser && currentUser.serverId === serverIdNum) {
-        targetUserId = currentUser.id;
-        debugLog(`🔍 Using current user: ${targetUserId}`);
-      } else {
-        debugLog(`❌ No valid user found for recommendations`);
-      }
-    } else {
-      debugLog(`👤 Using provided user: ${targetUserId}`);
-    }
-
     let recommendations: RecommendationItem[] = [];
 
-    if (targetUserId) {
+    if (userId) {
       // Get user-specific recommendations
       debugLog(`\n📊 Getting user-specific recommendations...`);
       recommendations = await getUserSpecificRecommendations(
-        serverIdNum,
-        targetUserId,
+        serverId,
+        userId,
         limit
       );
       debugLog(
@@ -90,9 +76,9 @@ export const getSimilarStatistics = async (
         `\n🔥 Need ${remainingLimit} more recommendations, getting popular items...`
       );
       const popularRecommendations = await getPopularRecommendations(
-        serverIdNum,
+        serverId,
         remainingLimit,
-        targetUserId
+        userId
       );
       debugLog(
         `✅ Got ${popularRecommendations.length} popular recommendations`
@@ -107,6 +93,55 @@ export const getSimilarStatistics = async (
   } catch (error) {
     debugLog("❌ Error getting similar statistics:", error);
     return [];
+  }
+};
+
+const getCachedSimilarStatistics = (
+  serverId: number,
+  userId: string,
+  limit: number
+) =>
+  unstable_cache(
+    () => getSimilarStatisticsUncached(serverId, userId, limit),
+    [`similar-statistics`, String(serverId), userId, String(limit)],
+    {
+      revalidate: CACHE_TTL,
+      tags: [
+        `recommendations-${serverId}`,
+        `recommendations-${serverId}-${userId}`,
+      ],
+    }
+  )();
+
+export const getSimilarStatistics = async (
+  serverId: string | number,
+  userId?: string,
+  limit: number = 10
+): Promise<RecommendationItem[]> => {
+  const serverIdNum = Number(serverId);
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const currentUser = await getMe();
+    if (currentUser && currentUser.serverId === serverIdNum) {
+      targetUserId = currentUser.id;
+      debugLog(`🔍 Using current user: ${targetUserId}`);
+    } else {
+      debugLog(`❌ No valid user found for recommendations`);
+      return [];
+    }
+  }
+
+  return getCachedSimilarStatistics(serverIdNum, targetUserId, limit);
+};
+
+export const revalidateRecommendations = async (
+  serverId: number,
+  userId?: string
+) => {
+  revalidateTag(`recommendations-${serverId}`);
+  if (userId) {
+    revalidateTag(`recommendations-${serverId}-${userId}`);
   }
 };
 
@@ -669,6 +704,9 @@ export const hideRecommendation = async (
       userId: currentUser.id,
       itemId: itemId,
     });
+
+    // Revalidate recommendations cache
+    await revalidateRecommendations(serverIdNum, currentUser.id);
 
     return {
       success: true,

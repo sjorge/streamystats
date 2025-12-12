@@ -98,17 +98,21 @@ async function startServer() {
 
     const status = activityScheduler.getStatus();
     console.log(
-      `Activity sync scheduler running (${status.activitySyncInterval})`
+      `[scheduler] started=activity-sync interval=${status.activitySyncInterval}`
     );
     console.log(
-      `Recently added items sync running (${status.recentItemsSyncInterval})`
+      `[scheduler] started=recent-items-sync interval=${status.recentItemsSyncInterval}`
     );
-    console.log(`User sync scheduler running (${status.userSyncInterval})`);
-    console.log(`People sync scheduler running (${status.peopleSyncInterval})`);
     console.log(
-      `Daily full sync scheduler running (${status.fullSyncInterval})`
+      `[scheduler] started=user-sync interval=${status.userSyncInterval}`
     );
-    console.log(`Session poller running (every 5 seconds)`);
+    console.log(
+      `[scheduler] started=people-sync interval=${status.peopleSyncInterval}`
+    );
+    console.log(
+      `[scheduler] started=full-sync interval=${status.fullSyncInterval}`
+    );
+    console.log(`[scheduler] started=session-poller interval=5s`);
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
