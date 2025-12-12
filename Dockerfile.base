@@ -1,35 +1,21 @@
-# Base image with dependencies
-FROM node:23-alpine AS deps
+# Base image with dependencies (Bun workspace)
+FROM oven/bun:1-alpine AS deps
 
-# Install system dependencies
-RUN apk add --no-cache libc6-compat wget
+RUN apk add --no-cache libc6-compat
 
-# Set working directory
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+COPY package.json bun.lock* ./
 
-# Copy workspace configuration files
-COPY pnpm-workspace.yaml ./
-COPY package.json pnpm-lock.yaml ./
-
-# Copy all package.json files to establish workspace structure
 COPY packages/database/package.json ./packages/database/
 COPY apps/nextjs-app/package.json ./apps/nextjs-app/
 COPY apps/job-server/package.json ./apps/job-server/
 
-# Install all dependencies with cache mount
-RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    --mount=type=cache,target=/app/node_modules/.pnpm \
-    pnpm install --no-frozen-lockfile
+RUN bun install --frozen-lockfile || bun install
 
-# Database build stage
 FROM deps AS database-builder
 
-# Copy database source
 COPY packages/database ./packages/database
 
-# Build database package with cache mount
-RUN --mount=type=cache,target=/app/node_modules/.pnpm \
-    pnpm --filter @streamystats/database build
+WORKDIR /app/packages/database
+RUN bun run build

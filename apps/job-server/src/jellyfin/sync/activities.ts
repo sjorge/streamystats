@@ -520,10 +520,6 @@ async function processActivity(
         validUserId = jellyfinActivity.UserId;
       } else if (jellyfinActivity.UserId == ACTIVITYLOG_SYSTEM_USERID) {
         // this is a system event (plugin install/uninstall, ...) we do not print a warning
-      } else {
-        console.warn(
-          `Activity ${jellyfinActivity.Id} references non-existent user ${jellyfinActivity.UserId}, setting to null`
-        );
       }
     } catch (error) {
       console.warn(

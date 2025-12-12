@@ -25,6 +25,8 @@ RUN bun run build
 # Production runtime stage
 FROM oven/bun:1-alpine AS runner
 
+RUN apk add --no-cache libc6-compat wget
+
 RUN addgroup --system --gid 1001 bunjs && \
     adduser --system --uid 1001 jobserver
 
@@ -43,6 +45,7 @@ USER jobserver
 
 ENV NODE_ENV=production
 ENV PORT=3005
+ENV HOST=0.0.0.0
 
 EXPOSE 3005
 

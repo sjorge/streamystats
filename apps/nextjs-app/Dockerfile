@@ -38,6 +38,7 @@ ARG BUILD_TIME
 ENV NEXT_PUBLIC_VERSION=${VERSION}
 ENV NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA}
 ENV NEXT_PUBLIC_BUILD_TIME=${BUILD_TIME}
+ENV NODE_ENV=production
 
 # Build Next.js with Bun
 WORKDIR /app/apps/nextjs-app
@@ -70,4 +71,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-CMD ["bun", "run", "apps/nextjs-app/server.js"]
+CMD ["bun", "server.js"]

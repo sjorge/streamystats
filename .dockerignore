@@ -1,7 +1,11 @@
-Dockerfile
-.dockerignore
-node_modules
-npm-debug.log
-README.md
-.next
 .git
+**/.DS_Store
+
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/coverage
+**/.cache
+
+npm-debug.log
