@@ -88,7 +88,7 @@ main() {
   create_extensions
 
   echo "Running database migrations with Drizzle..."
-  bun --cwd /app/packages/database run db:migrate
+  cd /app/packages/database && bun run db:migrate
 
   echo "Migrations completed successfully!"
   echo "=== Migration script finished at: $(date) ==="
