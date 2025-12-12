@@ -2,7 +2,6 @@
 
 import { DynamicBreadcrumbs } from "@/components/DynamicBreadcrumbs";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { JobStatusMonitor } from "@/components/JobStatusMonitor";
 import { SideBar } from "@/components/SideBar";
 import { SuspenseLoading } from "@/components/SuspenseLoading";
 import { UpdateNotifier } from "@/components/UpdateNotifier";
@@ -47,7 +46,6 @@ export default async function layout({ children, params }: Props) {
       {isAdmin ? (
         <>
           <UpdateNotifier />
-          <JobStatusMonitor />
         </>
       ) : null}
     </SidebarProvider>

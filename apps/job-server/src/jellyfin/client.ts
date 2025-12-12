@@ -3,6 +3,7 @@ import Bottleneck from "bottleneck";
 import pRetry from "p-retry";
 import { Server } from "@streamystats/database";
 import { JellyfinSession } from "./types";
+import { formatError } from "../utils/format-error";
 
 export interface JellyfinConfig {
   baseURL: string;
@@ -283,6 +284,11 @@ export interface ItemsResponse {
   StartIndex: number;
 }
 
+export interface JellyfinItemPeopleDto {
+  Id: string;
+  People?: any[];
+}
+
 const DEFAULT_ITEM_FIELDS = [
   "DateCreated",
   "Etag",
@@ -322,7 +328,6 @@ const DEFAULT_ITEM_FIELDS = [
   "ParentBackdropItemId",
   "ParentThumbItemId",
   "LocationType",
-  "People",
 ];
 
 const DEFAULT_IMAGE_TYPES = "Primary,Backdrop,Banner,Thumb";
@@ -335,7 +340,7 @@ export class JellyfinClient {
   constructor(config: JellyfinConfig) {
     this.config = {
       timeout: 60000,
-      rateLimitPerSecond: 10,
+      rateLimitPerSecond: 4,
       maxRetries: 3,
       ...config,
     };
@@ -379,7 +384,9 @@ export class JellyfinClient {
         maxTimeout: 10000,
         onFailedAttempt: (error) => {
           console.warn(
-            `Request attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`
+            `Request attempt ${error.attemptNumber} failed (${formatError(
+              error
+            )}). ${error.retriesLeft} retries left.`
           );
         },
       }
@@ -524,6 +531,24 @@ export class JellyfinClient {
       items: response.Items || [],
       totalCount: response.TotalRecordCount || 0,
     };
+  }
+
+  async getItemsPeople(ids: string[]): Promise<JellyfinItemPeopleDto[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const response = await this.makeRequest<ItemsResponse>("get", "/Items", {
+      params: {
+        ids: ids.join(","),
+        Fields: "People",
+      },
+    });
+
+    return (response.Items || []).map((item) => ({
+      Id: item.Id,
+      People: item.People,
+    }));
   }
 
   async getItemsWithImages(

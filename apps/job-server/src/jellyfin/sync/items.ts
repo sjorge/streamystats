@@ -15,7 +15,8 @@ import {
   createSyncResult,
 } from "../sync-metrics";
 import pMap from "p-map";
-import pLimit from "p-limit";
+import { sleep } from "../../utils/sleep";
+import { formatSyncLogLine } from "./sync-log";
 
 export interface ItemSyncOptions {
   itemPageSize?: number;
@@ -39,10 +40,9 @@ export async function syncItems(
   options: ItemSyncOptions = {}
 ): Promise<SyncResult<ItemSyncData>> {
   const {
-    itemPageSize = 500,
+    itemPageSize = 1000,
     batchSize = 1000,
-    maxLibraryConcurrency = 2,
-    itemConcurrency = 10,
+    itemConcurrency = 4,
     apiRequestDelayMs = 100,
   } = options;
 
@@ -51,46 +51,93 @@ export async function syncItems(
   const errors: string[] = [];
 
   try {
-    console.log(`Starting items sync for server ${server.name}`);
-
     // Get all libraries for this server
     const serverLibraries = await db
       .select()
       .from(libraries)
       .where(eq(libraries.serverId, server.id));
 
-    console.log(`Found ${serverLibraries.length} libraries to sync`);
-
-    // Process libraries with limited concurrency
-    const libraryLimit = pLimit(maxLibraryConcurrency);
-
-    await Promise.all(
-      serverLibraries.map((library: Library) =>
-        libraryLimit(async () => {
-          try {
-            console.log(
-              `Starting sync for library: ${library.name} (${library.id})`
-            );
-            await syncLibraryItems(library.id, client, metrics, {
-              itemPageSize,
-              batchSize,
-              itemConcurrency,
-              apiRequestDelayMs,
-            });
-            metrics.incrementLibrariesProcessed();
-            console.log(`Completed sync for library: ${library.name}`);
-          } catch (error) {
-            console.error(`Error syncing library ${library.name}:`, error);
-            metrics.incrementErrors();
-            errors.push(
-              `Library ${library.name}: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`
-            );
-          }
-        })
-      )
+    console.info(
+      formatSyncLogLine("items-sync", {
+        server: server.name,
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        libraries: serverLibraries.length,
+      })
     );
+
+    // Process libraries sequentially to avoid overwhelming Jellyfin / DB
+    for (const library of serverLibraries) {
+      try {
+        console.info(
+          formatSyncLogLine("items-sync", {
+            server: server.name,
+            page: 0,
+            processed: 0,
+            inserted: 0,
+            updated: 0,
+            errors: 0,
+            processMs: 0,
+            totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+            libraryId: library.id,
+            libraryName: library.name,
+            phase: "start",
+          })
+        );
+
+        await syncLibraryItems(server, library, client, metrics, {
+          itemPageSize,
+          batchSize,
+          itemConcurrency,
+          apiRequestDelayMs,
+        });
+        metrics.incrementLibrariesProcessed();
+
+        console.info(
+          formatSyncLogLine("items-sync", {
+            server: server.name,
+            page: 0,
+            processed: 0,
+            inserted: 0,
+            updated: 0,
+            errors: 0,
+            processMs: 0,
+            totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+            libraryId: library.id,
+            libraryName: library.name,
+            phase: "done",
+          })
+        );
+      } catch (error) {
+        console.error(
+          formatSyncLogLine("items-sync", {
+            server: server.name,
+            page: 0,
+            processed: 0,
+            inserted: 0,
+            updated: 0,
+            errors: 1,
+            processMs: 0,
+            totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+            libraryId: library.id,
+            libraryName: library.name,
+            message: "Error syncing library",
+            error: error instanceof Error ? error.message : "Unknown error",
+          })
+        );
+        metrics.incrementErrors();
+        errors.push(
+          `Library ${library.name}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      }
+    }
 
     const finalMetrics = metrics.finish();
     const data: ItemSyncData = {
@@ -101,7 +148,20 @@ export async function syncItems(
       itemsUnchanged: finalMetrics.itemsUnchanged,
     };
 
-    console.log(`Items sync completed for server ${server.name}:`, data);
+    console.info(
+      formatSyncLogLine("items-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: finalMetrics.itemsInserted,
+        updated: finalMetrics.itemsUpdated,
+        errors: errors.length,
+        processMs: finalMetrics.duration ?? 0,
+        totalProcessed: finalMetrics.itemsProcessed,
+        librariesProcessed: finalMetrics.librariesProcessed,
+        unchanged: finalMetrics.itemsUnchanged,
+      })
+    );
 
     if (errors.length > 0) {
       return createSyncResult("partial", data, finalMetrics, undefined, errors);
@@ -109,7 +169,20 @@ export async function syncItems(
 
     return createSyncResult("success", data, finalMetrics);
   } catch (error) {
-    console.error(`Items sync failed for server ${server.name}:`, error);
+    console.error(
+      formatSyncLogLine("items-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 1,
+        processMs: 0,
+        totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+        message: "Items sync failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    );
     const finalMetrics = metrics.finish();
     const errorData: ItemSyncData = {
       librariesProcessed: finalMetrics.librariesProcessed,
@@ -128,7 +201,8 @@ export async function syncItems(
 }
 
 async function syncLibraryItems(
-  libraryId: string,
+  server: Server,
+  library: Library,
   client: JellyfinClient,
   metrics: SyncMetricsTracker,
   options: {
@@ -140,59 +214,110 @@ async function syncLibraryItems(
 ): Promise<void> {
   let startIndex = 0;
   let hasMoreItems = true;
+  let page = 0;
 
   while (hasMoreItems) {
     // Add delay between API requests
     if (startIndex > 0) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, options.apiRequestDelayMs)
-      );
+      await sleep(options.apiRequestDelayMs);
     }
 
-    console.log(
-      `Fetching items ${startIndex} to ${
-        startIndex + options.itemPageSize
-      } for library ${libraryId}`
-    );
+    page += 1;
+    const beforePageMetrics = metrics.getCurrentMetrics();
 
     try {
+      const fetchStart = Date.now();
       metrics.incrementApiRequests();
       const { items: jellyfinItems, totalCount } = await client.getItemsPage(
-        libraryId,
+        library.id,
         startIndex,
         options.itemPageSize
       );
+      const fetchMs = Date.now() - fetchStart;
 
-      console.log(
-        `Fetched ${jellyfinItems.length} items from Jellyfin (${
-          startIndex + jellyfinItems.length
-        }/${totalCount})`
-      );
+      if (jellyfinItems.length === 0) {
+        hasMoreItems = false;
+        break;
+      }
 
       // Process items in smaller batches to avoid overwhelming the database
+      const processStart = Date.now();
       await pMap(
         jellyfinItems,
         async (jellyfinItem) => {
           try {
-            await processItem(jellyfinItem, libraryId, metrics);
+            await processItem(jellyfinItem, library.id, metrics);
           } catch (error) {
-            console.error(`Error processing item ${jellyfinItem.Id}:`, error);
+            console.error(
+              formatSyncLogLine("items-sync", {
+                server: server.name,
+                page,
+                processed: 0,
+                inserted: 0,
+                updated: 0,
+                errors: 1,
+                processMs: 0,
+                totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+                libraryId: library.id,
+                itemId: jellyfinItem.Id,
+                message: "Error processing item",
+                error: error instanceof Error ? error.message : "Unknown error",
+              })
+            );
             metrics.incrementErrors();
           }
         },
         { concurrency: options.itemConcurrency }
       );
+      const processMs = Date.now() - processStart;
+
+      const afterPageMetrics = metrics.getCurrentMetrics();
+      const processedDelta =
+        afterPageMetrics.itemsProcessed - beforePageMetrics.itemsProcessed;
+      const insertedDelta =
+        afterPageMetrics.itemsInserted - beforePageMetrics.itemsInserted;
+      const updatedDelta =
+        afterPageMetrics.itemsUpdated - beforePageMetrics.itemsUpdated;
+      const errorsDelta = afterPageMetrics.errors - beforePageMetrics.errors;
+
+      console.info(
+        formatSyncLogLine("items-sync", {
+          server: server.name,
+          page,
+          processed: processedDelta,
+          inserted: insertedDelta,
+          updated: updatedDelta,
+          errors: errorsDelta,
+          processMs,
+          totalProcessed: afterPageMetrics.itemsProcessed,
+          libraryId: library.id,
+          libraryName: library.name,
+          startIndex,
+          fetched: jellyfinItems.length,
+          fetchMs,
+          total: totalCount,
+        })
+      );
 
       startIndex += jellyfinItems.length;
       hasMoreItems = startIndex < totalCount && jellyfinItems.length > 0;
-
-      console.log(
-        `Processed batch for library ${libraryId}: ${startIndex}/${totalCount} items`
-      );
     } catch (error) {
       console.error(
-        `Error fetching items page for library ${libraryId}:`,
-        error
+        formatSyncLogLine("items-sync", {
+          server: server.name,
+          page,
+          processed: 0,
+          inserted: 0,
+          updated: 0,
+          errors: 1,
+          processMs: 0,
+          totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+          libraryId: library.id,
+          libraryName: library.name,
+          startIndex,
+          message: "Error fetching items page",
+          error: error instanceof Error ? error.message : "Unknown error",
+        })
       );
       metrics.incrementErrors();
       break; // Stop processing this library on API error
@@ -325,7 +450,7 @@ async function getServerIdFromLibrary(libraryId: string): Promise<number> {
     throw new Error(`Library not found: ${libraryId}`);
   }
 
-  const serverId = library[0].serverId;
+  const [{ serverId }] = library;
   serverIdCache.set(libraryId, serverId);
   return serverId;
 }
@@ -339,8 +464,18 @@ export async function syncRecentlyAddedItems(
   const errors: string[] = [];
 
   try {
-    console.log(
-      `Starting recently added items sync for server ${server.name} (limit: ${limit})`
+    console.info(
+      formatSyncLogLine("recent-items-sync", {
+        server: server.name,
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        limit,
+      })
     );
 
     // Get current libraries from Jellyfin server to verify they still exist
@@ -363,53 +498,91 @@ export async function syncRecentlyAddedItems(
       (library) => !existingLibraryIds.has(library.id)
     );
 
-    if (removedLibraries.length > 0) {
-      console.log(
-        `Found ${removedLibraries.length} libraries that no longer exist on server:`,
-        removedLibraries.map((lib) => `${lib.name} (${lib.id})`).join(", ")
-      );
-    }
-
-    console.log(
-      `Found ${validLibraries.length} valid libraries to sync (${
-        serverLibraries.length - validLibraries.length
-      } removed libraries skipped)`
+    console.info(
+      formatSyncLogLine("recent-items-sync", {
+        server: server.name,
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        validLibraries: validLibraries.length,
+        removedLibraries: removedLibraries.length,
+        limit,
+      })
     );
 
     let allMappedItems: NewItem[] = [];
     let allInvalidItems: Array<{ id: string; error: string }> = [];
 
     // Collect recent items from all valid libraries with their already-known library IDs
+    let page = 0;
     for (const library of validLibraries) {
       try {
-        console.log(
-          `Fetching recently added items from library: ${library.name} (limit: ${limit})`
-        );
-
+        page += 1;
+        const beforePageMetrics = metrics.getCurrentMetrics();
+        const fetchStart = Date.now();
         metrics.incrementApiRequests();
         const libraryItems = await client.getRecentlyAddedItemsByLibrary(
           library.id,
           limit
         );
+        const fetchMs = Date.now() - fetchStart;
 
         metrics.incrementItemsProcessed(libraryItems.length);
-        console.log(
-          `Retrieved ${libraryItems.length} recently added items from library ${library.name}`
-        );
 
         // Map items, knowing they belong to the current library
+        const processStart = Date.now();
         const { validItems, invalidItems } = await mapItemsWithKnownLibrary(
           libraryItems,
           library.id,
           server.id
         );
+        const processMs = Date.now() - processStart;
+
+        const afterPageMetrics = metrics.getCurrentMetrics();
 
         allMappedItems = allMappedItems.concat(validItems);
         allInvalidItems = allInvalidItems.concat(invalidItems);
+
+        console.info(
+          formatSyncLogLine("recent-items-sync", {
+            server: server.name,
+            page,
+            processed:
+              afterPageMetrics.itemsProcessed -
+              beforePageMetrics.itemsProcessed,
+            inserted: 0,
+            updated: 0,
+            errors: afterPageMetrics.errors - beforePageMetrics.errors,
+            processMs,
+            totalProcessed: afterPageMetrics.itemsProcessed,
+            libraryId: library.id,
+            libraryName: library.name,
+            fetched: libraryItems.length,
+            fetchMs,
+            invalid: invalidItems.length,
+          })
+        );
       } catch (error) {
+        page += 1;
         console.error(
-          `API error when fetching items from library ${library.name}:`,
-          error
+          formatSyncLogLine("recent-items-sync", {
+            server: server.name,
+            page,
+            processed: 0,
+            inserted: 0,
+            updated: 0,
+            errors: 1,
+            processMs: 0,
+            totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+            libraryId: library.id,
+            libraryName: library.name,
+            message: "API error when fetching items from library",
+            error: error instanceof Error ? error.message : "Unknown error",
+          })
         );
         metrics.incrementErrors();
         errors.push(
@@ -420,12 +593,22 @@ export async function syncRecentlyAddedItems(
       }
     }
 
-    console.log(
-      `Total recently added items collected: ${allMappedItems.length}`
+    console.info(
+      formatSyncLogLine("recent-items-sync", {
+        server: server.name,
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+        collected: allMappedItems.length,
+        invalid: allInvalidItems.length,
+      })
     );
 
     if (allMappedItems.length === 0) {
-      console.log("No recently added items found across libraries");
       const finalMetrics = metrics.finish();
       const data: ItemSyncData = {
         librariesProcessed: validLibraries.length,
@@ -434,6 +617,18 @@ export async function syncRecentlyAddedItems(
         itemsUpdated: 0,
         itemsUnchanged: 0,
       };
+      console.info(
+        formatSyncLogLine("recent-items-sync", {
+          server: server.name,
+          page: -1,
+          processed: 0,
+          inserted: 0,
+          updated: 0,
+          errors: errors.length,
+          processMs: finalMetrics.duration ?? 0,
+          totalProcessed: finalMetrics.itemsProcessed,
+        })
+      );
       return createSyncResult("success", data, finalMetrics);
     }
 
@@ -441,6 +636,10 @@ export async function syncRecentlyAddedItems(
     metrics.incrementDatabaseOperations();
     const { insertResult, updateResult, unchangedCount } =
       await processValidItems(allMappedItems, allInvalidItems, server.id);
+
+    metrics.incrementItemsInserted(insertResult);
+    metrics.incrementItemsUpdated(updateResult);
+    metrics.incrementItemsUnchanged(unchangedCount);
 
     const finalMetrics = metrics.finish();
     const data: ItemSyncData = {
@@ -451,31 +650,19 @@ export async function syncRecentlyAddedItems(
       itemsUnchanged: unchangedCount,
     };
 
-    // Optionally clean up libraries that no longer exist on the server
-    if (removedLibraries.length > 0) {
-      try {
-        const removedLibraryIds = removedLibraries.map((lib) => lib.id);
-
-        // Note: We don't automatically delete libraries as they might contain important historical data
-        // Instead, we just log them. In the future, we could add a configuration option for automatic cleanup
-        console.log(
-          `Libraries no longer on server (not automatically removed): ${removedLibraries
-            .map((lib) => lib.name)
-            .join(", ")}`
-        );
-
-        // If you want to enable automatic cleanup, uncomment the following:
-        // await db.delete(libraries).where(inArray(libraries.id, removedLibraryIds));
-        // console.log(`Removed ${removedLibraries.length} obsolete libraries from database`);
-      } catch (cleanupError) {
-        console.error("Error during library cleanup:", cleanupError);
-        // Don't fail the entire sync for cleanup errors
-      }
-    }
-
-    console.log(
-      `Recently added items sync completed for server ${server.name}:`,
-      data
+    console.info(
+      formatSyncLogLine("recent-items-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: insertResult,
+        updated: updateResult,
+        errors: errors.length + allInvalidItems.length,
+        processMs: finalMetrics.duration ?? 0,
+        totalProcessed: finalMetrics.itemsProcessed,
+        unchanged: unchangedCount,
+        librariesProcessed: validLibraries.length,
+      })
     );
 
     if (allInvalidItems.length > 0 || errors.length > 0) {
@@ -494,8 +681,18 @@ export async function syncRecentlyAddedItems(
     return createSyncResult("success", data, finalMetrics);
   } catch (error) {
     console.error(
-      `Recently added items sync failed for server ${server.name}:`,
-      error
+      formatSyncLogLine("recent-items-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 1,
+        processMs: 0,
+        totalProcessed: metrics.getCurrentMetrics().itemsProcessed,
+        message: "Recently added items sync failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
     );
     const finalMetrics = metrics.finish();
     const errorData: ItemSyncData = {
@@ -813,11 +1010,38 @@ async function processInserts(itemsToInsert: NewItem[]): Promise<number> {
   if (itemsToInsert.length === 0) return 0;
 
   try {
+    const start = Date.now();
     await db.insert(items).values(itemsToInsert);
-    console.log(`Inserted ${itemsToInsert.length} new items`);
+    console.info(
+      formatSyncLogLine("items-sync", {
+        server: String(itemsToInsert[0]?.serverId ?? 0),
+        page: 0,
+        processed: 0,
+        inserted: itemsToInsert.length,
+        updated: 0,
+        errors: 0,
+        processMs: Date.now() - start,
+        totalProcessed: 0,
+        phase: "dbInsert",
+      })
+    );
     return itemsToInsert.length;
   } catch (error) {
-    console.error("Error inserting items:", error);
+    console.error(
+      formatSyncLogLine("items-sync", {
+        server: String(itemsToInsert[0]?.serverId ?? 0),
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 1,
+        processMs: 0,
+        totalProcessed: 0,
+        phase: "dbInsert",
+        message: "Error inserting items",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    );
     throw error;
   }
 }
@@ -832,6 +1056,7 @@ async function processUpdates(
   if (itemsToUpdate.length === 0) return 0;
 
   let updateCount = 0;
+  const start = Date.now();
 
   for (const item of itemsToUpdate) {
     try {
@@ -854,11 +1079,38 @@ async function processUpdates(
 
       updateCount++;
     } catch (error) {
-      console.error(`Error updating item ${item.id}:`, error);
+      console.error(
+        formatSyncLogLine("items-sync", {
+          server: String(item.serverId),
+          page: 0,
+          processed: 0,
+          inserted: 0,
+          updated: 0,
+          errors: 1,
+          processMs: 0,
+          totalProcessed: 0,
+          phase: "dbUpdate",
+          itemId: item.id,
+          message: "Error updating item",
+          error: error instanceof Error ? error.message : "Unknown error",
+        })
+      );
       // Continue with other items rather than failing the whole batch
     }
   }
 
-  console.log(`Updated ${updateCount} items`);
+  console.info(
+    formatSyncLogLine("items-sync", {
+      server: String(itemsToUpdate[0]?.serverId ?? 0),
+      page: 0,
+      processed: 0,
+      inserted: 0,
+      updated: updateCount,
+      errors: 0,
+      processMs: Date.now() - start,
+      totalProcessed: 0,
+      phase: "dbUpdate",
+    })
+  );
   return updateCount;
 }

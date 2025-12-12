@@ -1,0 +1,180 @@
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { db, items, libraries, servers } from "@streamystats/database";
+import { JellyfinClient } from "../client";
+import { formatSyncLogLine } from "./sync-log";
+
+export interface PeopleSyncJobData {
+  serverId: number;
+}
+
+const LIBRARY_TYPES_WITH_PEOPLE = ["movies", "tvshows", "music"] as const;
+const ITEM_IDS_PER_FETCH = 10;
+const DB_BATCH_LIMIT = 100;
+const DEFAULT_MAX_RUNTIME_MS = 14 * 60 * 1000;
+
+export async function syncPeopleForServer(
+  _jobId: string,
+  data: PeopleSyncJobData,
+  options?: { maxRuntimeMs?: number }
+): Promise<{
+  processed: number;
+  remaining: number;
+}> {
+  const { serverId } = data;
+  const { client, serverName } = await createClientForServerId(serverId);
+  const startTime = Date.now();
+  const maxRuntimeMs = options?.maxRuntimeMs ?? DEFAULT_MAX_RUNTIME_MS;
+
+  let processed = 0;
+  let errors = 0;
+  let page = 0;
+
+  console.info(
+    formatSyncLogLine("people-sync", {
+      server: serverName,
+      page: 0,
+      processed: 0,
+      inserted: 0,
+      updated: 0,
+      errors: 0,
+      processMs: 0,
+      totalProcessed: 0,
+      serverId,
+      maxRuntimeMs,
+    })
+  );
+
+  while (Date.now() - startTime < maxRuntimeMs) {
+    const candidates = await db
+      .select({ id: items.id })
+      .from(items)
+      .innerJoin(libraries, eq(items.libraryId, libraries.id))
+      .where(
+        and(
+          eq(items.serverId, serverId),
+          isNull(items.people),
+          inArray(libraries.type, [...LIBRARY_TYPES_WITH_PEOPLE])
+        )
+      )
+      .limit(DB_BATCH_LIMIT);
+
+    if (candidates.length === 0) {
+      break;
+    }
+
+    const ids = candidates.map((c) => c.id);
+
+    for (let i = 0; i < ids.length; i += ITEM_IDS_PER_FETCH) {
+      if (Date.now() - startTime >= maxRuntimeMs) {
+        break;
+      }
+
+      const chunk = ids.slice(i, i + ITEM_IDS_PER_FETCH);
+      page += 1;
+      const chunkStart = Date.now();
+
+      try {
+        const peopleDtos = await client.getItemsPeople(chunk);
+
+        const byId = new Map(peopleDtos.map((d) => [d.Id, d.People ?? []]));
+
+        await Promise.all(
+          chunk.map(async (itemId) => {
+            const people = byId.get(itemId) ?? [];
+            await db
+              .update(items)
+              .set({ people, processed: false, updatedAt: new Date() })
+              .where(and(eq(items.id, itemId), eq(items.serverId, serverId)));
+          })
+        );
+
+        processed += chunk.length;
+
+        console.info(
+          formatSyncLogLine("people-sync", {
+            server: serverName,
+            page,
+            processed: chunk.length,
+            inserted: 0,
+            updated: chunk.length,
+            errors: 0,
+            processMs: Date.now() - chunkStart,
+            totalProcessed: processed,
+            serverId,
+          })
+        );
+      } catch (error) {
+        errors += 1;
+        console.error(
+          formatSyncLogLine("people-sync", {
+            server: serverName,
+            page,
+            processed: 0,
+            inserted: 0,
+            updated: 0,
+            errors: 1,
+            processMs: Date.now() - chunkStart,
+            totalProcessed: processed,
+            serverId,
+            message: "Error syncing people for items chunk",
+            error: error instanceof Error ? error.message : "Unknown error",
+          })
+        );
+      }
+    }
+  }
+
+  const remainingCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(items)
+    .innerJoin(libraries, eq(items.libraryId, libraries.id))
+    .where(
+      and(
+        eq(items.serverId, serverId),
+        isNull(items.people),
+        inArray(libraries.type, [...LIBRARY_TYPES_WITH_PEOPLE])
+      )
+    );
+
+  const remaining = Number(remainingCount[0]?.count ?? 0);
+
+  console.info(
+    formatSyncLogLine("people-sync", {
+      server: serverName,
+      page: -1,
+      processed: 0,
+      inserted: 0,
+      updated: 0,
+      errors,
+      processMs: Date.now() - startTime,
+      totalProcessed: processed,
+      serverId,
+      remaining,
+    })
+  );
+
+  return { processed, remaining };
+}
+
+async function createClientForServerId(
+  serverId: number
+): Promise<{ client: JellyfinClient; serverName: string }> {
+  const serverRows = await db
+    .select({ url: servers.url, apiKey: servers.apiKey, name: servers.name })
+    .from(servers)
+    .where(eq(servers.id, serverId))
+    .limit(1);
+
+  const server = serverRows[0];
+  if (!server) {
+    throw new Error(`Server not found: ${serverId}`);
+  }
+
+  return {
+    client: new JellyfinClient({
+      baseURL: server.url,
+      apiKey: server.apiKey,
+    }),
+    serverName: server.name,
+  };
+}

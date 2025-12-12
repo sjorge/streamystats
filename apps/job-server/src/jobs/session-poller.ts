@@ -13,6 +13,7 @@ import {
 } from "../jellyfin/types";
 import { v4 as uuidv4 } from "uuid";
 import { eq } from "drizzle-orm";
+import { formatError } from "../utils/format-error";
 
 interface SessionPollerConfig {
   intervalMs?: number;
@@ -58,7 +59,7 @@ class SessionPoller {
       try {
         await this.pollSessions();
       } catch (error) {
-        console.error("Error during session polling:", error);
+        console.error(`Error during session polling: ${formatError(error)}`);
       }
     }, this.config.intervalMs);
 
@@ -119,7 +120,7 @@ class SessionPoller {
         await this.pollServer(server);
       }
     } catch (error) {
-      console.error("Error polling sessions:", error);
+      console.error(`Error polling sessions: ${formatError(error)}`);
     }
   }
 
@@ -139,7 +140,11 @@ class SessionPoller {
       const currentSessions = await client.getSessions();
       await this.processSessions(server, currentSessions);
     } catch (error) {
-      console.error(`Failed to fetch sessions for server ${server.id}:`, error);
+      console.error(
+        `Failed to fetch sessions for server ${server.id}: ${formatError(
+          error
+        )}`
+      );
     }
   }
 
@@ -611,7 +616,7 @@ class SessionPoller {
         `Successfully saved playback session for server ${server.id}`
       );
     } catch (error) {
-      console.error("Failed to save playback session:", error);
+      console.error(`Failed to save playback session: ${formatError(error)}`);
     }
   }
 

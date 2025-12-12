@@ -5,6 +5,7 @@ import OpenAI from "openai";
 import { TIMEOUT_CONFIG } from "./config";
 import { logJobResult } from "./job-logger";
 import { getJobQueue } from "./queue";
+import { sleep } from "../utils/sleep";
 
 // Embedding configuration passed from job data
 interface EmbeddingConfig {
@@ -330,7 +331,10 @@ export async function generateItemEmbeddingsJob(job: any) {
             try {
               await db
                 .update(items)
-                .set({ embedding, processed: true })
+                .set({
+                  embedding,
+                  processed: true,
+                })
                 .where(eq(items.id, item.id));
               processedCount++;
             } catch (dbError) {
@@ -339,9 +343,7 @@ export async function generateItemEmbeddingsJob(job: any) {
             }
           }
 
-          await new Promise((resolve) =>
-            setTimeout(resolve, DEFAULT_RATE_LIMIT_DELAY)
-          );
+          await sleep(DEFAULT_RATE_LIMIT_DELAY);
         } catch (batchError) {
           console.error(`Error processing batch at index ${i}:`, batchError);
 
@@ -416,13 +418,16 @@ export async function generateItemEmbeddingsJob(job: any) {
 
           await db
             .update(items)
-            .set({ embedding, processed: true })
+            .set({
+              embedding,
+              processed: true,
+            })
             .where(eq(items.id, item.id));
 
           processedCount++;
 
           // Ollama is typically self-hosted, use shorter delay
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await sleep(100);
         } catch (itemError) {
           console.error(`Error processing item ${item.id}:`, itemError);
           errorCount++;

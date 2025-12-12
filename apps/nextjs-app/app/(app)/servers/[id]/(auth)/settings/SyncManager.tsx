@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, Database, CheckCircle, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
 import { fetch } from "@/lib/utils";
 
 interface SyncManagerProps {
@@ -51,10 +50,6 @@ export function SyncManager({ serverId, serverName }: SyncManagerProps) {
         message: data.message || "Full sync triggered successfully",
         timestamp: new Date(),
       });
-
-      toast.success(`Full sync started for ${serverName}`, {
-        description: "This may take several minutes to complete",
-      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to trigger full sync";
@@ -63,10 +58,6 @@ export function SyncManager({ serverId, serverName }: SyncManagerProps) {
         success: false,
         message: errorMessage,
         timestamp: new Date(),
-      });
-
-      toast.error("Failed to trigger full sync", {
-        description: errorMessage,
       });
     } finally {
       setIsTriggering(false);

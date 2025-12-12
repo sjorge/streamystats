@@ -7,6 +7,7 @@ import {
   createSyncResult,
 } from "../sync-metrics";
 import pMap from "p-map";
+import { formatSyncLogLine } from "./sync-log";
 
 export interface LibrarySyncOptions {
   batchSize?: number;
@@ -30,51 +31,82 @@ export async function syncLibraries(
   const errors: string[] = [];
 
   try {
-    console.log(`Starting library sync for server ${server.name}`);
-
     // Fetch libraries from Jellyfin
     metrics.incrementApiRequests();
     const jellyfinLibraries = await client.getLibraries();
-    console.log(`Fetched ${jellyfinLibraries.length} libraries from Jellyfin`);
 
-    // Process libraries in batches with controlled concurrency
-    let librariesInserted = 0;
-    let librariesUpdated = 0;
-
-    await pMap(
-      jellyfinLibraries,
-      async (jellyfinLibrary) => {
-        try {
-          const wasInserted = await processLibrary(
-            jellyfinLibrary,
-            server.id,
-            metrics
-          );
-
-          if (wasInserted) {
-            librariesInserted++;
-            metrics.incrementLibrariesInserted();
-          } else {
-            librariesUpdated++;
-            metrics.incrementLibrariesUpdated();
-          }
-
-          metrics.incrementLibrariesProcessed();
-        } catch (error) {
-          console.error(
-            `Error processing library ${jellyfinLibrary.Id}:`,
-            error
-          );
-          metrics.incrementErrors();
-          errors.push(
-            `Library ${jellyfinLibrary.Id}: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
-          );
-        }
-      },
-      { concurrency }
+    console.info(
+      formatSyncLogLine("libraries-sync", {
+        server: server.name,
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        fetched: jellyfinLibraries.length,
+      })
     );
+
+    for (
+      let offset = 0, page = 1;
+      offset < jellyfinLibraries.length;
+      offset += batchSize, page++
+    ) {
+      const chunk = jellyfinLibraries.slice(offset, offset + batchSize);
+      const before = metrics.getCurrentMetrics();
+      const processStart = Date.now();
+
+      await pMap(
+        chunk,
+        async (jellyfinLibrary) => {
+          try {
+            const wasInserted = await processLibrary(
+              jellyfinLibrary,
+              server.id,
+              metrics
+            );
+
+            if (wasInserted) {
+              metrics.incrementLibrariesInserted();
+            } else {
+              metrics.incrementLibrariesUpdated();
+            }
+
+            metrics.incrementLibrariesProcessed();
+          } catch (error) {
+            console.error(
+              `Error processing library ${jellyfinLibrary.Id}:`,
+              error
+            );
+            metrics.incrementErrors();
+            errors.push(
+              `Library ${jellyfinLibrary.Id}: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
+        },
+        { concurrency }
+      );
+
+      const processMs = Date.now() - processStart;
+      const after = metrics.getCurrentMetrics();
+
+      console.info(
+        formatSyncLogLine("libraries-sync", {
+          server: server.name,
+          page,
+          processed: after.librariesProcessed - before.librariesProcessed,
+          inserted: after.librariesInserted - before.librariesInserted,
+          updated: after.librariesUpdated - before.librariesUpdated,
+          errors: after.errors - before.errors,
+          processMs,
+          totalProcessed: after.librariesProcessed,
+        })
+      );
+    }
 
     const finalMetrics = metrics.finish();
     const data: LibrarySyncData = {
@@ -83,7 +115,18 @@ export async function syncLibraries(
       librariesUpdated: finalMetrics.librariesUpdated,
     };
 
-    console.log(`Library sync completed for server ${server.name}:`, data);
+    console.info(
+      formatSyncLogLine("libraries-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: errors.length,
+        processMs: finalMetrics.duration ?? 0,
+        totalProcessed: finalMetrics.librariesProcessed,
+      })
+    );
 
     if (errors.length > 0) {
       return createSyncResult("partial", data, finalMetrics, undefined, errors);

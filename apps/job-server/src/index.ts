@@ -7,6 +7,11 @@ import { sessionPoller } from "./jobs/session-poller";
 import { closeConnection } from "@streamystats/database";
 import jobRoutes from "./routes/jobs";
 
+process.on("warning", (warning) => {
+  if (warning?.name === "TimeoutNegativeWarning") return;
+  console.warn(warning);
+});
+
 const app = new Hono();
 
 const PORT = parseInt(Bun.env.PORT || "3000", 10);
@@ -99,6 +104,7 @@ async function startServer() {
       `Recently added items sync running (${status.recentItemsSyncInterval})`
     );
     console.log(`User sync scheduler running (${status.userSyncInterval})`);
+    console.log(`People sync scheduler running (${status.peopleSyncInterval})`);
     console.log(
       `Daily full sync scheduler running (${status.fullSyncInterval})`
     );

@@ -2,20 +2,15 @@ export const dynamic = "force-dynamic";
 
 import { requireAdmin } from "@/lib/api-auth";
 
-export async function GET(request: Request) {
+export async function GET(
+  _request: Request,
+  props: { params: Promise<{ serverId: string }> }
+) {
   try {
     const { error } = await requireAdmin();
     if (error) return error;
 
-    const url = new URL(request.url);
-    const serverId = url.searchParams.get("serverId");
-
-    if (!serverId) {
-      return new Response(JSON.stringify({ error: "serverId is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const { serverId } = await props.params;
 
     const jobServerUrl =
       process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
@@ -26,7 +21,9 @@ export async function GET(request: Request) {
       `${jobServerUrl}/api/jobs/servers/${serverId}/status`,
       {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
     );
 
@@ -38,20 +35,24 @@ export async function GET(request: Request) {
 
     return new Response(JSON.stringify(data), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
-  } catch (err) {
-    console.error("Error fetching server job status:", err);
+  } catch (error) {
+    console.error("Error fetching server job status:", error);
     return new Response(
       JSON.stringify({
         error:
-          err instanceof Error
-            ? err.message
+          error instanceof Error
+            ? error.message
             : "Failed to fetch server job status",
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
     );
   }

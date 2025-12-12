@@ -11,6 +11,7 @@ import {
   jellyfinActivitiesSyncWorker,
   jellyfinRecentItemsSyncWorker,
   jellyfinRecentActivitiesSyncWorker,
+  jellyfinPeopleSyncWorker,
   JELLYFIN_JOB_NAMES,
 } from "./workers";
 
@@ -103,6 +104,12 @@ async function registerJobHandlers(boss: PgBoss) {
     JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
     { teamSize: 3, teamConcurrency: 3 }, // Higher concurrency for lighter operations
     jellyfinRecentActivitiesSyncWorker
+  );
+
+  await boss.work(
+    JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+    { teamSize: 1, teamConcurrency: 1 },
+    jellyfinPeopleSyncWorker
   );
 
   console.log("All job handlers registered successfully");

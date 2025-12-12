@@ -7,6 +7,7 @@ import {
   createSyncResult,
 } from "../sync-metrics";
 import pMap from "p-map";
+import { formatSyncLogLine } from "./sync-log";
 
 export interface UserSyncOptions {
   batchSize?: number;
@@ -30,51 +31,69 @@ export async function syncUsers(
   const errors: string[] = [];
 
   try {
-    console.log(`Starting user sync for server ${server.name}`);
-
     // Fetch users from Jellyfin
     metrics.incrementApiRequests();
     const jellyfinUsers = await client.getUsers();
-    console.log(`Fetched ${jellyfinUsers.length} users from Jellyfin`);
 
-    // Process users in batches with controlled concurrency
-    let usersInserted = 0;
-    let usersUpdated = 0;
-
-    await pMap(
-      jellyfinUsers,
-      async (jellyfinUser) => {
-        try {
-          await processUser(jellyfinUser, server.id, metrics);
-
-          // Check if this was an insert or update by checking if user existed
-          const existingUser = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, jellyfinUser.Id))
-            .limit(1);
-
-          if (existingUser.length === 0) {
-            usersInserted++;
-            metrics.incrementUsersInserted();
-          } else {
-            usersUpdated++;
-            metrics.incrementUsersUpdated();
-          }
-
-          metrics.incrementUsersProcessed();
-        } catch (error) {
-          console.error(`Error processing user ${jellyfinUser.Id}:`, error);
-          metrics.incrementErrors();
-          errors.push(
-            `User ${jellyfinUser.Id}: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
-          );
-        }
-      },
-      { concurrency }
+    console.info(
+      formatSyncLogLine("users-sync", {
+        server: server.name,
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        fetched: jellyfinUsers.length,
+      })
     );
+
+    for (let offset = 0, page = 1; offset < jellyfinUsers.length; offset += batchSize, page++) {
+      const chunk = jellyfinUsers.slice(offset, offset + batchSize);
+      const before = metrics.getCurrentMetrics();
+      const processStart = Date.now();
+
+      await pMap(
+        chunk,
+        async (jellyfinUser) => {
+          try {
+            const wasInserted = await processUser(jellyfinUser, server.id, metrics);
+            if (wasInserted) {
+              metrics.incrementUsersInserted();
+            } else {
+              metrics.incrementUsersUpdated();
+            }
+            metrics.incrementUsersProcessed();
+          } catch (error) {
+            console.error(`Error processing user ${jellyfinUser.Id}:`, error);
+            metrics.incrementErrors();
+            errors.push(
+              `User ${jellyfinUser.Id}: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
+        },
+        { concurrency }
+      );
+
+      const processMs = Date.now() - processStart;
+      const after = metrics.getCurrentMetrics();
+
+      console.info(
+        formatSyncLogLine("users-sync", {
+          server: server.name,
+          page,
+          processed: after.usersProcessed - before.usersProcessed,
+          inserted: after.usersInserted - before.usersInserted,
+          updated: after.usersUpdated - before.usersUpdated,
+          errors: after.errors - before.errors,
+          processMs,
+          totalProcessed: after.usersProcessed,
+        })
+      );
+    }
 
     const finalMetrics = metrics.finish();
     const data: UserSyncData = {
@@ -83,7 +102,18 @@ export async function syncUsers(
       usersUpdated: finalMetrics.usersUpdated,
     };
 
-    console.log(`User sync completed for server ${server.name}:`, data);
+    console.info(
+      formatSyncLogLine("users-sync", {
+        server: server.name,
+        page: -1,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: errors.length,
+        processMs: finalMetrics.duration ?? 0,
+        totalProcessed: finalMetrics.usersProcessed,
+      })
+    );
 
     if (errors.length > 0) {
       return createSyncResult("partial", data, finalMetrics, undefined, errors);
@@ -111,7 +141,15 @@ async function processUser(
   jellyfinUser: JellyfinUser,
   serverId: number,
   metrics: SyncMetricsTracker
-): Promise<void> {
+): Promise<boolean> {
+  const existingUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, jellyfinUser.Id))
+    .limit(1);
+
+  const isNewUser = existingUser.length === 0;
+
   const userData: NewUser = {
     id: jellyfinUser.Id,
     name: jellyfinUser.Name,
@@ -171,4 +209,5 @@ async function processUser(
     });
 
   metrics.incrementDatabaseOperations();
+  return isNewUser;
 }

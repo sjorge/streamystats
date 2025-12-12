@@ -10,8 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
 import {
   saveEmbeddingConfig,
   clearEmbeddings,
@@ -158,6 +158,10 @@ export function EmbeddingsManager({ server }: { server: Server }) {
     server.autoGenerateEmbeddings || false
   );
   const [isUpdatingAutoEmbed, setIsUpdatingAutoEmbed] = useState(false);
+  const [actionResult, setActionResult] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
 
   const {
     data: progress,
@@ -188,6 +192,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
+    setActionResult(null);
     try {
       await saveEmbeddingConfig({
         serverId: server.id,
@@ -199,10 +204,16 @@ export function EmbeddingsManager({ server }: { server: Server }) {
           dimensions,
         },
       });
-      toast.success("Embedding configuration saved successfully");
+      setActionResult({
+        type: "success",
+        message: "Embedding configuration saved",
+      });
       refetch();
     } catch (error) {
-      toast.error("Failed to save embedding configuration");
+      setActionResult({
+        type: "error",
+        message: "Failed to save embedding configuration",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -226,14 +237,22 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleStartEmbedding = async () => {
     setIsStarting(true);
+    setActionResult(null);
     try {
       await startEmbedding({ serverId: server.id });
-      toast.success("Embedding process started successfully");
+      setActionResult({
+        type: "success",
+        message: "Embedding process started",
+      });
       refetch();
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to start embedding process"
-      );
+      setActionResult({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to start embedding process",
+      });
     } finally {
       setIsStarting(false);
     }
@@ -241,21 +260,29 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleStopEmbedding = async () => {
     setIsStopping(true);
+    setActionResult(null);
     try {
       await stopEmbedding({ serverId: server.id });
-      toast.dismiss();
-      toast.success("Embedding process stopped successfully");
+      setActionResult({
+        type: "success",
+        message: "Embedding process stopped",
+      });
       refetch();
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to stop embedding process"
-      );
+      setActionResult({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to stop embedding process",
+      });
     } finally {
       setIsStopping(false);
     }
   };
 
   const handleCleanupStaleJobs = async () => {
+    setActionResult(null);
     try {
       const jobServerUrl =
         process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
@@ -276,28 +303,40 @@ export function EmbeddingsManager({ server }: { server: Server }) {
       const result = await response.json();
 
       if (result.cleanedJobs > 0) {
-        toast.success(`Cleaned up ${result.cleanedJobs} stale embedding jobs`);
+        setActionResult({
+          type: "success",
+          message: `Cleaned up ${result.cleanedJobs} stale embedding job(s)`,
+        });
       } else {
-        toast.info("No stale jobs found to cleanup");
+        setActionResult({
+          type: "info",
+          message: "No stale embedding jobs to cleanup",
+        });
       }
 
       refetch();
     } catch (error) {
       console.error("Error cleaning up stale jobs:", error);
-      toast.error("Failed to cleanup stale jobs");
+      setActionResult({
+        type: "error",
+        message: "Failed to cleanup stale jobs",
+      });
     }
   };
 
   const handleClearEmbeddings = async () => {
     setIsClearing(true);
+    setActionResult(null);
     try {
       await clearEmbeddings({ serverId: server.id });
-      toast.success("Embeddings cleared successfully");
+      setActionResult({ type: "success", message: "Embeddings cleared" });
       refetch();
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to clear embeddings"
-      );
+      setActionResult({
+        type: "error",
+        message:
+          err instanceof Error ? err.message : "Failed to clear embeddings",
+      });
     } finally {
       setIsClearing(false);
       setShowClearDialog(false);
@@ -306,14 +345,19 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleToggleAutoEmbeddings = async (checked: boolean) => {
     setIsUpdatingAutoEmbed(true);
+    setActionResult(null);
     try {
       await toggleAutoEmbeddings({ serverId: server.id, enabled: checked });
       setAutoEmbeddings(checked);
-      toast.success(
-        `Auto-generate embeddings ${checked ? "enabled" : "disabled"}`
-      );
+      setActionResult({
+        type: "success",
+        message: `Auto-generate embeddings ${checked ? "enabled" : "disabled"}`,
+      });
     } catch (error) {
-      toast.error("Failed to update auto-embedding setting");
+      setActionResult({
+        type: "error",
+        message: "Failed to update auto-embedding setting",
+      });
       // Reset to previous state
       setAutoEmbeddings(!checked);
     } finally {
@@ -357,6 +401,15 @@ export function EmbeddingsManager({ server }: { server: Server }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {actionResult ? (
+            <Alert
+              variant={
+                actionResult.type === "error" ? "destructive" : "default"
+              }
+            >
+              <AlertDescription>{actionResult.message}</AlertDescription>
+            </Alert>
+          ) : null}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="preset-select">Provider Preset</Label>
