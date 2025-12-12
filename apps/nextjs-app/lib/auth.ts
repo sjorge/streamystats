@@ -1,8 +1,9 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { getServer } from "./db/server";
 import { createSession } from "./session";
+import { shouldUseSecureCookies } from "@/lib/secure-cookies";
 
 export const login = async ({
   serverId,
@@ -38,8 +39,7 @@ export const login = async ({
   const user = data["User"];
   const isAdmin = user["Policy"]["IsAdministrator"];
 
-  const h = await headers();
-  const secure = h.get("x-forwarded-proto") === "https";
+  const secure = await shouldUseSecureCookies();
   const maxAge = 30 * 24 * 60 * 60;
 
   // Create signed session (tamper-proof)

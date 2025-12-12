@@ -1,10 +1,11 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import {
   updateServerConnection,
   UpdateServerConnectionResult,
 } from "@/lib/db/server";
+import { shouldUseSecureCookies } from "@/lib/secure-cookies";
 
 export const updateServerConnectionAction = async ({
   serverId,
@@ -32,8 +33,7 @@ export const updateServerConnectionAction = async ({
     });
 
     if (result.success && result.accessToken && result.userId) {
-      const h = await headers();
-      const secure = h.get("x-forwarded-proto") === "https";
+      const secure = await shouldUseSecureCookies();
       const maxAge = 30 * 24 * 60 * 60;
 
       const c = await cookies();
@@ -73,7 +73,6 @@ export const updateServerConnectionAction = async ({
 
     return result;
   } catch (error) {
-    console.error("Error in updateServerConnectionAction:", error);
     return {
       success: false,
       message:

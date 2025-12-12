@@ -1,7 +1,8 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { SignJWT, jwtVerify, JWTPayload } from "jose";
+import { shouldUseSecureCookies } from "@/lib/secure-cookies";
 
 const SECRET = new TextEncoder().encode(
   process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production"
@@ -41,8 +42,7 @@ export async function createSession(user: SessionUser): Promise<void> {
     .sign(SECRET);
 
   const c = await cookies();
-  const h = await headers();
-  const secure = h.get("x-forwarded-proto") === "https";
+  const secure = await shouldUseSecureCookies();
 
   c.set(SESSION_COOKIE, token, {
     httpOnly: true,
