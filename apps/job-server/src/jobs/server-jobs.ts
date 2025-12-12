@@ -10,13 +10,23 @@ import {
 import { logJobResult } from "./job-logger";
 import { TIMEOUT_CONFIG } from "./config";
 
+function log(prefix: string, data: Record<string, string | number | boolean | null | undefined>): void {
+  const parts = [`[${prefix}]`];
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined && value !== null) {
+      parts.push(`${key}=${value}`);
+    }
+  }
+  console.log(parts.join(" "));
+}
+
 // Job: Sync server data from external media server API
 export async function syncServerDataJob(job: any) {
   const startTime = Date.now();
   const { serverId, endpoint } = job.data;
 
   try {
-    console.log(`Syncing server data for server ID: ${serverId}`);
+    log("sync-server-data", { action: "start", serverId, endpoint });
 
     // Get server configuration
     const serverData = await db
@@ -98,7 +108,7 @@ export async function addServerJob(job: any) {
   const { name, url, apiKey } = job.data;
 
   try {
-    console.log(`Adding new server: ${name}`);
+    log("add-server", { action: "start", name });
 
     // Test server connection
     const response = await axios.get(`${url}/System/Info`, {
@@ -159,7 +169,7 @@ export async function sequentialServerSyncJob(job: any) {
   const { serverId } = job.data;
 
   try {
-    console.log(`Starting sequential sync for server ID: ${serverId}`);
+    log("sequential-sync", { action: "start", serverId });
 
     // Update server status to syncing
     await db
@@ -180,9 +190,7 @@ export async function sequentialServerSyncJob(job: any) {
       .limit(1);
 
     if (!serverData.length) {
-      console.warn(
-        `Sequential sync: Server with ID ${serverId} not found, possibly deleted. Skipping job.`
-      );
+      console.warn(`[sequential-sync] action=skipped serverId=${serverId} reason=server-not-found`);
       const processingTime = Date.now() - startTime;
       await logJobResult(
         job.id,
@@ -203,7 +211,7 @@ export async function sequentialServerSyncJob(job: any) {
     };
 
     // Step 1: Sync Users
-    console.log(`Syncing users for server ${serverId}`);
+    log("user-sync", { action: "start", serverId });
     try {
       const usersResponse = await axios.get(`${server.url}/Users`, {
         headers: {
@@ -213,9 +221,9 @@ export async function sequentialServerSyncJob(job: any) {
         timeout: TIMEOUT_CONFIG.DEFAULT,
       });
       syncResults.users = await syncUsers(serverId, usersResponse.data);
-      console.log(`Synced ${syncResults.users} users`);
+      log("user-sync", { action: "completed", serverId, count: syncResults.users });
     } catch (error) {
-      console.error("Error syncing users:", error);
+      console.error(`[user-sync] action=error serverId=${serverId} error=${error instanceof Error ? error.message : String(error)}`);
       const errorMessage = axios.isAxiosError(error)
         ? `API Error: ${error.response?.status} - ${
             error.response?.statusText || error.message
@@ -233,7 +241,7 @@ export async function sequentialServerSyncJob(job: any) {
       .where(eq(servers.id, serverId));
 
     // Step 2: Sync Libraries
-    console.log(`Syncing libraries for server ${serverId}`);
+    log("library-sync", { action: "start", serverId });
     try {
       const librariesResponse = await axios.get(
         `${server.url}/Library/VirtualFolders`,
@@ -249,9 +257,9 @@ export async function sequentialServerSyncJob(job: any) {
         serverId,
         librariesResponse.data
       );
-      console.log(`Synced ${syncResults.libraries} libraries`);
+      log("library-sync", { action: "completed", serverId, count: syncResults.libraries });
     } catch (error) {
-      console.error("Error syncing libraries:", error);
+      console.error(`[library-sync] action=error serverId=${serverId} error=${error instanceof Error ? error.message : String(error)}`);
       const errorMessage = axios.isAxiosError(error)
         ? `API Error: ${error.response?.status} - ${
             error.response?.statusText || error.message
@@ -269,7 +277,7 @@ export async function sequentialServerSyncJob(job: any) {
       .where(eq(servers.id, serverId));
 
     // Step 3: Sync Items (for each library)
-    console.log(`Syncing items for server ${serverId}`);
+    log("item-sync", { action: "start", serverId });
     try {
       const librariesData = await db
         .select()
@@ -293,11 +301,11 @@ export async function sequentialServerSyncJob(job: any) {
           itemsResponse.data.Items || []
         );
         syncResults.items += itemsSynced;
-        console.log(`Synced ${itemsSynced} items for library ${library.name}`);
+        log("item-sync", { action: "library-completed", serverId, library: library.name, count: itemsSynced });
       }
-      console.log(`Total synced ${syncResults.items} items`);
+      log("item-sync", { action: "completed", serverId, totalCount: syncResults.items });
     } catch (error) {
-      console.error("Error syncing items:", error);
+      console.error(`[item-sync] action=error serverId=${serverId} error=${error instanceof Error ? error.message : String(error)}`);
       const errorMessage = axios.isAxiosError(error)
         ? `API Error: ${error.response?.status} - ${
             error.response?.statusText || error.message
@@ -315,7 +323,7 @@ export async function sequentialServerSyncJob(job: any) {
       .where(eq(servers.id, serverId));
 
     // Step 4: Sync Activities
-    console.log(`Syncing activities for server ${serverId}`);
+    log("activity-sync", { action: "start", serverId });
     try {
       const activitiesResponse = await axios.get(
         `${server.url}/System/ActivityLog/Entries`,
@@ -331,9 +339,9 @@ export async function sequentialServerSyncJob(job: any) {
         serverId,
         activitiesResponse.data.Items || []
       );
-      console.log(`Synced ${syncResults.activities} activities`);
+      log("activity-sync", { action: "completed", serverId, count: syncResults.activities });
     } catch (error) {
-      console.error("Error syncing activities:", error);
+      console.error(`[activity-sync] action=error serverId=${serverId} error=${error instanceof Error ? error.message : String(error)}`);
       const errorMessage = axios.isAxiosError(error)
         ? `API Error: ${error.response?.status} - ${
             error.response?.statusText || error.message
@@ -363,13 +371,18 @@ export async function sequentialServerSyncJob(job: any) {
       processingTime
     );
 
-    console.log(
-      `Sequential sync completed for server ${serverId}:`,
-      syncResults
-    );
+    log("sequential-sync", { 
+      action: "completed", 
+      serverId, 
+      users: syncResults.users, 
+      libraries: syncResults.libraries, 
+      items: syncResults.items, 
+      activities: syncResults.activities,
+      durationMs: processingTime 
+    });
     return { success: true, syncResults };
   } catch (error) {
-    console.error(`Sequential sync failed for server ${serverId}:`, error);
+    console.error(`[sequential-sync] action=failed serverId=${serverId} error=${error instanceof Error ? error.message : String(error)}`);
 
     // Update server status to failed
     await db
