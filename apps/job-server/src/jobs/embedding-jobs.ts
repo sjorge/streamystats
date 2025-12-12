@@ -501,6 +501,17 @@ export async function generateItemEmbeddingsJob(job: any) {
       console.log(
         `Embedding job complete for server ${serverId}. Processed: ${processedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`
       );
+
+      // Revalidate recommendations cache since embeddings have changed
+      try {
+        const nextjsUrl = process.env.NEXTJS_URL || "http://localhost:3000";
+        await axios.post(`${nextjsUrl}/api/revalidate-recommendations`, {
+          serverId,
+        });
+        console.log(`Recommendations cache revalidated for server ${serverId}`);
+      } catch (revalidateError) {
+        console.warn("Failed to revalidate recommendations cache:", revalidateError);
+      }
     }
 
     return {

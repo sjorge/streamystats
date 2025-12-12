@@ -10,6 +10,7 @@ import {
   Calendar,
   Clock,
   Library,
+  MessageSquare,
   Settings,
   TrendingUp,
   User as UserIcon,
@@ -87,6 +88,11 @@ const settings_items = [
     title: "AI Recommendations",
     url: "/settings/ai",
     icon: TrendingUp,
+  },
+  {
+    title: "Chat AI",
+    url: "/settings/chat",
+    icon: MessageSquare,
   },
   {
     title: "Backup & Import",

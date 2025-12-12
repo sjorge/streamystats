@@ -71,6 +71,13 @@
       "when": 1765466991165,
       "tag": "0009_romantic_ego",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1765545810750,
+      "tag": "0010_curious_gabe_jones",
+      "breakpoints": true
     }
   ]
 }

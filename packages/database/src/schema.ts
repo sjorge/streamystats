@@ -66,6 +66,13 @@ export const servers = pgTable(
     embeddingModel: text("embedding_model"),
     embeddingDimensions: integer("embedding_dimensions").default(1536),
 
+    // Chat AI configuration (separate from embedding AI)
+    // Supports OpenAI-compatible, Anthropic, Ollama, etc.
+    chatProvider: text("chat_provider"), // "openai-compatible" | "ollama" | "anthropic"
+    chatBaseUrl: text("chat_base_url"),
+    chatApiKey: text("chat_api_key"),
+    chatModel: text("chat_model"),
+
     // Sync status tracking
     syncStatus: text("sync_status").notNull().default("pending"), // pending, syncing, completed, failed
     syncProgress: text("sync_progress").notNull().default("not_started"), // not_started, users, libraries, items, activities, completed

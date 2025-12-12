@@ -46,6 +46,12 @@ exports.servers = (0, pg_core_1.pgTable)("servers", {
     embeddingApiKey: (0, pg_core_1.text)("embedding_api_key"),
     embeddingModel: (0, pg_core_1.text)("embedding_model"),
     embeddingDimensions: (0, pg_core_1.integer)("embedding_dimensions").default(1536),
+    // Chat AI configuration (separate from embedding AI)
+    // Supports OpenAI-compatible, Anthropic, Ollama, etc.
+    chatProvider: (0, pg_core_1.text)("chat_provider"), // "openai-compatible" | "ollama" | "anthropic"
+    chatBaseUrl: (0, pg_core_1.text)("chat_base_url"),
+    chatApiKey: (0, pg_core_1.text)("chat_api_key"),
+    chatModel: (0, pg_core_1.text)("chat_model"),
     // Sync status tracking
     syncStatus: (0, pg_core_1.text)("sync_status").notNull().default("pending"), // pending, syncing, completed, failed
     syncProgress: (0, pg_core_1.text)("sync_progress").notNull().default("not_started"), // not_started, users, libraries, items, activities, completed
