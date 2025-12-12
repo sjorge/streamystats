@@ -32,50 +32,62 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
+    env:
+      REGISTRY: docker.io
+      IMAGE_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - streamystats-v2-nextjs
+          - streamystats-v2-job-server
+          - streamystats-v2-migrate
+        include:
+          - part: streamystats-v2-nextjs
+            folder: .
+            dockerfile: apps/nextjs-app/Dockerfile
+          - part: streamystats-v2-job-server
+            folder: .
+            dockerfile: apps/job-server/Dockerfile
+          - part: streamystats-v2-migrate
+            folder: .
+            dockerfile: migration.Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          node-version: "20"
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          version: 8
+          images: ${{ env.IMAGE_NAMESPACE }}/${{ matrix.part }}
+          tags: |
+            type=raw,value=${{ needs.release-please.outputs.tag_name }}
+            type=raw,value=latest
 
-      - name: Print pnpm version
-        run: pnpm --version
-
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Build packages
-        run: pnpm run build:all
-
-      - name: Docker Build and Push
-        env:
-          DOCKER_BUILDKIT: 1
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: |
-          # Set up Docker Buildx
-          docker buildx create --use
-
-          # Build and tag with version
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            -t streamystats-v2:latest \
-            -t streamystats-v2:${TAG_NAME} \
-            --push \
-            -f Dockerfile.base .
-        # Note: You'll need to configure your Docker registry credentials
-        # Add these as repository secrets:
-        # - DOCKER_USERNAME
-        # - DOCKER_PASSWORD
-        # And uncomment the login step below:
-
-        # - name: Log in to Docker Registry
-        #   run: |
-        #     echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+      - name: Build and push ${{ matrix.part }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.folder }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ needs.release-please.outputs.tag_name }}
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
