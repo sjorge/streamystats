@@ -7,6 +7,7 @@ import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/StreamArray";
 import { db } from "@streamystats/database";
 import { sessions, type NewSession } from "@streamystats/database/schema";
+import { requireAdmin } from "@/lib/api-auth";
 
 export const runtime = "nodejs"; // IMPORTANT: disables edge runtime
 export const dynamic = "force-dynamic"; // optional – no cache
@@ -130,6 +131,10 @@ interface JellystatsSession {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require admin for data import
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const url = new URL(req.url);
     const serverId = url.searchParams.get("serverId");
 

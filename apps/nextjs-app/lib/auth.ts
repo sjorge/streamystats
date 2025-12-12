@@ -2,6 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { getServer } from "./db/server";
+import { createSession } from "./session";
 
 export const login = async ({
   serverId,
@@ -12,7 +13,6 @@ export const login = async ({
   username: string;
   password?: string | null;
 }): Promise<void> => {
-  // Make login request to jellyfin server directly
   const server = await getServer({ serverId: serverId.toString() });
 
   if (!server) {
@@ -36,42 +36,23 @@ export const login = async ({
 
   const accessToken = data["AccessToken"];
   const user = data["User"];
+  const isAdmin = user["Policy"]["IsAdministrator"];
 
   const h = await headers();
-
   const secure = h.get("x-forwarded-proto") === "https";
-
   const maxAge = 30 * 24 * 60 * 60;
 
-  const isAdmin = data["User"]["Policy"]["IsAdministrator"];
-
-  const c = await cookies();
-
-  c.set("streamystats-token", accessToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge,
-    secure,
+  // Create signed session (tamper-proof)
+  await createSession({
+    id: user.Id,
+    name: user.Name,
+    serverId,
+    isAdmin,
   });
 
-  c.set(
-    "streamystats-user",
-    JSON.stringify({
-      name: user.Name,
-      id: user.Id,
-      serverId,
-    }),
-    {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge,
-      secure,
-    }
-  );
-
-  c.set("show-admin-statistics", isAdmin ? "true" : "false", {
+  // Store Jellyfin access token separately for API calls
+  const c = await cookies();
+  c.set("streamystats-token", accessToken, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",

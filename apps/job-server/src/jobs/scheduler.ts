@@ -1,6 +1,6 @@
 import * as cron from "node-cron";
 import { db, servers, jobResults } from "@streamystats/database";
-import { eq, and, sql, ne } from "drizzle-orm";
+import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
 
@@ -18,7 +18,50 @@ class SyncScheduler {
     // Auto-start if not explicitly disabled
     const autoStart = Bun.env.SCHEDULER_AUTO_START !== "false";
     if (autoStart) {
-      this.start();
+      this.startWithCleanup();
+    }
+  }
+
+  /**
+   * Start scheduler with initial cleanup of stale states
+   */
+  private async startWithCleanup(): Promise<void> {
+    await this.performStartupCleanup();
+    this.start();
+  }
+
+  /**
+   * Reset any servers stuck in "syncing" status on startup
+   * This handles cases where the server crashed mid-sync
+   */
+  private async performStartupCleanup(): Promise<void> {
+    try {
+      console.log("Performing startup cleanup...");
+
+      // Reset all servers stuck in "syncing" status
+      const result = await db
+        .update(servers)
+        .set({
+          syncStatus: "pending",
+          syncError: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(servers.syncStatus, "syncing"))
+        .returning({ id: servers.id, name: servers.name });
+
+      if (result.length > 0) {
+        console.log(
+          `Startup cleanup: Reset ${
+            result.length
+          } server(s) from "syncing" to "pending": ${result
+            .map((s) => s.name)
+            .join(", ")}`
+        );
+      } else {
+        console.log("Startup cleanup: No stuck servers found");
+      }
+    } catch (error) {
+      console.error("Error during startup cleanup:", error);
     }
   }
 
@@ -188,17 +231,37 @@ class SyncScheduler {
   }
 
   /**
+   * Get servers available for periodic sync
+   * Returns servers that are not syncing, or have been syncing for more than 30 minutes (stale)
+   */
+  private async getServersForPeriodicSync() {
+    return await db
+      .select()
+      .from(servers)
+      .where(
+        or(
+          ne(servers.syncStatus, "syncing"),
+          // Include servers stuck in "syncing" for more than 30 minutes
+          and(
+            eq(servers.syncStatus, "syncing"),
+            or(
+              isNull(servers.lastSyncStarted),
+              lt(servers.lastSyncStarted, sql`NOW() - INTERVAL '30 minutes'`)
+            )
+          )
+        )
+      );
+  }
+
+  /**
    * Trigger activity sync for all active servers
    */
   private async triggerActivitySync(): Promise<void> {
     try {
       console.log("Triggering periodic activity sync...");
 
-      // Get all servers that are not currently syncing
-      const activeServers = await db
-        .select()
-        .from(servers)
-        .where(ne(servers.syncStatus, "syncing"));
+      // Get all servers that are not currently syncing (or stale syncing)
+      const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
         console.log("No active servers found for activity sync");
@@ -253,11 +316,8 @@ class SyncScheduler {
     try {
       console.log("Triggering periodic recently added items sync...");
 
-      // Get all servers that are not currently syncing
-      const activeServers = await db
-        .select()
-        .from(servers)
-        .where(ne(servers.syncStatus, "syncing"));
+      // Get all servers that are not currently syncing (or stale syncing)
+      const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
         console.log("No active servers found for recently added items sync");
@@ -315,11 +375,8 @@ class SyncScheduler {
     try {
       console.log("Triggering periodic user sync...");
 
-      // Get all servers that are not currently syncing
-      const activeServers = await db
-        .select()
-        .from(servers)
-        .where(ne(servers.syncStatus, "syncing"));
+      // Get all servers that are not currently syncing (or stale syncing)
+      const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
         console.log("No active servers found for user sync");
@@ -374,11 +431,8 @@ class SyncScheduler {
     try {
       console.log("Triggering scheduled daily full sync...");
 
-      // Get all servers that are not currently syncing
-      const activeServers = await db
-        .select()
-        .from(servers)
-        .where(ne(servers.syncStatus, "syncing"));
+      // Get all servers that are not currently syncing (or stale syncing)
+      const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
         console.log("No active servers found for full sync");
@@ -440,10 +494,49 @@ class SyncScheduler {
   }
 
   /**
+   * Reset servers stuck in "syncing" status for more than 30 minutes
+   */
+  private async resetStaleSyncStatus(): Promise<void> {
+    try {
+      const result = await db
+        .update(servers)
+        .set({
+          syncStatus: "failed",
+          syncError:
+            "Sync timed out - status was stuck in syncing for more than 30 minutes",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(servers.syncStatus, "syncing"),
+            or(
+              isNull(servers.lastSyncStarted),
+              lt(servers.lastSyncStarted, sql`NOW() - INTERVAL '30 minutes'`)
+            )
+          )
+        )
+        .returning({ id: servers.id, name: servers.name });
+
+      if (result.length > 0) {
+        console.log(
+          `Reset stale sync status for ${result.length} server(s): ${result
+            .map((s) => s.name)
+            .join(", ")}`
+        );
+      }
+    } catch (error) {
+      console.error("Error resetting stale sync status:", error);
+    }
+  }
+
+  /**
    * Trigger cleanup of stale embedding jobs
    */
   private async triggerJobCleanup(): Promise<void> {
     try {
+      // First, reset any servers stuck in "syncing" status
+      await this.resetStaleSyncStatus();
+
       // Find all processing embedding jobs older than 10 minutes
       const staleJobs = await db
         .select()

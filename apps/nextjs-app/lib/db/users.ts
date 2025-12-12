@@ -4,6 +4,7 @@ import { db, User, users, sessions, items } from "@streamystats/database";
 import { and, eq, sum, inArray, gte, lte, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { getServer } from "./server";
+import { getSession, destroySession } from "../session";
 
 interface JellyfinUser {
   Id: string;
@@ -18,7 +19,7 @@ interface JellyfinUser {
 
 export const getUser = async ({
   name,
-  serverId
+  serverId,
 }: {
   name: string;
   serverId: string | number;
@@ -31,7 +32,7 @@ export const getUser = async ({
 
 export const getUserById = async ({
   userId,
-  serverId
+  serverId,
 }: {
   userId: string;
   serverId: string | number;
@@ -43,7 +44,7 @@ export const getUserById = async ({
 };
 
 export const getUsers = async ({
-  serverId
+  serverId,
 }: {
   serverId: string | number;
 }): Promise<User[]> => {
@@ -59,7 +60,7 @@ export interface WatchTimePerWeekDay {
 
 export const getWatchTimePerWeekDay = async ({
   serverId,
-  userId
+  userId,
 }: {
   serverId: string | number;
   userId?: string | number;
@@ -116,7 +117,7 @@ export interface WatchTimePerHour {
 
 export const getWatchTimePerHour = async ({
   serverId,
-  userId
+  userId,
 }: {
   serverId: string | number;
   userId?: string | number;
@@ -158,7 +159,7 @@ export const getWatchTimePerHour = async ({
 
 export const getTotalWatchTime = async ({
   serverId,
-  userId
+  userId,
 }: {
   serverId: string | number;
   userId?: string | number;
@@ -186,7 +187,7 @@ interface UserWithWatchTime {
 }
 
 export const getTotalWatchTimeForUsers = async ({
-  userIds
+  userIds,
 }: {
   userIds: string[] | number[];
 }): Promise<UserWithWatchTime> => {
@@ -228,7 +229,7 @@ export type UserActivityPerDay = Record<string, number>;
 export const getUserActivityPerDay = async ({
   serverId,
   startDate,
-  endDate
+  endDate,
 }: {
   serverId: string | number;
   startDate: string;
@@ -271,27 +272,47 @@ export const getUserActivityPerDay = async ({
 };
 
 export const logout = async (): Promise<void> => {
-  (await cookies()).delete("streamystats-token");
-  (await cookies()).delete("streamystats-user");
+  await destroySession();
 };
 
+/**
+ * Gets the current user from the signed session cookie.
+ * The session is cryptographically signed, so it cannot be tampered with.
+ */
 export const getMe = async (): Promise<User | null> => {
-  const c = await cookies();
-  const userStr = c.get("streamystats-user");
-  const user = userStr?.value ? JSON.parse(userStr.value) : undefined;
+  const session = await getSession();
+  if (!session) {
+    return null;
+  }
 
-  return user ? (user as User) : null;
+  return {
+    id: session.id,
+    name: session.name,
+    serverId: session.serverId,
+  } as User;
 };
 
+/**
+ * Checks if the current user is an admin from the signed session.
+ * This is a fast check using the cryptographically signed session cookie.
+ */
 export const isUserAdmin = async (): Promise<boolean> => {
-  const me = await getMe();
+  const session = await getSession();
+  return session?.isAdmin === true;
+};
 
-  if (!me) {
+/**
+ * Validates admin status against the live Jellyfin server.
+ * Use this for security-critical operations where you need real-time verification.
+ */
+export const validateAdminWithJellyfin = async (): Promise<boolean> => {
+  const session = await getSession();
+
+  if (!session) {
     return false;
   }
 
-  // Get the server configuration for this user
-  const server = await getServer({ serverId: me.serverId });
+  const server = await getServer({ serverId: session.serverId });
   if (!server) {
     return false;
   }
@@ -300,7 +321,6 @@ export const isUserAdmin = async (): Promise<boolean> => {
   const token = c.get("streamystats-token");
 
   try {
-    // Make a request to the Jellyfin server to get current user details
     const response = await fetch(`${server.url}/Users/Me`, {
       method: "GET",
       headers: {
@@ -311,22 +331,17 @@ export const isUserAdmin = async (): Promise<boolean> => {
     });
 
     if (!response.ok) {
-      // If the request fails, fall back to false for security
       return false;
     }
 
     const jellyfinUser: JellyfinUser = await response.json();
 
-    // Verify the user ID matches what we expect
-    if (jellyfinUser.Id !== me.id) {
+    if (jellyfinUser.Id !== session.id) {
       return false;
     }
 
-    // Return the actual admin status from Jellyfin
     return jellyfinUser.Policy.IsAdministrator === true;
-  } catch (error) {
-    // If there's any error (network, timeout, etc.), return false for security
-    console.error("Error checking admin status with Jellyfin server:", error);
+  } catch {
     return false;
   }
 };
@@ -341,7 +356,7 @@ export interface UserStatsSummary {
 }
 
 export const getUserStatsSummaryForServer = async ({
-  serverId
+  serverId,
 }: {
   serverId: string | number;
 }): Promise<UserStatsSummary[]> => {
@@ -374,7 +389,7 @@ export const getUserStatsSummaryForServer = async ({
 };
 
 export const getServerStatistics = async ({
-  serverId
+  serverId,
 }: {
   serverId: string | number;
 }) => {
@@ -416,7 +431,7 @@ export interface UserWithStats extends User {
 
 export const getUserWatchStats = async ({
   serverId,
-  userId
+  userId,
 }: {
   serverId: string | number;
   userId: string;
@@ -485,7 +500,7 @@ export const getUserWatchStats = async ({
 };
 
 export const getUsersWithStats = async ({
-  serverId
+  serverId,
 }: {
   serverId: string | number;
 }): Promise<UserWithStats[]> => {
@@ -512,7 +527,7 @@ export interface GenreStat {
 
 export const getUserGenreStats = async ({
   userId,
-  serverId
+  serverId,
 }: {
   userId: string;
   serverId: string | number;
