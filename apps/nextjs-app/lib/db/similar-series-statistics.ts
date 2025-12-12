@@ -137,9 +137,9 @@ export const revalidateSeriesRecommendations = async (
   serverId: number,
   userId?: string
 ) => {
-  revalidateTag(`series-recommendations-${serverId}`, {});
+  revalidateTag(`series-recommendations-${serverId}`, "hours");
   if (userId) {
-    revalidateTag(`series-recommendations-${serverId}-${userId}`, {});
+    revalidateTag(`series-recommendations-${serverId}-${userId}`, "hours");
   }
 };
 

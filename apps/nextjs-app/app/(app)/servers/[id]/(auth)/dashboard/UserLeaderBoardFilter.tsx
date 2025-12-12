@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { User } from "@/lib/types";
 import { Filter } from "lucide-react";
-import { Dispatch, SetStateAction, useId } from "react";
+import { Dispatch, SetStateAction } from "react";
 
 interface UserLeaderboardFilterProps {
   users: User[];
@@ -36,9 +36,6 @@ export function UserLeaderboardFilter({
     setHiddenUsers([]);
   };
 
-  // Generate a unique ID for this instance
-  const id = useId();
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -52,12 +49,7 @@ export function UserLeaderboardFilter({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-[200px]"
-        id={`user-filter-dropdown-${id}`}
-        skipPortal={true}
-      >
+      <DropdownMenuContent align="end" className="w-[200px]">
         <DropdownMenuLabel>Hidden Users</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {users.map((user, index) => (
