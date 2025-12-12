@@ -7,12 +7,12 @@ interface CreateServerRequest {
   url: string;
   apiKey: string;
   localAddress?: string;
-  openAiApiToken?: string;
   autoGenerateEmbeddings?: boolean;
-  ollamaApiToken?: string;
-  ollamaBaseUrl?: string;
-  ollamaModel?: string;
-  embeddingProvider?: string;
+  embeddingProvider?: "openai-compatible" | "ollama";
+  embeddingBaseUrl?: string;
+  embeddingApiKey?: string;
+  embeddingModel?: string;
+  embeddingDimensions?: number;
 }
 
 interface CreateServerSuccessResponse {
