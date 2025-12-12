@@ -118,6 +118,19 @@ export const clearEmbeddings = async ({ serverId }: { serverId: number }) => {
       .update(items)
       .set({ embedding: null, processed: false })
       .where(eq(items.serverId, serverId));
+
+    // Check if any other servers still have embeddings
+    const otherEmbeddings = await db
+      .select({ count: count() })
+      .from(items)
+      .where(sql`${items.embedding} IS NOT NULL`);
+
+    const hasOtherEmbeddings = (otherEmbeddings[0]?.count ?? 0) > 0;
+
+    // If no embeddings remain, drop the index so it can be recreated with new dimensions
+    if (!hasOtherEmbeddings) {
+      await db.execute(sql`DROP INDEX IF EXISTS items_embedding_idx`);
+    }
   } catch (error) {
     console.error(`Error clearing embeddings for server ${serverId}:`, error);
     throw new Error("Failed to clear embeddings");

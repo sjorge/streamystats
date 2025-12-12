@@ -120,7 +120,7 @@ export function createChatTools(serverId: number, userId: string) {
 
     getPersonalizedRecommendations: {
       description:
-        "Get personalized movie and series recommendations based on user's watch history and preferences using AI embeddings. Returns detailed reasoning for each recommendation.",
+        "Get personalized movie and series recommendations based on user's watch history using AI embeddings. Each recommendation includes a 'reason' field (e.g. 'Because you watched X and Y') and a 'basedOn' array with the watched items that led to this recommendation. Always use this data when presenting recommendations to explain what they're based on.",
       inputSchema: z.object({
         limit: z
           .number()
@@ -510,7 +510,7 @@ export function createChatTools(serverId: number, userId: string) {
 
     getSimilarToItem: {
       description:
-        "Get items similar to a specific movie or series with detailed reasoning. Use this when user asks 'what should I watch after X' or 'find movies like X'",
+        "Get items similar to a specific movie or series. Returns a 'sourceItem' showing what the search was based on, and similar items with a 'reason' field explaining the connection. Use when user asks 'what should I watch after X' or 'find movies like X'. Always mention the sourceItem when presenting results.",
       inputSchema: z.object({
         itemName: z
           .string()

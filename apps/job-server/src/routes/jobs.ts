@@ -181,6 +181,7 @@ app.post("/start-embedding", async (c) => {
         model: serverConfig.embeddingModel,
         dimensions: serverConfig.embeddingDimensions || 1536,
       },
+      manualStart: true, // Continue until complete even if auto-embeddings is disabled
     });
 
     return c.json({

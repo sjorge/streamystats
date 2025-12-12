@@ -13,10 +13,65 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader, Send, Sparkles, User, Bot, AlertCircle } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Loader,
+  Send,
+  Sparkles,
+  User,
+  Bot,
+  AlertCircle,
+  Brain,
+  ChevronDown,
+} from "lucide-react";
 
 interface ChatDialogProps {
   chatConfigured: boolean;
+}
+
+interface ThinkingBlockProps {
+  text: string;
+  isStreaming?: boolean;
+}
+
+function ThinkingBlock({ text, isStreaming }: ThinkingBlockProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="my-2">
+      <CollapsibleTrigger className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 flex-1">
+          {isStreaming ? (
+            <Loader className="h-3 w-3 animate-spin text-amber-500" />
+          ) : (
+            <Brain className="h-3 w-3 text-amber-500" />
+          )}
+          <span className="text-amber-600 dark:text-amber-400 font-medium">
+            {isStreaming ? "Thinking..." : "Thought process"}
+          </span>
+          <ChevronDown
+            className={`h-3 w-3 ml-auto transition-transform duration-200 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+        <div className="mt-2 pl-3 border-l-2 border-amber-500/30">
+          <div className="text-xs text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
+            {text}
+            {isStreaming && (
+              <span className="inline-block w-1.5 h-3 ml-0.5 bg-amber-500/50 animate-pulse" />
+            )}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
 }
 
 export function ChatDialog({ chatConfigured }: ChatDialogProps) {
@@ -337,6 +392,9 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
                       const hasToolCalls = message.parts.some((p) =>
                         p.type.startsWith("tool-")
                       );
+                      const hasReasoningContent = message.parts.some(
+                        (p) => p.type === "reasoning"
+                      );
                       const isAssistantThinking =
                         isLoading &&
                         isLastMessage &&
@@ -364,6 +422,23 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
                           >
                             <div className="text-sm">
                               {message.parts.map((part, partIndex) => {
+                                if (part.type === "reasoning") {
+                                  const reasoningPart = part as {
+                                    type: "reasoning";
+                                    text: string;
+                                    state?: "streaming" | "done";
+                                  };
+                                  if (!reasoningPart.text.trim()) return null;
+                                  return (
+                                    <ThinkingBlock
+                                      key={partIndex}
+                                      text={reasoningPart.text}
+                                      isStreaming={
+                                        reasoningPart.state === "streaming"
+                                      }
+                                    />
+                                  );
+                                }
                                 if (part.type === "text" && part.text.trim()) {
                                   return (
                                     <div key={partIndex}>
@@ -412,12 +487,14 @@ export function ChatDialog({ chatConfigured }: ChatDialogProps) {
                                 }
                                 return null;
                               })}
-                              {isAssistantThinking && !hasToolCalls && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                                  <Loader className="h-3 w-3 animate-spin" />
-                                  Thinking...
-                                </div>
-                              )}
+                              {isAssistantThinking &&
+                                !hasToolCalls &&
+                                !hasReasoningContent && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                                    <Loader className="h-3 w-3 animate-spin" />
+                                    Thinking...
+                                  </div>
+                                )}
                               {isAssistantThinking && hasToolCalls && (
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
                                   <Loader className="h-3 w-3 animate-spin" />
