@@ -28,7 +28,7 @@ export async function POST(request: Request) {
         : "http://localhost:3005";
 
     const response = await fetch(
-      `${jobServerUrl}/api/jobs/maintenance/cleanup-deleted-items`,
+      `${jobServerUrl}/api/jobs/cleanup-deleted-items`,
       {
         method: "POST",
         headers: {
@@ -71,5 +71,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-
