@@ -320,7 +320,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl h-[600px] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogContent className="max-w-2xl lg:max-w-4xl xl:max-w-5xl h-[80vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-4 py-3 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
@@ -346,11 +346,11 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
                   {messages.length === 0 ? (
                     <div className="flex size-full flex-col items-center justify-center gap-4 p-8 text-center">
                       <Sparkles className="h-12 w-12 text-muted-foreground" />
-                      <div className="space-y-2">
+                      <div className="space-y-2 text-center">
                         <h3 className="font-semibold">
                           Ask me about your media library
                         </h3>
-                        <p className="text-sm text-muted-foreground max-w-sm">
+                        <p className="text-sm text-muted-foreground max-w-sm mx-auto text-center">
                           Try asking things like:
                         </p>
                         <div className="flex flex-wrap gap-2 justify-center pt-2">
