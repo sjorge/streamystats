@@ -1,7 +1,23 @@
 import { z } from "zod/v3";
 import { tool } from "ai";
-import { db, items, sessions, users, libraries } from "@streamystats/database";
-import { and, eq, desc, isNotNull, ilike, inArray, sql } from "drizzle-orm";
+import {
+  db,
+  items,
+  sessions,
+  users,
+  libraries,
+  servers,
+} from "@streamystats/database";
+import {
+  and,
+  eq,
+  desc,
+  isNotNull,
+  ilike,
+  inArray,
+  sql,
+  cosineDistance,
+} from "drizzle-orm";
 import { getMostWatchedItems } from "@/lib/db/statistics";
 import {
   getSimilarStatistics,
@@ -46,6 +62,155 @@ function formatItem(
   return base;
 }
 
+type EmbeddingProvider = "openai-compatible" | "ollama";
+
+function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, "");
+}
+
+async function embedTextForServer({
+  serverId,
+  text,
+}: {
+  serverId: number;
+  text: string;
+}): Promise<
+  | { ok: true; embedding: number[] }
+  | { ok: false; error: string; reason: "not_configured" | "request_failed" }
+> {
+  const server = await db.query.servers.findFirst({
+    where: eq(servers.id, serverId),
+  });
+
+  const provider = server?.embeddingProvider as EmbeddingProvider | null;
+  const baseUrl = server?.embeddingBaseUrl ?? null;
+  const model = server?.embeddingModel ?? null;
+  const apiKey = server?.embeddingApiKey ?? null;
+  const dimensions = server?.embeddingDimensions ?? null;
+
+  if (!provider || !baseUrl || !model) {
+    return {
+      ok: false,
+      reason: "not_configured",
+      error:
+        "Embeddings are not configured for this server. Configure them in Settings > Embeddings.",
+    };
+  }
+
+  try {
+    if (provider === "ollama") {
+      const res = await fetch(`${normalizeBaseUrl(baseUrl)}/api/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model, prompt: text }),
+      });
+
+      if (!res.ok) {
+        return {
+          ok: false,
+          reason: "request_failed",
+          error: `Embedding request failed (status ${res.status})`,
+        };
+      }
+
+      const json = (await res.json()) as {
+        embedding?: number[];
+        embeddings?: number[];
+      };
+      const embedding = json.embedding ?? json.embeddings;
+      if (!Array.isArray(embedding) || embedding.length === 0) {
+        return {
+          ok: false,
+          reason: "request_failed",
+          error: "Embedding request returned no embedding vector",
+        };
+      }
+      return { ok: true, embedding };
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+
+    const body: Record<string, unknown> = { model, input: text };
+    if (typeof dimensions === "number" && dimensions > 0) {
+      body.dimensions = dimensions;
+    }
+
+    const res = await fetch(`${normalizeBaseUrl(baseUrl)}/v1/embeddings`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        reason: "request_failed",
+        error: `Embedding request failed (status ${res.status})`,
+      };
+    }
+
+    const json = (await res.json()) as {
+      data?: Array<{ embedding?: number[] }>;
+    };
+    const embedding = json.data?.[0]?.embedding;
+    if (!Array.isArray(embedding) || embedding.length === 0) {
+      return {
+        ok: false,
+        reason: "request_failed",
+        error: "Embedding request returned no embedding vector",
+      };
+    }
+    return { ok: true, embedding };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "request_failed",
+      error:
+        error instanceof Error ? error.message : "Embedding request failed",
+    };
+  }
+}
+
+function getHolidayHintScore(item: any): number {
+  const haystack = `${item?.name ?? ""}\n${item?.overview ?? ""}`.toLowerCase();
+  const keywords = [
+    "christmas",
+    "xmas",
+    "holiday",
+    "santa",
+    "reindeer",
+    "elf",
+    "grinch",
+    "nativity",
+    "yuletide",
+    "snowman",
+    "mistletoe",
+  ];
+  const keywordHits = keywords.reduce(
+    (sum, k) => sum + (haystack.includes(k) ? 1 : 0),
+    0
+  );
+
+  const genreHits = Array.isArray(item?.genres)
+    ? item.genres.reduce(
+        (sum: number, g: string) =>
+          sum +
+          (typeof g === "string" &&
+          ["holiday", "christmas"].includes(g.toLowerCase())
+            ? 1
+            : 0),
+        0
+      )
+    : 0;
+
+  return keywordHits + genreHits * 2;
+}
+
 const limitSchema = z.object({
   limit: z
     .number()
@@ -87,7 +252,7 @@ export function createChatTools(serverId: number, userId: string) {
             movies.length > 0
               ? `Found ${movies.length} most watched movies`
               : "No movies watched yet",
-        }
+        };
       },
     }),
 
@@ -661,6 +826,138 @@ export function createChatTools(serverId: number, userId: string) {
         return {
           items: results.map((item) => formatItem(item)),
           message: `Found ${results.length} top-rated items (${minRating}+ rating)`,
+        };
+      },
+    }),
+
+    searchLibraryBySemanticQuery: tool({
+      description:
+        "Semantic search across the user's library using embeddings. Use this for theme-based queries like 'Christmas movie I have', 'cozy winter movie', or 'something like a heist thriller'. Returns items from the library ranked by semantic similarity.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe("What the user is looking for (theme/query)"),
+        type: z
+          .enum(["Movie", "Series", "all"])
+          .optional()
+          .default("Movie")
+          .describe("Filter by item type"),
+        limit: z.number().optional().default(10).describe("Number of results"),
+      }),
+      execute: async ({
+        query,
+        type,
+        limit,
+      }: {
+        query: string;
+        type: "Movie" | "Series" | "all";
+        limit: number;
+      }) => {
+        const embed = await embedTextForServer({
+          serverId,
+          text: query,
+        });
+
+        // Fallback: embeddings not configured, do a best-effort keyword/genre search.
+        if (!embed.ok) {
+          const lowered = query.toLowerCase();
+          const isHolidayQuery =
+            lowered.includes("christmas") ||
+            lowered.includes("xmas") ||
+            lowered.includes("holiday");
+
+          const conditions = [eq(items.serverId, serverId)];
+          if (type !== "all") {
+            conditions.push(eq(items.type, type));
+          } else {
+            conditions.push(inArray(items.type, ["Movie", "Series"]));
+          }
+
+          if (isHolidayQuery) {
+            conditions.push(
+              sql`(${items.name} ILIKE '%christmas%' OR ${items.overview} ILIKE '%christmas%' OR ${items.name} ILIKE '%holiday%' OR ${items.overview} ILIKE '%holiday%' OR ${items.name} ILIKE '%xmas%' OR ${items.overview} ILIKE '%xmas%' OR ${items.genres} && ARRAY['Holiday','Christmas']::text[])`
+            );
+          } else {
+            conditions.push(
+              sql`(${items.name} ILIKE ${"%" + query + "%"} OR ${
+                items.overview
+              } ILIKE ${"%" + query + "%"})`
+            );
+          }
+
+          const results = await db
+            .select()
+            .from(items)
+            .where(and(...conditions))
+            .orderBy(desc(items.communityRating))
+            .limit(limit);
+
+          return {
+            items: results.map((item) => ({
+              ...formatItem(item),
+              reason: `Matched text/metadata for "${query}"`,
+            })),
+            message:
+              results.length > 0
+                ? `Found ${results.length} items matching "${query}" (fallback search)`
+                : `No items found matching "${query}". ${
+                    embed.reason === "not_configured" ? embed.error : ""
+                  }`.trim(),
+            usedEmbeddings: false,
+          };
+        }
+
+        const similarity = sql<number>`1 - (${cosineDistance(
+          items.embedding,
+          embed.embedding
+        )})`;
+
+        const conditions = [
+          eq(items.serverId, serverId),
+          isNotNull(items.embedding),
+        ];
+        if (type !== "all") {
+          conditions.push(eq(items.type, type));
+        } else {
+          conditions.push(inArray(items.type, ["Movie", "Series"]));
+        }
+
+        const candidates = await db
+          .select({
+            item: items,
+            similarity,
+          })
+          .from(items)
+          .where(and(...conditions))
+          .orderBy(desc(similarity), desc(items.communityRating))
+          .limit(Math.max(limit * 12, 50));
+
+        const ranked = candidates
+          .map((c) => {
+            const sim = Number(c.similarity);
+            const hint = getHolidayHintScore(c.item);
+            const bonus = Math.min(0.12, hint * 0.02);
+            return {
+              ...c,
+              similarity: sim,
+              holidayHintScore: hint,
+              finalScore: sim + bonus,
+            };
+          })
+          .sort((a, b) => b.finalScore - a.finalScore)
+          .slice(0, limit);
+
+        return {
+          items: ranked.map((r) => ({
+            ...formatItem(r.item),
+            similarityPercent: Math.round(r.similarity * 100),
+            reason: `Semantic match for "${query}"`,
+          })),
+          message:
+            ranked.length > 0
+              ? `Found ${ranked.length} semantically similar items for "${query}"`
+              : `No items found for "${query}" (embeddings search)`,
+          usedEmbeddings: true,
         };
       },
     }),
