@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.7.0](https://github.com/fredrikburmester/streamystats/compare/v2.6.1...v2.7.0) (2025-12-13)
+
+
+### Features
+
+* endpoint for deleted items ([22f4aa5](https://github.com/fredrikburmester/streamystats/commit/22f4aa589282aa8d56d9ffd35f31181515f67bea))
+
+
+### Bug Fixes
+
+* add deleted items as schedule ([cd4ac64](https://github.com/fredrikburmester/streamystats/commit/cd4ac648c14fd120cd7051456908e9fc9f83ee71))
+* better ai library search with rag ([6835417](https://github.com/fredrikburmester/streamystats/commit/683541748b31cb7cfadfc23d735c1379c7a2bb5a))
+* build action ([cd6d375](https://github.com/fredrikburmester/streamystats/commit/cd6d375c1a5608f5c1884a81a63194d62242f2ca))
+* deleted item show design ([839eadd](https://github.com/fredrikburmester/streamystats/commit/839eadd48f096311e7f0cceacadd41d47ae96b52))
+* design ([d17a3a2](https://github.com/fredrikburmester/streamystats/commit/d17a3a24c0c88033deac79cdd75a5259604d43c8))
+* embeding dimensions edge case ([c1d4b88](https://github.com/fredrikburmester/streamystats/commit/c1d4b88a5f5984f46e280c86ea1df3b588c41a32))
+* hydration warning ([a708b28](https://github.com/fredrikburmester/streamystats/commit/a708b283dc03086e1a24ebcf309c6a05e049c158))
+* hydration warnings ([563440e](https://github.com/fredrikburmester/streamystats/commit/563440e5e91d9277d783f8244a2ae5b98b2bdad7))
+* logs ([c399473](https://github.com/fredrikburmester/streamystats/commit/c3994736d5672110647b76583dd5ff3c3bb23a7a))
+* logs ([ae74975](https://github.com/fredrikburmester/streamystats/commit/ae7497545fa9e219ad6b85801eb542e3886bfb1b))
+* memory issue ([392b370](https://github.com/fredrikburmester/streamystats/commit/392b3709dfadc6fd7b48950014061a8821c689e4))
+* path ([a428f8b](https://github.com/fredrikburmester/streamystats/commit/a428f8b34c6149d840565fe1dc79b7626cd63a3d))
+* remove ssr wrapper ([b3e24ef](https://github.com/fredrikburmester/streamystats/commit/b3e24ef7ec194f0b3a5c43f4a9259380ff043b9e))
+* restore or migrate items on normal sync ([1afed43](https://github.com/fredrikburmester/streamystats/commit/1afed436647b75926ae784d3758cd25e108f6c86))
+
 ## [2.6.1](https://github.com/fredrikburmester/streamystats/compare/v2.6.0...v2.6.1) (2025-12-12)
 
 
