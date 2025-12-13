@@ -10,12 +10,10 @@ import {
   Star,
   Clock,
   Calendar,
-  Eye,
-  PlayCircle,
   ExternalLink,
   Folder,
   Tag,
-  CheckCircle,
+  Trash2,
 } from "lucide-react";
 
 interface ItemDetailsResponse {
@@ -44,16 +42,38 @@ function formatRating(rating: number): string {
 }
 
 export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
+  const isDeleted = item.deletedAt !== null;
+
   return (
-    <Card>
+    <Card className={isDeleted ? "border-destructive/50" : undefined}>
       <CardContent className="p-6 relative">
+        {/* Deleted Banner */}
+        {isDeleted && (
+          <div className="absolute top-0 left-0 right-0 bg-destructive/10 border-b border-destructive/30 px-4 py-2 flex items-center gap-2 rounded-t-lg">
+            <Trash2 className="w-4 h-4 text-destructive" />
+            <span className="text-sm font-medium text-destructive">
+              This item has been removed from Jellyfin
+            </span>
+          </div>
+        )}
+
         {/* Open in Jellyfin Button - Top Right */}
-        <div className="absolute top-4 right-4 z-10">
-          <Button asChild variant="outline" className="gap-2">
+        <div
+          className={`absolute ${isDeleted ? "top-14" : "top-4"} right-4 z-10`}
+        >
+          <Button
+            asChild
+            variant="outline"
+            className="gap-2"
+            disabled={isDeleted}
+          >
             <a
               href={`${server.url}/web/index.html#!/details?id=${item.id}`}
               target="_blank"
               rel="noopener noreferrer"
+              className={
+                isDeleted ? "pointer-events-none opacity-50" : undefined
+              }
             >
               <ExternalLink className="w-4 h-4" />
               Open in Jellyfin
@@ -61,9 +81,13 @@ export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
           </Button>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div
+          className={`flex flex-col lg:flex-row gap-6 ${
+            isDeleted ? "pt-10" : ""
+          }`}
+        >
           <div className="flex-shrink-0 mx-auto lg:mx-0">
-            <div className="w-48">
+            <div className={`w-48 ${isDeleted ? "opacity-60 grayscale" : ""}`}>
               <Poster
                 item={item}
                 server={server}
@@ -77,9 +101,17 @@ export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
 
           <div className="flex-1 space-y-4">
             <div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
-                {item.name}
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
+                  {item.name}
+                </h1>
+                {isDeleted && (
+                  <Badge variant="destructive" className="text-xs">
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Removed
+                  </Badge>
+                )}
+              </div>
               {item.type === "Episode" && (
                 <div className="space-y-1">
                   <div className="flex gap-4 text-sm text-muted-foreground">

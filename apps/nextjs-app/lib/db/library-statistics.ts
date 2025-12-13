@@ -18,6 +18,7 @@ import {
   sum,
   desc,
   isNotNull,
+  isNull,
   inArray,
   ilike,
   asc,
@@ -59,18 +60,18 @@ export interface ItemWatchStatsResponse {
  * Get aggregated library statistics for a server
  */
 export const getAggregatedLibraryStatistics = async ({
-  serverId
+  serverId,
 }: {
   serverId: number;
 }): Promise<AggregatedLibraryStatistics> => {
-  // Get counts by item type
+  // Get counts by item type (excluding soft-deleted items)
   const itemCounts = await db
     .select({
       type: items.type,
       count: count(items.id),
     })
     .from(items)
-    .where(eq(items.serverId, serverId))
+    .where(and(eq(items.serverId, serverId), isNull(items.deletedAt)))
     .groupBy(items.type);
 
   // Get library count
@@ -136,7 +137,7 @@ export const getLibraryItemsWithStats = async ({
   sortBy,
   type,
   search,
-  libraryIds
+  libraryIds,
 }: {
   serverId: number;
   page?: string;
@@ -150,8 +151,8 @@ export const getLibraryItemsWithStats = async ({
   const perPage = 20;
   const offset = (currentPage - 1) * perPage;
 
-  // Build base query conditions
-  const conditions = [eq(items.serverId, serverId)];
+  // Build base query conditions (excluding soft-deleted items)
+  const conditions = [eq(items.serverId, serverId), isNull(items.deletedAt)];
 
   // Add type filter
   if (type) {

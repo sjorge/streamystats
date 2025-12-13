@@ -105,7 +105,11 @@ export const TranscodingReasonsCard = ({
         <CardDescription>Why media is being transcoded</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={reasonsConfig} className="h-[200px]">
+        <ChartContainer
+          id="transcoding-reasons"
+          config={reasonsConfig}
+          className="h-[200px]"
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               accessibilityLayer

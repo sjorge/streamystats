@@ -92,6 +92,7 @@ export const CodecUsageCard = ({
       </CardHeader>
       <CardContent>
         <ChartContainer
+          id="codec-usage"
           config={codecConfig}
           className="h-[200px]"
           onWidthChange={setContainerWidth}

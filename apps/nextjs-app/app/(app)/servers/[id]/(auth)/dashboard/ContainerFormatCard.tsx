@@ -91,6 +91,7 @@ export const ContainerFormatCard = ({ data }: ContainerFormatCardProps) => {
       </CardHeader>
       <CardContent>
         <ChartContainer
+          id="container-format"
           config={containerConfig}
           className="h-[200px]"
           onWidthChange={setContainerWidth}

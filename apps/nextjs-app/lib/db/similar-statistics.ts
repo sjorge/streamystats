@@ -14,6 +14,7 @@ import {
   desc,
   notInArray,
   isNotNull,
+  isNull,
   gt,
   count,
 } from "drizzle-orm";
@@ -317,6 +318,7 @@ async function getUserSpecificRecommendations(
       .where(
         and(
           eq(items.serverId, serverId),
+          isNull(items.deletedAt),
           isNotNull(items.embedding),
           notInArray(items.id, watchedItemIds), // Exclude already watched items
           hiddenItemIds.length > 0
@@ -537,6 +539,7 @@ async function getPopularRecommendations(
     .where(
       and(
         eq(items.serverId, serverId),
+        isNull(items.deletedAt),
         isNotNull(items.embedding),
         // Exclude user's watched items if we have a user
         watchedItemIds.length > 0
@@ -618,6 +621,7 @@ export const getSimilarItemsForItem = async (
       .where(
         and(
           eq(items.serverId, serverIdNum),
+          isNull(items.deletedAt),
           eq(items.type, targetItem.type), // Same type (Movie, Series, etc.)
           isNotNull(items.embedding),
           sql`${items.id} != ${itemId}` // Exclude the target item itself

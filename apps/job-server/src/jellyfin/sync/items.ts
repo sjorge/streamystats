@@ -1,8 +1,10 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, or } from "drizzle-orm";
 import {
   db,
   items,
   libraries,
+  sessions,
+  hiddenRecommendations,
   Server,
   NewItem,
   Library,
@@ -33,6 +35,8 @@ export interface ItemSyncData {
   itemsInserted: number;
   itemsUpdated: number;
   itemsUnchanged: number;
+  itemsMigrated?: number;
+  sessionsMigrated?: number;
 }
 
 export async function syncItems(
@@ -332,23 +336,52 @@ async function processItem(
 ): Promise<void> {
   // Check if item already exists and compare etag for changes
   const existingItem = await db
-    .select({ etag: items.etag })
+    .select({ etag: items.etag, deletedAt: items.deletedAt })
     .from(items)
     .where(eq(items.id, jellyfinItem.Id))
     .limit(1);
 
   const isNewItem = existingItem.length === 0;
+  const wasDeleted = !isNewItem && existingItem[0].deletedAt !== null;
   const hasChanged = !isNewItem && existingItem[0].etag !== jellyfinItem.Etag;
 
-  if (!isNewItem && !hasChanged) {
+  // If item exists but was deleted, clear the deletedAt flag (item is back)
+  if (wasDeleted) {
+    console.info(
+      `[items-sync] Item ${jellyfinItem.Id} was previously deleted, restoring it`
+    );
+  }
+
+  if (!isNewItem && !hasChanged && !wasDeleted) {
     metrics.incrementItemsUnchanged();
     metrics.incrementItemsProcessed();
-    return; // Skip if item hasn't changed
+    return; // Skip if item hasn't changed and wasn't deleted
+  }
+
+  const serverId = await getServerIdFromLibrary(libraryId);
+
+  // For truly new items, check for previously deleted items to migrate data from
+  if (isNewItem) {
+    const tempItemData: NewItem = {
+      id: jellyfinItem.Id,
+      serverId,
+      libraryId,
+      name: jellyfinItem.Name,
+      type: jellyfinItem.Type,
+      seriesId: jellyfinItem.SeriesId || null,
+      indexNumber: jellyfinItem.IndexNumber || null,
+      parentIndexNumber: jellyfinItem.ParentIndexNumber || null,
+      providerIds: jellyfinItem.ProviderIds || null,
+      isFolder: jellyfinItem.IsFolder,
+      rawData: jellyfinItem,
+      updatedAt: new Date(),
+    };
+    await checkAndMigrateDeletedItem(tempItemData);
   }
 
   const itemData: NewItem = {
     id: jellyfinItem.Id,
-    serverId: await getServerIdFromLibrary(libraryId),
+    serverId,
     libraryId,
     name: jellyfinItem.Name,
     type: jellyfinItem.Type,
@@ -409,7 +442,7 @@ async function processItem(
     updatedAt: new Date(),
   };
 
-  // Upsert item
+  // Upsert item (also clear deletedAt in case item was previously soft-deleted)
   await db
     .insert(items)
     .values(itemData)
@@ -417,6 +450,7 @@ async function processItem(
       target: items.id,
       set: {
         ...itemData,
+        deletedAt: null, // Clear deletion flag if item is back
         updatedAt: new Date(),
       },
     });
@@ -634,8 +668,13 @@ export async function syncRecentlyAddedItems(
 
     // Process valid items - determine inserts vs updates
     metrics.incrementDatabaseOperations();
-    const { insertResult, updateResult, unchangedCount } =
-      await processValidItems(allMappedItems, allInvalidItems, server.id);
+    const {
+      insertResult,
+      updateResult,
+      unchangedCount,
+      itemsMigrated,
+      sessionsMigrated,
+    } = await processValidItems(allMappedItems, allInvalidItems, server.id);
 
     metrics.incrementItemsInserted(insertResult);
     metrics.incrementItemsUpdated(updateResult);
@@ -648,6 +687,8 @@ export async function syncRecentlyAddedItems(
       itemsInserted: insertResult,
       itemsUpdated: updateResult,
       itemsUnchanged: unchangedCount,
+      itemsMigrated,
+      sessionsMigrated,
     };
 
     console.info(
@@ -662,6 +703,8 @@ export async function syncRecentlyAddedItems(
         totalProcessed: finalMetrics.itemsProcessed,
         unchanged: unchangedCount,
         librariesProcessed: validLibraries.length,
+        itemsMigrated,
+        sessionsMigrated,
       })
     );
 
@@ -826,6 +869,8 @@ async function processValidItems(
   insertResult: number;
   updateResult: number;
   unchangedCount: number;
+  itemsMigrated: number;
+  sessionsMigrated: number;
 }> {
   // Fields that we track for changes (matching the Elixir version)
   const trackedFields = [
@@ -917,11 +962,17 @@ async function processValidItems(
   }
 
   // Process insertions and updates
-  const insertResult = await processInserts(itemsToInsert);
+  const insertResults = await processInserts(itemsToInsert);
   const updateResult = await processUpdates(itemsToUpdate, trackedFields);
   const unchangedCount = unchangedItems.length;
 
-  return { insertResult, updateResult, unchangedCount };
+  return {
+    insertResult: insertResults.insertCount,
+    updateResult,
+    unchangedCount,
+    itemsMigrated: insertResults.itemsMigrated,
+    sessionsMigrated: insertResults.sessionsMigrated,
+  };
 }
 
 /**
@@ -1004,14 +1055,35 @@ function hasImageFieldsChanged(existing: any, newItem: any): boolean {
 }
 
 /**
- * Insert new items
+ * Insert new items and check for previously deleted items to migrate data from
  */
-async function processInserts(itemsToInsert: NewItem[]): Promise<number> {
-  if (itemsToInsert.length === 0) return 0;
+async function processInserts(itemsToInsert: NewItem[]): Promise<{
+  insertCount: number;
+  itemsMigrated: number;
+  sessionsMigrated: number;
+}> {
+  if (itemsToInsert.length === 0) {
+    return { insertCount: 0, itemsMigrated: 0, sessionsMigrated: 0 };
+  }
+
+  let itemsMigrated = 0;
+  let sessionsMigrated = 0;
 
   try {
     const start = Date.now();
+
+    // Insert all items first (required before migrating sessions due to FK constraints)
     await db.insert(items).values(itemsToInsert);
+
+    // After inserting, check each item for matches with deleted items and migrate data
+    for (const item of itemsToInsert) {
+      const migrationResult = await checkAndMigrateDeletedItem(item);
+      if (migrationResult.migrated) {
+        itemsMigrated++;
+        sessionsMigrated += migrationResult.sessionsMigrated;
+      }
+    }
+
     console.info(
       formatSyncLogLine("items-sync", {
         server: String(itemsToInsert[0]?.serverId ?? 0),
@@ -1023,9 +1095,15 @@ async function processInserts(itemsToInsert: NewItem[]): Promise<number> {
         processMs: Date.now() - start,
         totalProcessed: 0,
         phase: "dbInsert",
+        itemsMigrated,
+        sessionsMigrated,
       })
     );
-    return itemsToInsert.length;
+    return {
+      insertCount: itemsToInsert.length,
+      itemsMigrated,
+      sessionsMigrated,
+    };
   } catch (error) {
     console.error(
       formatSyncLogLine("items-sync", {
@@ -1113,4 +1191,137 @@ async function processUpdates(
     })
   );
   return updateCount;
+}
+
+/**
+ * Check if a new item matches a previously deleted item and migrate data if so.
+ * Returns migration stats.
+ */
+async function checkAndMigrateDeletedItem(newItem: NewItem): Promise<{
+  migrated: boolean;
+  sessionsMigrated: number;
+  hiddenRecsMigrated: number;
+}> {
+  const result = {
+    migrated: false,
+    sessionsMigrated: 0,
+    hiddenRecsMigrated: 0,
+  };
+
+  // Find deleted items with matching criteria
+  const deletedMatch = await findDeletedItemMatch(newItem);
+
+  if (!deletedMatch) {
+    return result;
+  }
+
+  console.info(
+    `[items-sync] Migrating data from deleted item ${deletedMatch.id} to new item ${newItem.id} (matched by: ${deletedMatch.matchReason})`
+  );
+
+  // Migrate sessions from old item to new item
+  const migratedSessions = await db
+    .update(sessions)
+    .set({ itemId: newItem.id })
+    .where(eq(sessions.itemId, deletedMatch.id))
+    .returning({ id: sessions.id });
+
+  result.sessionsMigrated = migratedSessions.length;
+
+  // Migrate hidden recommendations from old item to new item
+  const migratedRecs = await db
+    .update(hiddenRecommendations)
+    .set({ itemId: newItem.id })
+    .where(eq(hiddenRecommendations.itemId, deletedMatch.id))
+    .returning({ id: hiddenRecommendations.id });
+
+  result.hiddenRecsMigrated = migratedRecs.length;
+  result.migrated = true;
+
+  if (result.sessionsMigrated > 0 || result.hiddenRecsMigrated > 0) {
+    console.info(
+      `[items-sync] Migrated ${result.sessionsMigrated} sessions and ${result.hiddenRecsMigrated} hidden recommendations from ${deletedMatch.id} to ${newItem.id}`
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Find a deleted item that matches the new item by provider IDs or episode details
+ */
+async function findDeletedItemMatch(
+  newItem: NewItem
+): Promise<{ id: string; matchReason: string } | null> {
+  // 1. Try to match by provider IDs (IMDB, TMDB, etc.)
+  if (newItem.providerIds && typeof newItem.providerIds === "object") {
+    const providerIds = newItem.providerIds as Record<string, string>;
+
+    // Get all deleted items for this server that have provider IDs
+    const deletedItemsWithProviders = await db
+      .select({ id: items.id, providerIds: items.providerIds })
+      .from(items)
+      .where(
+        and(
+          eq(items.serverId, newItem.serverId),
+          isNotNull(items.deletedAt),
+          isNotNull(items.providerIds)
+        )
+      );
+
+    for (const deletedItem of deletedItemsWithProviders) {
+      if (
+        !deletedItem.providerIds ||
+        typeof deletedItem.providerIds !== "object"
+      ) {
+        continue;
+      }
+
+      const deletedProviderIds = deletedItem.providerIds as Record<
+        string,
+        string
+      >;
+
+      // Check if any provider ID matches
+      for (const [provider, id] of Object.entries(providerIds)) {
+        if (id && deletedProviderIds[provider] === id) {
+          return { id: deletedItem.id, matchReason: `${provider}:${id}` };
+        }
+      }
+    }
+  }
+
+  // 2. For episodes, try to match by series ID + season + episode number
+  const indexNum = newItem.indexNumber;
+  const parentIndexNum = newItem.parentIndexNumber;
+  if (
+    newItem.type === "Episode" &&
+    newItem.seriesId &&
+    indexNum != null &&
+    parentIndexNum != null
+  ) {
+    const deletedEpisode = await db
+      .select({ id: items.id })
+      .from(items)
+      .where(
+        and(
+          eq(items.serverId, newItem.serverId),
+          isNotNull(items.deletedAt),
+          eq(items.type, "Episode"),
+          eq(items.seriesId, newItem.seriesId),
+          eq(items.indexNumber, indexNum),
+          eq(items.parentIndexNumber, parentIndexNum)
+        )
+      )
+      .limit(1);
+
+    if (deletedEpisode.length > 0) {
+      return {
+        id: deletedEpisode[0].id,
+        matchReason: `episode:${newItem.seriesId}:S${parentIndexNum}E${indexNum}`,
+      };
+    }
+  }
+
+  return null;
 }

@@ -48,7 +48,11 @@ export const WatchTimePerDay: React.FC<Props> = ({ data }) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        <ChartContainer
+          id="watch-time-per-day"
+          config={chartConfig}
+          className="h-[300px] w-full"
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
               <CartesianGrid vertical={false} />

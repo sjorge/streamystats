@@ -14,6 +14,7 @@ import {
   desc,
   notInArray,
   isNotNull,
+  isNull,
   count,
   inArray,
 } from "drizzle-orm";
@@ -201,6 +202,7 @@ async function getUserSpecificSeriesRecommendations(
     .where(
       and(
         eq(items.serverId, serverId),
+        isNull(items.deletedAt),
         eq(items.type, "Series"),
         isNotNull(items.embedding),
         inArray(items.id, seriesIds)
@@ -344,6 +346,7 @@ async function getUserSpecificSeriesRecommendations(
       .where(
         and(
           eq(items.serverId, serverId),
+          isNull(items.deletedAt),
           eq(items.type, "Series"),
           isNotNull(items.embedding),
           notInArray(items.id, watchedSeriesIds), // Exclude already watched series
@@ -484,6 +487,7 @@ async function getPopularSeriesRecommendations(
     .where(
       and(
         eq(items.serverId, serverId),
+        isNull(items.deletedAt),
         eq(items.type, "Series"),
         isNotNull(items.embedding),
         // Exclude user's watched series if we have a user
@@ -569,6 +573,7 @@ export const getSimilarSeriesForItem = async (
       .where(
         and(
           eq(items.serverId, serverIdNum),
+          isNull(items.deletedAt),
           eq(items.type, "Series"),
           isNotNull(items.embedding),
           sql`${items.id} != ${itemId}` // Exclude the target series itself

@@ -129,6 +129,7 @@ export const BitrateDistributionCard = ({
       <CardContent>
         {bitrateData.length > 0 ? (
           <ChartContainer
+            id="bitrate-distribution"
             config={bitrateConfig}
             className="h-[200px]"
             onWidthChange={setContainerWidth}

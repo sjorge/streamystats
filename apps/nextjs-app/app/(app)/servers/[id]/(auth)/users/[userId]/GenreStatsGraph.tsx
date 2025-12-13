@@ -41,7 +41,11 @@ export const GenreStatsGraph: React.FC<Props> = ({
         {/* <CardDescription>Showing most watched genres</CardDescription> */}
       </CardHeader>
       <CardContent className="pb-0">
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        <ChartContainer
+          id="genre-stats"
+          config={chartConfig}
+          className="h-[300px] w-full"
+        >
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={data} outerRadius={90}>
               <PolarGrid />

@@ -401,6 +401,7 @@ export * from "./users";
 export * from "./libraries";
 export * from "./items";
 export * from "./activities";
+export * from "./deleted-items";
 
 export type { SyncResult, SyncMetrics };
 

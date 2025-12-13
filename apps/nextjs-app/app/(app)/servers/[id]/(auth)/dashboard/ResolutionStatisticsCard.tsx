@@ -156,6 +156,7 @@ export const ResolutionStatisticsCard = ({ width, height }: Props) => {
       </CardHeader>
       <CardContent>
         <ChartContainer
+          id="resolution-stats"
           config={resolutionConfig}
           className="h-[200px]"
           onWidthChange={setContainerWidth}

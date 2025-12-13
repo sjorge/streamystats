@@ -137,6 +137,7 @@ function WatchTimeChartView({
 
   return (
     <ChartContainer
+      id="watch-time-graph"
       config={chartConfig}
       className="aspect-auto h-[250px] w-full"
     >

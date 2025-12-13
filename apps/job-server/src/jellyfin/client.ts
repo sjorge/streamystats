@@ -289,6 +289,16 @@ export interface JellyfinItemPeopleDto {
   People?: any[];
 }
 
+export interface MinimalJellyfinItem {
+  Id: string;
+  Name: string;
+  Type: string;
+  ProviderIds?: Record<string, string>;
+  SeriesId?: string;
+  IndexNumber?: number;
+  ParentIndexNumber?: number;
+}
+
 const DEFAULT_ITEM_FIELDS = [
   "DateCreated",
   "Etag",
@@ -584,6 +594,58 @@ export class JellyfinClient {
 
   async getSessions(): Promise<JellyfinSession[]> {
     return this.makeRequest<JellyfinSession[]>("get", "/Sessions");
+  }
+
+  /**
+   * Fetch all items from a library with minimal fields for comparison.
+   * Used for detecting deleted items without fetching full metadata.
+   */
+  async getAllItemsMinimal(
+    libraryId: string,
+    pageSize: number = 1000
+  ): Promise<MinimalJellyfinItem[]> {
+    const minimalFields = [
+      "ProviderIds",
+      "SeriesId",
+      "IndexNumber",
+      "ParentIndexNumber",
+    ];
+
+    const allItems: MinimalJellyfinItem[] = [];
+    let startIndex = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.makeRequest<ItemsResponse>("get", "/Items", {
+        params: {
+          ParentId: libraryId,
+          Recursive: true,
+          Fields: minimalFields.join(","),
+          StartIndex: startIndex,
+          Limit: pageSize,
+          IsFolder: false,
+          IsPlaceHolder: false,
+        },
+      });
+
+      const items = response.Items || [];
+      for (const item of items) {
+        allItems.push({
+          Id: item.Id,
+          Name: item.Name,
+          Type: item.Type,
+          ProviderIds: item.ProviderIds,
+          SeriesId: item.SeriesId,
+          IndexNumber: item.IndexNumber,
+          ParentIndexNumber: item.ParentIndexNumber,
+        });
+      }
+
+      startIndex += items.length;
+      hasMore = startIndex < response.TotalRecordCount && items.length > 0;
+    }
+
+    return allItems;
   }
 
   // Helper method to create client from server configuration
