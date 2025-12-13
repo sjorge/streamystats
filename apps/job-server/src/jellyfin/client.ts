@@ -592,6 +592,34 @@ export class JellyfinClient {
     return this.makeRequest<any[]>("get", "/Plugins");
   }
 
+  /**
+   * Get server system info. Useful for health checks.
+   */
+  async getServerInfo(): Promise<{
+    ServerName: string;
+    Version: string;
+    Id: string;
+  }> {
+    return this.makeRequest<{
+      ServerName: string;
+      Version: string;
+      Id: string;
+    }>("get", "/System/Info");
+  }
+
+  /**
+   * Check if the Jellyfin server is reachable and responding.
+   * Returns true if server is healthy, false otherwise.
+   */
+  async isServerHealthy(): Promise<boolean> {
+    try {
+      const info = await this.getServerInfo();
+      return !!info?.Id;
+    } catch {
+      return false;
+    }
+  }
+
   async getSessions(): Promise<JellyfinSession[]> {
     return this.makeRequest<JellyfinSession[]>("get", "/Sessions");
   }

@@ -110,6 +110,36 @@ export async function cleanupDeletedItems(
       })
     );
 
+    // Safety check: Verify server is reachable before proceeding
+    const serverHealthy = await client.isServerHealthy();
+    if (!serverHealthy) {
+      console.warn(
+        formatSyncLogLine("deleted-items-cleanup", {
+          server: server.name,
+          page: -1,
+          processed: 0,
+          inserted: 0,
+          updated: 0,
+          errors: 1,
+          processMs: 0,
+          totalProcessed: 0,
+          message: "Server unreachable - aborting to prevent false deletions",
+          phase: "abort",
+        })
+      );
+      metrics.endTime = new Date();
+      metrics.duration =
+        metrics.endTime.getTime() - metrics.startTime.getTime();
+      metrics.errors++;
+      return {
+        status: "error",
+        metrics,
+        errors: [
+          "Server unreachable - cleanup aborted to prevent marking all items as deleted",
+        ],
+      };
+    }
+
     // Get all libraries for this server
     const serverLibraries = await db
       .select()
@@ -201,6 +231,45 @@ export async function cleanupDeletedItems(
         phase: "maps-built",
       })
     );
+
+    // Safety check: Count database items to compare with Jellyfin
+    const dbItemCount = await db
+      .select({ count: items.id })
+      .from(items)
+      .where(and(eq(items.serverId, server.id), isNull(items.deletedAt)));
+    metrics.databaseOperations++;
+
+    const totalDbItems = dbItemCount.length;
+
+    // Abort if Jellyfin returns 0 items but we have items in database
+    // This prevents marking everything as deleted due to server issues
+    if (metrics.jellyfinItemsCount === 0 && totalDbItems > 0) {
+      console.warn(
+        formatSyncLogLine("deleted-items-cleanup", {
+          server: server.name,
+          page: -1,
+          processed: 0,
+          inserted: 0,
+          updated: 0,
+          errors: 1,
+          processMs: 0,
+          totalProcessed: 0,
+          message: `Jellyfin returned 0 items but database has ${totalDbItems} items - aborting`,
+          phase: "abort",
+        })
+      );
+      metrics.endTime = new Date();
+      metrics.duration =
+        metrics.endTime.getTime() - metrics.startTime.getTime();
+      metrics.errors++;
+      return {
+        status: "error",
+        metrics,
+        errors: [
+          `Jellyfin returned 0 items but database has ${totalDbItems} items - cleanup aborted to prevent false deletions`,
+        ],
+      };
+    }
 
     // Phase 2: Process database items per-library to limit memory usage
     const allItemsToDelete: string[] = [];
