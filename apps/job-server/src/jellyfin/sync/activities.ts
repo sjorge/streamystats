@@ -221,7 +221,18 @@ export async function syncRecentActivities(
 
   try {
     console.info(
-      `Starting recent activities sync for server ${server.name} (intelligent: ${intelligent})`
+      formatSyncLogLine("recent-activities-sync", {
+        server: server.name,
+        page: 0,
+        processed: 0,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        processMs: 0,
+        totalProcessed: 0,
+        action: "start",
+        intelligent,
+      })
     );
 
     let mostRecentDbActivityId: string | null = null;

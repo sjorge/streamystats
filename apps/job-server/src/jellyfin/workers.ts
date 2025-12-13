@@ -44,7 +44,9 @@ export async function jellyfinSyncWorker(job: {
 }): Promise<any> {
   const { serverId, syncType, options = {} } = job.data;
 
-  console.log(`Starting Jellyfin ${syncType} sync for server ID: ${serverId}`);
+  console.info(
+    `[jellyfin-sync] serverId=${serverId} syncType=${syncType} action=start`
+  );
 
   try {
     // Get server configuration
@@ -53,7 +55,9 @@ export async function jellyfinSyncWorker(job: {
       throw new Error(`Server not found: ${serverId}`);
     }
 
-    console.log(`Found server: ${server.name} (${server.url})`);
+    console.info(
+      `[jellyfin-sync] server=${server.name} serverId=${serverId} syncType=${syncType} action=loadedServer url=${server.url}`
+    );
 
     // Update server sync status
     await updateServerSyncStatus(serverId, "syncing", syncType);
@@ -94,12 +98,8 @@ export async function jellyfinSyncWorker(job: {
         throw new Error(`Unknown sync type: ${syncType}`);
     }
 
-    console.log(
-      `Jellyfin ${syncType} sync completed for server ${server.name}:`,
-      {
-        status: result.status,
-        duration: result.metrics.duration,
-      }
+    console.info(
+      `[jellyfin-sync] server=${server.name} serverId=${serverId} syncType=${syncType} action=completed status=${result.status} durationMs=${result.metrics.duration}`
     );
 
     // Update server sync status based on result
