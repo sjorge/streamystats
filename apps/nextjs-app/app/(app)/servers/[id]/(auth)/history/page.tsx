@@ -1,7 +1,7 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { redirect } from "next/navigation";
-import { HistoryTableClient } from "./HistoryTableClient";
+import { HistoryTable } from "./HistoryTable";
 import { getServer } from "@/lib/db/server";
 import { getHistory, HistoryResponse } from "@/lib/db/history";
 
@@ -46,7 +46,7 @@ export default async function HistoryPage({
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
       <PageTitle title="History" subtitle="View playback history." />
-      <HistoryTableClient data={historyData} server={server} />
+      <HistoryTable data={historyData} server={server} />
     </Container>
   );
 }

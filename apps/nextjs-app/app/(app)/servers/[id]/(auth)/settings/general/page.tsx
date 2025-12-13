@@ -3,7 +3,7 @@ import { ServerJobStatusCard } from "@/components/ServerJobStatusCard";
 import { getServer } from "@/lib/db/server";
 import { isUserAdmin } from "@/lib/db/users";
 import { redirect } from "next/navigation";
-import { DeleteServerClient } from "../DeleteServerClient";
+import { DeleteServer } from "../DeleteServer";
 import { VersionSection } from "../VersionSection";
 import { SyncManager } from "../SyncManager";
 import { CleanupManager } from "../CleanupManager";
@@ -29,7 +29,7 @@ export default async function GeneralSettings(props: {
         <UpdateConnection serverId={server.id} />
         <SyncManager serverId={server.id} serverName={server.name} />
         {isAdmin ? <CleanupManager serverId={server.id} /> : null}
-        <DeleteServerClient server={server} />
+        <DeleteServer server={server} />
       </div>
     </Container>
   );

@@ -3,7 +3,7 @@
 import { ChatDialogWrapper } from "@/components/ChatDialogWrapper";
 import { DynamicBreadcrumbs } from "@/components/DynamicBreadcrumbs";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { SideBarClient } from "@/components/SideBarClient";
+import { SideBar } from "@/components/SideBar";
 import { SuspenseLoading } from "@/components/SuspenseLoading";
 import { UpdateNotifier } from "@/components/UpdateNotifier";
 import { Separator } from "@/components/ui/separator";
@@ -39,11 +39,7 @@ export default async function layout({ children, params }: Props) {
 
   return (
     <SidebarProvider defaultOpen={defaultSidebarOpen}>
-      <SideBarClient
-        servers={servers}
-        me={me}
-        allowedToCreateServer={isAdmin}
-      />
+      <SideBar servers={servers} me={me} allowedToCreateServer={isAdmin} />
       <Suspense fallback={<SuspenseLoading />}>
         <ErrorBoundary>
           <main>

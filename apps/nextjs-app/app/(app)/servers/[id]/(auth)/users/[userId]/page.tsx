@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { redirect } from "next/navigation";
-import { HistoryTableClient } from "../../history/HistoryTableClient";
+import { HistoryTable } from "../../history/HistoryTable";
 import { GenreStatsGraph } from "./GenreStatsGraph";
 import UserBadges from "./UserBadges";
 import { WatchTimePerDay } from "./WatchTimePerDay";
@@ -90,11 +90,7 @@ export default async function User({
         <GenreStatsGraph data={genreStats} />
         <WatchTimePerDay data={watchTimePerWeekday} />
       </div>
-      <HistoryTableClient
-        server={server}
-        data={userHistory}
-        hideUserColumn={true}
-      />
+      <HistoryTable server={server} data={userHistory} hideUserColumn={true} />
     </Container>
   );
 }
