@@ -3,13 +3,14 @@
 import { ChatDialogWrapper } from "@/components/ChatDialogWrapper";
 import { DynamicBreadcrumbs } from "@/components/DynamicBreadcrumbs";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { SideBar } from "@/components/SideBar";
+import { SideBarClient } from "@/components/SideBarClient";
 import { SuspenseLoading } from "@/components/SuspenseLoading";
 import { UpdateNotifier } from "@/components/UpdateNotifier";
 import { Separator } from "@/components/ui/separator";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { getServer, getServers } from "@/lib/db/server";
 import { getMe, isUserAdmin } from "@/lib/db/users";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { PropsWithChildren, Suspense } from "react";
 
@@ -32,10 +33,17 @@ export default async function layout({ children, params }: Props) {
   }
 
   const chatConfigured = !!(server?.chatProvider && server?.chatModel);
+  const cookieStore = await cookies();
+  const sidebarCookie = cookieStore.get("sidebar_state")?.value;
+  const defaultSidebarOpen = sidebarCookie ? sidebarCookie === "true" : true;
 
   return (
-    <SidebarProvider>
-      <SideBar servers={servers} me={me} allowedToCreateServer={isAdmin} />
+    <SidebarProvider defaultOpen={defaultSidebarOpen}>
+      <SideBarClient
+        servers={servers}
+        me={me}
+        allowedToCreateServer={isAdmin}
+      />
       <Suspense fallback={<SuspenseLoading />}>
         <ErrorBoundary>
           <main>
@@ -44,7 +52,11 @@ export default async function layout({ children, params }: Props) {
               <Separator orientation="vertical" />
               <DynamicBreadcrumbs />
               <div className="ml-auto">
-                <ChatDialogWrapper chatConfigured={chatConfigured} me={me} serverUrl={server?.url} />
+                <ChatDialogWrapper
+                  chatConfigured={chatConfigured}
+                  me={me}
+                  serverUrl={server?.url}
+                />
               </div>
             </div>
             {children}

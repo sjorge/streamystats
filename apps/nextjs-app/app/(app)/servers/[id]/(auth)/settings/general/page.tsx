@@ -1,11 +1,9 @@
-"use server";
-
 import { Container } from "@/components/Container";
 import { ServerJobStatusCard } from "@/components/ServerJobStatusCard";
 import { getServer } from "@/lib/db/server";
 import { isUserAdmin } from "@/lib/db/users";
 import { redirect } from "next/navigation";
-import { DeleteServer } from "../DeleteServer";
+import { DeleteServerClient } from "../DeleteServerClient";
 import { VersionSection } from "../VersionSection";
 import { SyncManager } from "../SyncManager";
 import { CleanupManager } from "../CleanupManager";
@@ -31,7 +29,7 @@ export default async function GeneralSettings(props: {
         <UpdateConnection serverId={server.id} />
         <SyncManager serverId={server.id} serverName={server.name} />
         {isAdmin ? <CleanupManager serverId={server.id} /> : null}
-        <DeleteServer server={server} />
+        <DeleteServerClient server={server} />
       </div>
     </Container>
   );
