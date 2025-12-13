@@ -47,6 +47,10 @@ const chartConfig = {
     label: "Movies",
     color: "hsl(var(--chart-5))",
   },
+  Music: {
+    label: "Music",
+    color: "hsl(var(--chart-2))",
+  },
   Other: {
     label: "Other",
     color: "hsl(var(--chart-3))",
@@ -85,7 +89,7 @@ function WatchTimeChartView({
     // Group data by date
     const dataByDate: Record<
       string,
-      { Movie: number; Episode: number; Other: number }
+      { Movie: number; Episode: number; Music: number; Other: number }
     > = {};
 
     // Process the new data structure
@@ -99,7 +103,7 @@ function WatchTimeChartView({
 
       // Initialize date entry if it doesn't exist
       if (!dataByDate[date]) {
-        dataByDate[date] = { Movie: 0, Episode: 0, Other: 0 };
+        dataByDate[date] = { Movie: 0, Episode: 0, Music: 0, Other: 0 };
       }
 
       // Convert seconds to minutes and assign to appropriate type
@@ -109,6 +113,8 @@ function WatchTimeChartView({
         dataByDate[date].Movie = watchTimeMinutes;
       } else if (type === "episode") {
         dataByDate[date].Episode = watchTimeMinutes;
+      } else if (type === "music") {
+        dataByDate[date].Music = watchTimeMinutes;
       } else if (type === "other") {
         dataByDate[date].Other = watchTimeMinutes;
       }
@@ -121,6 +127,7 @@ function WatchTimeChartView({
       const dayData = dataByDate[dateString] || {
         Movie: 0,
         Episode: 0,
+        Music: 0,
         Other: 0,
       };
 
@@ -128,6 +135,7 @@ function WatchTimeChartView({
         date: dateString,
         Movie: dayData.Movie,
         Episode: dayData.Episode,
+        Music: dayData.Music,
         Other: dayData.Other,
       });
     }
@@ -184,6 +192,12 @@ function WatchTimeChartView({
           fill={chartConfig.Movie.color}
           radius={[4, 4, 0, 0]}
           name="Movie"
+        />
+        <Bar
+          dataKey="Music"
+          fill={chartConfig.Music.color}
+          radius={[4, 4, 0, 0]}
+          name="Music"
         />
         <Bar
           dataKey="Other"

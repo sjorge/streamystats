@@ -263,12 +263,14 @@ export const getWatchTimePerType = async ({
 
   for (const [key, result] of groupedResults) {
     if (result.date && result.type) {
-      // Normalize type: map Episode to episode, Movie to movie, everything else to other
+      // Normalize type: map Episode to episode, Movie to movie, Audio to music, everything else to other
       let normalizedType: string;
       if (result.type === "Movie") {
         normalizedType = "movie";
       } else if (result.type === "Episode") {
         normalizedType = "episode";
+      } else if (result.type === "Audio") {
+        normalizedType = "music";
       } else {
         normalizedType = "other";
       }
