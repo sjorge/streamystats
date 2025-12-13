@@ -5,7 +5,7 @@ import { getJobQueue, closeJobQueue } from "./jobs/queue";
 import { activityScheduler } from "./jobs/scheduler";
 import { sessionPoller } from "./jobs/session-poller";
 import { closeConnection } from "@streamystats/database";
-import jobRoutes from "./routes/jobs";
+import jobRoutes from "./routes/jobs/index";
 
 process.on("warning", (warning) => {
   if (warning?.name === "TimeoutNegativeWarning") return;

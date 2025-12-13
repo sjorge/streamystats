@@ -254,8 +254,8 @@ export async function syncRecentActivities(
 
     while (pagesFetched < maxPages) {
       // Add delay between API requests
-      if (pagesFetched > 0) {
-        await new Promise((resolve) => setTimeout(resolve, apiRequestDelayMs));
+      if (pagesFetched > 0 && apiRequestDelayMs > 0) {
+        await sleep(apiRequestDelayMs);
       }
 
       try {
