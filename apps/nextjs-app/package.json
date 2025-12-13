@@ -94,7 +94,7 @@
     "use-debounce": "^10.0.4",
     "use-stick-to-bottom": "^1.1.1",
     "uuid": "^11.1.0",
-    "zod": "^4.1.13"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

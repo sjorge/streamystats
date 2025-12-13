@@ -1,4 +1,5 @@
-import { z } from "zod";
+import { z } from "zod/v3";
+import { tool } from "ai";
 import { db, items, sessions, users, libraries } from "@streamystats/database";
 import { and, eq, desc, isNotNull, ilike, inArray, sql } from "drizzle-orm";
 import { getMostWatchedItems } from "@/lib/db/statistics";
@@ -45,65 +46,56 @@ function formatItem(
   return base;
 }
 
+const limitSchema = z.object({
+  limit: z
+    .number()
+    .optional()
+    .default(10)
+    .describe("Number of items to return"),
+});
+
+const limitTypeSchema = z.object({
+  limit: z
+    .number()
+    .optional()
+    .default(10)
+    .describe("Number of items to return"),
+  type: z
+    .enum(["Movie", "Series", "all"])
+    .optional()
+    .default("all")
+    .describe("Filter by item type"),
+});
+
 export function createChatTools(serverId: number, userId: string) {
   return {
-    getUserMostWatchedMovies: {
+    getUserMostWatchedMovies: tool({
       description:
         "Get the user's most watched movies ordered by total watch time",
-      inputSchema: z.object({
-        limit: z
-          .number()
-          .optional()
-          .default(10)
-          .describe("Number of movies to return"),
-      }),
-      execute: async ({ limit }: { limit: number }) => {
-        console.log("[Tool] getUserMostWatchedMovies called with:", {
-          limit,
-          serverId,
-          userId,
-        });
-        try {
-          const result = await getMostWatchedItems({ serverId, userId });
-          console.log("[Tool] getMostWatchedItems returned:", {
-            movieCount: result.Movie?.length,
-          });
-          const movies = result.Movie.slice(0, limit);
-          const response = {
-            movies: movies.map((m) =>
-              formatItem(m, {
-                playCount: m.totalPlayCount,
-                playDuration: m.totalPlayDuration,
-              })
-            ),
-            message:
-              movies.length > 0
-                ? `Found ${movies.length} most watched movies`
-                : "No movies watched yet",
-          };
-          console.log("[Tool] getUserMostWatchedMovies returning:", {
-            movieCount: response.movies.length,
-            message: response.message,
-          });
-          return response;
-        } catch (error) {
-          console.error("[Tool] getUserMostWatchedMovies error:", error);
-          throw error;
+      inputSchema: limitSchema,
+      execute: async ({ limit }: z.infer<typeof limitSchema>) => {
+        const result = await getMostWatchedItems({ serverId, userId });
+        const movies = result.Movie.slice(0, limit);
+        return {
+          movies: movies.map((m) =>
+            formatItem(m, {
+              playCount: m.totalPlayCount,
+              playDuration: m.totalPlayDuration,
+            })
+          ),
+          message:
+            movies.length > 0
+              ? `Found ${movies.length} most watched movies`
+              : "No movies watched yet",
         }
       },
-    },
+    }),
 
-    getUserMostWatchedSeries: {
+    getUserMostWatchedSeries: tool({
       description:
         "Get the user's most watched TV series ordered by total watch time",
-      inputSchema: z.object({
-        limit: z
-          .number()
-          .optional()
-          .default(10)
-          .describe("Number of series to return"),
-      }),
-      execute: async ({ limit }: { limit: number }) => {
+      inputSchema: limitSchema,
+      execute: async ({ limit }: z.infer<typeof limitSchema>) => {
         const result = await getMostWatchedItems({ serverId, userId });
         const series = result.Series.slice(0, limit);
         return {
@@ -119,30 +111,13 @@ export function createChatTools(serverId: number, userId: string) {
               : "No series watched yet",
         };
       },
-    },
+    }),
 
-    getPersonalizedRecommendations: {
+    getPersonalizedRecommendations: tool({
       description:
         "Get personalized movie and series recommendations based on user's watch history using AI embeddings. Each recommendation includes a 'reason' field (e.g. 'Because you watched X and Y') and a 'basedOn' array with the watched items that led to this recommendation. Always use this data when presenting recommendations to explain what they're based on.",
-      inputSchema: z.object({
-        limit: z
-          .number()
-          .optional()
-          .default(10)
-          .describe("Number of recommendations to return"),
-        type: z
-          .enum(["Movie", "Series", "all"])
-          .optional()
-          .default("all")
-          .describe("Filter recommendations by type"),
-      }),
-      execute: async ({
-        limit,
-        type,
-      }: {
-        limit: number;
-        type: "Movie" | "Series" | "all";
-      }) => {
+      inputSchema: limitTypeSchema,
+      execute: async ({ limit, type }: z.infer<typeof limitTypeSchema>) => {
         const recommendations = await getSimilarStatistics(
           serverId,
           userId,
@@ -203,9 +178,9 @@ export function createChatTools(serverId: number, userId: string) {
               : "Unable to generate recommendations. Make sure embeddings are configured and you have watch history.",
         };
       },
-    },
+    }),
 
-    getRecentlyAddedItems: {
+    getRecentlyAddedItems: tool({
       description: "Get recently added movies and series to the library",
       inputSchema: z.object({
         limit: z
@@ -253,9 +228,9 @@ export function createChatTools(serverId: number, userId: string) {
           }`,
         };
       },
-    },
+    }),
 
-    searchItems: {
+    searchItems: tool({
       description: "Search for movies and series by name or genre",
       inputSchema: z.object({
         query: z.string().describe("Search query for item name"),
@@ -300,9 +275,9 @@ export function createChatTools(serverId: number, userId: string) {
               : `No items found matching "${query}"`,
         };
       },
-    },
+    }),
 
-    getUserWatchStatistics: {
+    getUserWatchStatistics: tool({
       description:
         "Get overall watch statistics for the user including total watch time and streaks",
       inputSchema: z.object({}),
@@ -318,9 +293,9 @@ export function createChatTools(serverId: number, userId: string) {
           )} total with ${stats.total_plays} plays`,
         };
       },
-    },
+    }),
 
-    getAvailableUsers: {
+    getAvailableUsers: tool({
       description:
         "Get list of all users on this server (for finding users to get shared recommendations with)",
       inputSchema: z.object({}),
@@ -333,9 +308,9 @@ export function createChatTools(serverId: number, userId: string) {
           message: `Found ${allUsers.length} users`,
         };
       },
-    },
+    }),
 
-    getSharedRecommendations: {
+    getSharedRecommendations: tool({
       description:
         "Get movie/series recommendations that both the current user and another user would enjoy based on their overlapping watch history",
       inputSchema: z.object({
@@ -489,9 +464,9 @@ export function createChatTools(serverId: number, userId: string) {
               : `No strong shared recommendations found. Try watching more content together!`,
         };
       },
-    },
+    }),
 
-    getLibraries: {
+    getLibraries: tool({
       description: "Get list of media libraries on the server",
       inputSchema: z.object({}),
       execute: async () => {
@@ -509,9 +484,9 @@ export function createChatTools(serverId: number, userId: string) {
           message: `Found ${libs.length} libraries`,
         };
       },
-    },
+    }),
 
-    getSimilarToItem: {
+    getSimilarToItem: tool({
       description:
         "Get items similar to a specific movie or series. Returns a 'sourceItem' showing what the search was based on, and similar items with a 'reason' field explaining the connection. Use when user asks 'what should I watch after X' or 'find movies like X'. Always mention the sourceItem when presenting results.",
       inputSchema: z.object({
@@ -595,9 +570,9 @@ export function createChatTools(serverId: number, userId: string) {
               : `No similar items found for "${sourceItem.name}". Embeddings may not be configured.`,
         };
       },
-    },
+    }),
 
-    getItemsByGenre: {
+    getItemsByGenre: tool({
       description: "Get movies or series filtered by genre",
       inputSchema: z.object({
         genre: z
@@ -643,9 +618,9 @@ export function createChatTools(serverId: number, userId: string) {
               : `No items found in genre "${genre}"`,
         };
       },
-    },
+    }),
 
-    getTopRatedItems: {
+    getTopRatedItems: tool({
       description: "Get top rated movies or series by community rating",
       inputSchema: z.object({
         type: z.enum(["Movie", "Series", "all"]).optional().default("all"),
@@ -688,7 +663,7 @@ export function createChatTools(serverId: number, userId: string) {
           message: `Found ${results.length} top-rated items (${minRating}+ rating)`,
         };
       },
-    },
+    }),
   };
 }
 
