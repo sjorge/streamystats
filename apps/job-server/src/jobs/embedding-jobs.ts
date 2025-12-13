@@ -47,8 +47,8 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
   // pgvector HNSW index has a max of 2000 dimensions
   // For larger dimensions, skip index - queries still work via sequential scan
   if (dimensions > 2000) {
-    console.log(
-      `Skipping HNSW index for ${dimensions} dimensions (exceeds 2000 limit). Queries will use sequential scan.`
+    console.info(
+      `[embeddings-index] dimensions=${dimensions} action=skip reason=exceedsMaxDimensions maxDimensions=2000`
     );
     // Drop any existing index with different dimensions
     await db.execute(sql`DROP INDEX IF EXISTS items_embedding_idx`);
@@ -77,14 +77,16 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
         return;
       }
       // Index exists but with different dimensions - need to recreate
-      console.log(`Dropping existing index (dimension mismatch)...`);
+      console.info(
+        `[embeddings-index] dimensions=${dimensions} action=dropExisting reason=dimensionMismatch`
+      );
       await db.execute(sql`DROP INDEX IF EXISTS items_embedding_idx`);
     }
 
     // Create HNSW index for cosine similarity
     // The cast to vector(N) allows the index to work with our variable-dimension column
-    console.log(
-      `Creating HNSW index for ${dimensions}-dimensional embeddings...`
+    console.info(
+      `[embeddings-index] dimensions=${dimensions} action=create method=hnsw metric=cosine`
     );
     await db.execute(sql`
       CREATE INDEX CONCURRENTLY IF NOT EXISTS items_embedding_idx 
@@ -93,7 +95,9 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
         String(dimensions)
       )})) vector_cosine_ops)
     `);
-    console.log(`HNSW index created successfully for ${dimensions} dimensions`);
+    console.info(
+      `[embeddings-index] dimensions=${dimensions} action=created method=hnsw metric=cosine`
+    );
     indexEnsuredForDimension.add(dimensions);
   } catch (error) {
     // Log but don't fail - queries will work, just slower
@@ -134,8 +138,15 @@ export async function generateItemEmbeddingsJob(job: any) {
       );
     }
 
-    console.log(
-      `Generating embeddings for movies and series on server ${serverId} using ${provider}`
+    const serverMeta = await db
+      .select({ name: servers.name })
+      .from(servers)
+      .where(eq(servers.id, serverId))
+      .limit(1);
+    const serverName = serverMeta[0]?.name ?? String(serverId);
+
+    console.info(
+      `[embeddings] server=${serverName} serverId=${serverId} action=start provider=${provider} model=${config.model} baseUrl=${config.baseUrl}`
     );
 
     // Update job status to processing
@@ -180,8 +191,8 @@ export async function generateItemEmbeddingsJob(job: any) {
       const now = Date.now();
       if (now - lastHeartbeat > 30000) {
         // 30 seconds
-        console.log(
-          `Embedding job heartbeat: ${processedCount}/${unprocessedItems.length} processed, ${skippedCount} skipped`
+        console.info(
+          `[embeddings] server=${serverName} serverId=${serverId} action=heartbeat processed=${processedCount} total=${unprocessedItems.length} skipped=${skippedCount} errors=${errorCount}`
         );
         lastHeartbeat = now;
       }
@@ -323,8 +334,8 @@ export async function generateItemEmbeddingsJob(job: any) {
 
           const textsToEmbed = batchData.map((data) => data.textToEmbed);
 
-          console.log(
-            `[embeddings] serverId=${serverId} batchIndex=${Math.floor(
+          console.info(
+            `[embeddings] server=${serverName} serverId=${serverId} action=batch batchIndex=${Math.floor(
               i / BATCH_SIZE
             )} batchItems=${batchData.length} model=${config.model} baseUrl=${
               config.baseUrl
@@ -521,12 +532,12 @@ export async function generateItemEmbeddingsJob(job: any) {
       const shouldContinue = manualStart || autoEnabled;
 
       if (!shouldContinue) {
-        console.log(
-          `Auto-embeddings disabled for server ${serverId} and not a manual start, not queueing next batch`
+        console.info(
+          `[embeddings] server=${serverName} serverId=${serverId} action=skipQueueNextBatch remaining=${remaining} manual=${manualStart} auto=${autoEnabled} reason=autoDisabled`
         );
       } else {
-        console.log(
-          `Queueing next batch for server ${serverId}, ${remaining} items remaining (manual: ${manualStart}, auto: ${autoEnabled})`
+        console.info(
+          `[embeddings] server=${serverName} serverId=${serverId} action=queueNextBatch remaining=${remaining} manual=${manualStart} auto=${autoEnabled}`
         );
 
         // Queue next batch (no singleton - chained jobs need to run sequentially)
@@ -546,14 +557,16 @@ export async function generateItemEmbeddingsJob(job: any) {
             }
           );
 
-          console.log(`Queued next embedding batch with job ID: ${nextJobId}`);
+          console.info(
+            `[embeddings] server=${serverName} serverId=${serverId} action=queuedNextBatch jobId=${nextJobId}`
+          );
         } catch (queueError) {
           console.error("Failed to queue next embedding batch:", queueError);
         }
       }
     } else {
-      console.log(
-        `Embedding job complete for server ${serverId}. Processed: ${processedCount}, Skipped: ${skippedCount}, Errors: ${errorCount}`
+      console.info(
+        `[embeddings] server=${serverName} serverId=${serverId} action=completed processed=${processedCount} skipped=${skippedCount} errors=${errorCount}`
       );
 
       // Revalidate recommendations cache since embeddings have changed
@@ -562,7 +575,9 @@ export async function generateItemEmbeddingsJob(job: any) {
         await axios.post(`${nextjsUrl}/api/revalidate-recommendations`, {
           serverId,
         });
-        console.log(`Recommendations cache revalidated for server ${serverId}`);
+        console.info(
+          `[embeddings] server=${serverName} serverId=${serverId} action=revalidatedRecommendationsCache`
+        );
       } catch (revalidateError) {
         console.warn(
           "Failed to revalidate recommendations cache:",
