@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ActiveSessions } from "./ActiveSessions";
 import { MostWatchedItems } from "./MostWatchedItems";
-import { SimilarStatistics } from "./SimilarStatistics";
+import { SimilarMovieStatistics } from "./SimilarStatistics";
 import { SimilarSeriesStatistics } from "./SimilarSeriesStatistics";
 import { UserActivityWrapper } from "./UserActivityWrapper";
 import { UserLeaderboard } from "./UserLeaderboard";
@@ -71,13 +71,16 @@ async function GeneralStats({
   const [similarData, similarSeriesData, data] = await Promise.all([
     getSimilarStatistics(server.id),
     getSimilarSeries(server.id),
-    getMostWatchedItems({ serverId: server.id, userId: sas ? undefined : me?.id }),
+    getMostWatchedItems({
+      serverId: server.id,
+      userId: sas ? undefined : me?.id,
+    }),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
       {/* <ServerSetupMonitor serverId={server.id} serverName={server.name} /> */}
-      <SimilarStatistics data={similarData} server={server} />
+      <SimilarMovieStatistics data={similarData} server={server} />
       <SimilarSeriesStatistics data={similarSeriesData} server={server} />
       <MostWatchedItems data={data} server={server} />
       {sas ? (

@@ -115,7 +115,7 @@ const getCachedSimilarSeries = (
 export const getSimilarSeries = async (
   serverId: string | number,
   userId?: string,
-  limit: number = 10
+  limit: number = 20
 ): Promise<SeriesRecommendationItem[]> => {
   const serverIdNum = Number(serverId);
 
@@ -274,7 +274,7 @@ async function getUserSpecificSeriesRecommendations(
   const recommendations: SeriesRecommendationItem[] = [];
 
   // Prioritize recent watches but include some highly watched series
-  const recentWatches = watchedSeriesWithStats.slice(0, 4);
+  const recentWatches = watchedSeriesWithStats.slice(0, 5);
   debugLog(`⏰ Recent series watches (${recentWatches.length}):`);
   recentWatches.forEach((item, index) => {
     debugLog(`  ${index + 1}. "${item!.series.name}"`);
@@ -283,7 +283,7 @@ async function getUserSpecificSeriesRecommendations(
   // Get top watched series ordered by total play duration
   const topWatchedSeries = watchedSeriesWithStats
     .sort((a, b) => b!.totalPlayDuration - a!.totalPlayDuration)
-    .slice(0, 6);
+    .slice(0, 10);
 
   debugLog(`🔥 Top watched series by duration (${topWatchedSeries.length}):`);
   topWatchedSeries.forEach((item, index) => {
@@ -294,13 +294,13 @@ async function getUserSpecificSeriesRecommendations(
     );
   });
 
-  // Combine recent and top watched, remove duplicates, limit to 6
+  // Combine recent and top watched, remove duplicates, limit to 15
   const recentIds = new Set(recentWatches.map((item) => item!.series.id));
   const additionalTopWatched = topWatchedSeries.filter(
     (item) => !recentIds.has(item!.series.id)
   );
 
-  const baseSeries = [...recentWatches, ...additionalTopWatched].slice(0, 6);
+  const baseSeries = [...recentWatches, ...additionalTopWatched].slice(0, 15);
   debugLog(`📺 Final base series for similarity (${baseSeries.length}):`);
   baseSeries.forEach((item, index) => {
     const isRecent = recentIds.has(item!.series.id);
@@ -369,10 +369,12 @@ async function getUserSpecificSeriesRecommendations(
 
     // Filter for good similarity scores
     const qualifiedSimilarSeries = similarSeries.filter(
-      (result) => Number(result.similarity) > 0.6
+      (result) => Number(result.similarity) > 0.45
     );
 
-    debugLog(`  ${qualifiedSimilarSeries.length} series with similarity > 0.6`);
+    debugLog(
+      `  ${qualifiedSimilarSeries.length} series with similarity > 0.45`
+    );
 
     // Add similarities to candidate series
     for (const result of qualifiedSimilarSeries) {

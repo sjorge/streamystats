@@ -117,7 +117,7 @@ const getCachedSimilarStatistics = (
 export const getSimilarStatistics = async (
   serverId: string | number,
   userId?: string,
-  limit: number = 10
+  limit: number = 20
 ): Promise<RecommendationItem[]> => {
   const serverIdNum = Number(serverId);
 
@@ -228,8 +228,8 @@ async function getUserSpecificRecommendations(
   const usedRecommendationIds = new Set<string>();
 
   // Hybrid approach: prioritize recent watches but include some highly watched items
-  // Take recent watches (first 4) and mix with some top watched items
-  const recentWatches = watchedItems.slice(0, 4); // Most recent 4
+  // Take recent watches (first 5) and mix with some top watched items
+  const recentWatches = watchedItems.slice(0, 5); // Most recent 5
   debugLog(`⏰ Recent watches (${recentWatches.length}):`);
   recentWatches.forEach((item, index) => {
     debugLog(`  ${index + 1}. "${item.name}"`);
@@ -256,7 +256,7 @@ async function getUserSpecificRecommendations(
     )
     .groupBy(sessions.itemId, items.id)
     .orderBy(desc(sql<number>`SUM(${sessions.playDuration})`))
-    .limit(6);
+    .limit(10);
 
   const topWatchedItems = topWatchedHistory.map((w) => w.item);
   debugLog(`🔥 Top watched by duration (${topWatchedItems.length}):`);
@@ -268,13 +268,13 @@ async function getUserSpecificRecommendations(
     );
   });
 
-  // Combine recent and top watched, remove duplicates, limit to 6
+  // Combine recent and top watched, remove duplicates, limit to 15
   const recentIds = new Set(recentWatches.map((item) => item.id));
   const additionalTopWatched = topWatchedItems.filter(
     (item) => !recentIds.has(item.id)
   );
 
-  const baseMovies = [...recentWatches, ...additionalTopWatched].slice(0, 6);
+  const baseMovies = [...recentWatches, ...additionalTopWatched].slice(0, 15);
   debugLog(`🎬 Final base movies for similarity (${baseMovies.length}):`);
   baseMovies.forEach((item, index) => {
     const isRecent = recentIds.has(item.id);
@@ -340,11 +340,11 @@ async function getUserSpecificRecommendations(
 
     // Now filter for actual recommendations with lower threshold
     const similarItems = allSimilarItems.filter(
-      (result) => Number(result.similarity) > 0.5
+      (result) => Number(result.similarity) > 0.35
     );
 
     debugLog(
-      `  Found ${similarItems.length} similar items (similarity > 0.5):`
+      `  Found ${similarItems.length} similar items (similarity > 0.35):`
     );
     similarItems.slice(0, 5).forEach((result, index) => {
       debugLog(

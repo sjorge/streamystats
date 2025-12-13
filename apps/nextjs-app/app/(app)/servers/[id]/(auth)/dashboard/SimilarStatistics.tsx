@@ -13,7 +13,7 @@ interface Props {
   server: Server;
 }
 
-export const SimilarStatistics = ({ data, server }: Props) => {
+export const SimilarMovieStatistics = ({ data, server }: Props) => {
   const formatRuntime = (ticks: number | null) => {
     if (!ticks) {
       return null;
