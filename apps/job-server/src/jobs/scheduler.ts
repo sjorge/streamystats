@@ -3,6 +3,7 @@ import { db, servers, jobResults, items } from "@streamystats/database";
 import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
+import { cleanupDeletedItems } from "../jellyfin/sync/deleted-items";
 
 class SyncScheduler {
   private scheduledTasks: Map<string, cron.ScheduledTask> = new Map();
@@ -15,6 +16,7 @@ class SyncScheduler {
   private jobCleanupInterval: string = "*/1 * * * *"; // Every 5 minutes
   private oldJobCleanupInterval: string = "0 3 * * *"; // Daily at 3 AM
   private fullSyncInterval: string = "0 2 * * *"; // Daily at 2 AM
+  private deletedItemsCleanupInterval: string = "0 * * * *"; // Every hour
 
   constructor() {
     // Auto-start if not explicitly disabled
@@ -144,6 +146,16 @@ class SyncScheduler {
         });
       });
 
+      // Deleted items cleanup task - hourly
+      const deletedItemsCleanupTask = cron.schedule(
+        this.deletedItemsCleanupInterval,
+        () => {
+          this.triggerDeletedItemsCleanup().catch((error) => {
+            console.error("Error during scheduled deleted items cleanup:", error);
+          });
+        }
+      );
+
       this.scheduledTasks.set("activity-sync", activityTask);
       this.scheduledTasks.set("recent-items-sync", recentItemsTask);
       this.scheduledTasks.set("user-sync", userSyncTask);
@@ -152,6 +164,7 @@ class SyncScheduler {
       this.scheduledTasks.set("job-cleanup", jobCleanupTask);
       this.scheduledTasks.set("old-job-cleanup", oldJobCleanupTask);
       this.scheduledTasks.set("full-sync", fullSyncTask);
+      this.scheduledTasks.set("deleted-items-cleanup", deletedItemsCleanupTask);
 
       // Start all tasks
       activityTask.start();
@@ -162,6 +175,7 @@ class SyncScheduler {
       jobCleanupTask.start();
       oldJobCleanupTask.start();
       fullSyncTask.start();
+      deletedItemsCleanupTask.start();
 
       console.log("Scheduler started successfully");
       console.log(`Activity sync: ${this.activitySyncInterval}`);
@@ -172,6 +186,7 @@ class SyncScheduler {
       console.log(`Job cleanup: ${this.jobCleanupInterval}`);
       console.log(`Old job cleanup: ${this.oldJobCleanupInterval}`);
       console.log(`Full sync: ${this.fullSyncInterval}`);
+      console.log(`Deleted items cleanup: ${this.deletedItemsCleanupInterval}`);
     } catch (error) {
       console.error("Failed to start scheduler:", error);
       this.enabled = false;
@@ -217,6 +232,7 @@ class SyncScheduler {
     jobCleanupInterval?: string;
     oldJobCleanupInterval?: string;
     fullSyncInterval?: string;
+    deletedItemsCleanupInterval?: string;
   }): void {
     const wasEnabled = this.enabled;
 
@@ -250,6 +266,10 @@ class SyncScheduler {
 
     if (config.fullSyncInterval) {
       this.fullSyncInterval = config.fullSyncInterval;
+    }
+
+    if (config.deletedItemsCleanupInterval) {
+      this.deletedItemsCleanupInterval = config.deletedItemsCleanupInterval;
     }
 
     if (config.enabled !== undefined && config.enabled !== this.enabled) {
@@ -805,6 +825,51 @@ class SyncScheduler {
   }
 
   /**
+   * Trigger deleted items cleanup for all servers.
+   * Detects items removed from Jellyfin and soft-deletes them in the database.
+   * Migrates watch history if items were re-added with new IDs.
+   */
+  private async triggerDeletedItemsCleanup(): Promise<void> {
+    try {
+      console.log("[scheduler] trigger=deleted-items-cleanup");
+
+      const activeServers = await this.getServersForPeriodicSync();
+
+      if (activeServers.length === 0) {
+        console.log("No active servers found for deleted items cleanup");
+        return;
+      }
+
+      for (const server of activeServers) {
+        try {
+          console.log(
+            `[scheduler] starting=deleted-items-cleanup server=${server.name} serverId=${server.id}`
+          );
+
+          const result = await cleanupDeletedItems(server);
+
+          console.log(
+            `[scheduler] completed=deleted-items-cleanup server=${server.name} ` +
+              `status=${result.status} deleted=${result.metrics.itemsSoftDeleted} ` +
+              `migrated=${result.metrics.itemsMigrated} duration=${result.metrics.duration}ms`
+          );
+        } catch (error) {
+          console.error(
+            `Failed to run deleted items cleanup for server ${server.name}:`,
+            error
+          );
+        }
+      }
+
+      console.log(
+        `[scheduler] completed=deleted-items-cleanup serverCount=${activeServers.length}`
+      );
+    } catch (error) {
+      console.error("Error during deleted items cleanup:", error);
+    }
+  }
+
+  /**
    * Manually trigger activity sync for a specific server
    */
   async triggerServerActivitySync(
@@ -973,6 +1038,7 @@ class SyncScheduler {
       jobCleanupInterval: this.jobCleanupInterval,
       oldJobCleanupInterval: this.oldJobCleanupInterval,
       fullSyncInterval: this.fullSyncInterval,
+      deletedItemsCleanupInterval: this.deletedItemsCleanupInterval,
       runningTasks: Array.from(this.scheduledTasks.keys()),
       healthCheck: this.enabled,
     };
