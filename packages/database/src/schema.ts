@@ -313,6 +313,9 @@ export const items = pgTable(
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
+
+    // Soft delete
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   }
   // Note: Vector index must be created manually per dimension using:
   // CREATE INDEX items_embedding_idx ON items USING hnsw ((embedding::vector(N)) vector_cosine_ops)

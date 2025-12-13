@@ -55,5 +55,3 @@ export function publishJobEvent(event: JobEvent): void {
 export function getBufferedEventsSince(epochMs: number): JobEvent[] {
   return buffer.filter((e) => e.epochMs >= epochMs);
 }
-
-
