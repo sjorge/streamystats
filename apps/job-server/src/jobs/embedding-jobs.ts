@@ -24,6 +24,15 @@ const DEFAULT_RATE_LIMIT_DELAY = 500;
 const indexEnsuredForDimension = new Set<number>();
 
 /**
+ * Clear the in-memory embedding index cache.
+ * Call this when embeddings are cleared to ensure the index
+ * is properly recreated on next embedding generation.
+ */
+export function clearEmbeddingIndexCache(): void {
+  indexEnsuredForDimension.clear();
+}
+
+/**
  * Ensure HNSW index exists for the given embedding dimension.
  * pgvector requires indexes to be created with a specific dimension.
  * This creates the index if it doesn't exist, improving similarity query performance.
@@ -232,8 +241,11 @@ export async function generateItemEmbeddingsJob(job: any) {
     };
 
     const expectedDimensions = config.dimensions;
+    let dimensionMismatchDetected = false;
+    let actualDimensions = 0;
 
     // Validate embedding dimensions match expected
+    // On first mismatch, we'll throw an error to fail fast
     const validateEmbedding = (
       rawEmbedding: number[],
       itemId: string
@@ -244,10 +256,16 @@ export async function generateItemEmbeddingsJob(job: any) {
       }
 
       if (rawEmbedding.length !== expectedDimensions) {
-        console.error(
-          `Dimension mismatch for item ${itemId}: got ${rawEmbedding.length}, expected ${expectedDimensions}. ` +
-            `Check your model configuration - the model may output different dimensions than configured.`
-        );
+        if (!dimensionMismatchDetected) {
+          dimensionMismatchDetected = true;
+          actualDimensions = rawEmbedding.length;
+          // Throw error on first mismatch to fail fast with clear message
+          throw new Error(
+            `Dimension mismatch: model outputs ${rawEmbedding.length} dimensions, but configured for ${expectedDimensions}. ` +
+              `Update your dimension setting to ${rawEmbedding.length} to match the model output, or use a different model. ` +
+              `Note: Most embedding models have fixed output dimensions that cannot be changed via configuration.`
+          );
+        }
         return null;
       }
 
@@ -306,7 +324,11 @@ export async function generateItemEmbeddingsJob(job: any) {
           const textsToEmbed = batchData.map((data) => data.textToEmbed);
 
           console.log(
-            `[embeddings] serverId=${serverId} batchIndex=${Math.floor(i / BATCH_SIZE)} batchItems=${batchData.length} model=${config.model} baseUrl=${config.baseUrl}`
+            `[embeddings] serverId=${serverId} batchIndex=${Math.floor(
+              i / BATCH_SIZE
+            )} batchItems=${batchData.length} model=${config.model} baseUrl=${
+              config.baseUrl
+            }`
           );
 
           // Call embedding API

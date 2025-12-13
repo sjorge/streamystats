@@ -14,6 +14,7 @@ import { activityScheduler } from "../jobs/scheduler";
 import { sessionPoller } from "../jobs/session-poller";
 import { eq, desc, and, sql } from "drizzle-orm";
 import type { JobStatus } from "../types/job-status";
+import { clearEmbeddingIndexCache } from "../jobs/embedding-jobs";
 
 const app = new Hono();
 
@@ -218,6 +219,25 @@ app.post("/stop-embedding", async (c) => {
     return c.json(
       {
         error: "Failed to stop embedding job",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      500
+    );
+  }
+});
+
+app.post("/clear-embedding-cache", async (c) => {
+  try {
+    clearEmbeddingIndexCache();
+    return c.json({
+      success: true,
+      message: "Embedding index cache cleared",
+    });
+  } catch (error) {
+    console.error("Error clearing embedding cache:", error);
+    return c.json(
+      {
+        error: "Failed to clear embedding cache",
         details: error instanceof Error ? error.message : String(error),
       },
       500

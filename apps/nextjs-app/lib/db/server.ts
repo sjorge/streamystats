@@ -131,6 +131,22 @@ export const clearEmbeddings = async ({ serverId }: { serverId: number }) => {
     if (!hasOtherEmbeddings) {
       await db.execute(sql`DROP INDEX IF EXISTS items_embedding_idx`);
     }
+
+    // Clear the job server's in-memory embedding index cache
+    // This ensures the index is properly checked/recreated on next embedding generation
+    const jobServerUrl =
+      process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
+        ? process.env.JOB_SERVER_URL
+        : "http://localhost:3005";
+
+    try {
+      await fetch(`${jobServerUrl}/api/jobs/clear-embedding-cache`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch {
+      // Non-critical: cache will be rebuilt on next check
+    }
   } catch (error) {
     console.error(`Error clearing embeddings for server ${serverId}:`, error);
     throw new Error("Failed to clear embeddings");
