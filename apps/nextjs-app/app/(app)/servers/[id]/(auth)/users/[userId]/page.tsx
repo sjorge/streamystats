@@ -10,7 +10,7 @@ import {
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { redirect } from "next/navigation";
-import { HistoryTable } from "../../history/HistoryTable";
+import { HistoryTableClient } from "../../history/HistoryTableClient";
 import { GenreStatsGraph } from "./GenreStatsGraph";
 import UserBadges from "./UserBadges";
 import { WatchTimePerDay } from "./WatchTimePerDay";
@@ -21,7 +21,12 @@ export default async function User({
   searchParams,
 }: {
   params: Promise<{ id: string; userId: string }>;
-  searchParams: Promise<{ page?: string; search?: string; sort_by?: string; sort_order?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    sort_by?: string;
+    sort_order?: string;
+  }>;
 }) {
   const { id, userId } = await params;
   const { page = "1", search, sort_by, sort_order } = await searchParams;
@@ -43,17 +48,20 @@ export default async function User({
   const [watchStats, watchTimePerWeekday, userHistory, genreStats] =
     await Promise.all([
       getUserWatchStats({ serverId: server.id, userId: user.id }),
-      getWatchTimePerWeekDay({ serverId: server.id, userId: showAdminStats ? undefined : user.id }),
+      getWatchTimePerWeekDay({
+        serverId: server.id,
+        userId: showAdminStats ? undefined : user.id,
+      }),
       getUserHistory(server.id, user.id, {
         page: currentPage,
         perPage: 50,
         search: search || undefined,
         sortBy: sort_by || undefined,
-        sortOrder: sort_order as "asc" | "desc" || undefined,
+        sortOrder: (sort_order as "asc" | "desc") || undefined,
       }),
       getUserGenreStats({ userId: user.id, serverId: server.id }),
     ]);
-  
+
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
       <PageTitle title={user.name || "N/A"} />
@@ -82,7 +90,11 @@ export default async function User({
         <GenreStatsGraph data={genreStats} />
         <WatchTimePerDay data={watchTimePerWeekday} />
       </div>
-      <HistoryTable server={server} data={userHistory} hideUserColumn={true} />
+      <HistoryTableClient
+        server={server}
+        data={userHistory}
+        hideUserColumn={true}
+      />
     </Container>
   );
 }

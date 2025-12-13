@@ -25,7 +25,10 @@ import {
 } from "recharts";
 import { InfoIcon } from "lucide-react";
 import { DirectnessStat } from "@/lib/db/transcoding-statistics";
-import { CustomBarLabel, CustomValueLabel } from "@/components/ui/CustomBarLabel";
+import {
+  CustomBarLabel,
+  CustomValueLabel,
+} from "@/components/ui/CustomBarLabel";
 
 interface DirectnessCardProps {
   data: DirectnessStat[];
@@ -52,10 +55,12 @@ export const DirectnessCard = ({ data }: DirectnessCardProps) => {
   const maxCount = Math.max(...directnessData.map((d) => d.count));
 
   const total = directnessData.reduce((sum, item) => sum + item.count, 0);
-  const directnessDataWithPercent = directnessData.map(item => ({
+  const directnessDataWithPercent = directnessData.map((item) => ({
     ...item,
-    percent: total > 0 ? ((item.count / total) * 100) : 0,
-    labelWithPercent: `${item.name} - ${(total > 0 ? ((item.count / total) * 100).toFixed(1) : '0.0')}%`,
+    percent: total > 0 ? (item.count / total) * 100 : 0,
+    labelWithPercent: `${item.name} - ${
+      total > 0 ? ((item.count / total) * 100).toFixed(1) : "0.0"
+    }%`,
   }));
 
   // Calculate bar height based on number of items
@@ -77,7 +82,11 @@ export const DirectnessCard = ({ data }: DirectnessCardProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={directnessConfig} className="h-[200px]">
+        <ChartContainer
+          id="directness"
+          config={directnessConfig}
+          className="h-[200px]"
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               accessibilityLayer

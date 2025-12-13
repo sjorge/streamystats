@@ -65,6 +65,7 @@ export const WatchTimePerWeekDay: React.FC<Props> = ({
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
         <ChartContainer
+          id="watch-time-per-weekday"
           config={chartConfig}
           className="aspect-auto h-[250px] w-full"
         >

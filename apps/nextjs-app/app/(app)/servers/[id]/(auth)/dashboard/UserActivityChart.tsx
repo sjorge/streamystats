@@ -106,6 +106,7 @@ function UserActivityChartView({
 
   return (
     <ChartContainer
+      id="user-activity-chart"
       config={chartConfig}
       className="aspect-auto h-[250px] w-full"
     >

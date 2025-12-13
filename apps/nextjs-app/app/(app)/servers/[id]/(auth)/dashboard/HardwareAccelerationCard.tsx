@@ -111,6 +111,7 @@ export const HardwareAccelerationCard = ({ data }: Props) => {
       </CardHeader>
       <CardContent>
         <ChartContainer
+          id="hardware-acceleration"
           config={hwAccelConfig}
           className="h-[200px]"
           onWidthChange={setContainerWidth}
