@@ -1,4 +1,4 @@
-import { eq, and, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import {
   db,
   items,
@@ -6,7 +6,6 @@ import {
   libraries,
   hiddenRecommendations,
   Server,
-  Item,
 } from "@streamystats/database";
 import { JellyfinClient, MinimalJellyfinItem } from "../client";
 import { formatSyncLogLine } from "./sync-log";
@@ -27,6 +26,7 @@ export interface CleanupMetrics {
   apiRequests: number;
   databaseOperations: number;
   errors: number;
+  peakMemoryMB?: number;
 }
 
 export interface CleanupResult {
@@ -42,10 +42,27 @@ interface MatchResult {
   matchReason?: string;
 }
 
+interface LibraryCleanupResult {
+  itemsToDelete: string[];
+  itemsToMigrate: Array<{ oldId: string; newId: string; reason: string }>;
+  itemsScanned: number;
+}
+
+/**
+ * Get current memory usage in MB
+ */
+function getMemoryUsageMB(): number {
+  const usage = process.memoryUsage();
+  return Math.round(usage.heapUsed / 1024 / 1024);
+}
+
 /**
  * Detect and handle deleted items from Jellyfin server.
  * - Soft deletes items no longer in Jellyfin
  * - Migrates sessions/recommendations for re-added items (same providerIds but different ID)
+ *
+ * Memory optimization: Processes database items per-library to limit memory usage.
+ * Jellyfin items are still loaded globally for cross-library matching support.
  */
 export async function cleanupDeletedItems(
   server: Server
@@ -64,8 +81,16 @@ export async function cleanupDeletedItems(
     apiRequests: 0,
     databaseOperations: 0,
     errors: 0,
+    peakMemoryMB: getMemoryUsageMB(),
   };
   const errors: string[] = [];
+
+  const updatePeakMemory = () => {
+    const currentMB = getMemoryUsageMB();
+    if (currentMB > (metrics.peakMemoryMB || 0)) {
+      metrics.peakMemoryMB = currentMB;
+    }
+  };
 
   try {
     const client = JellyfinClient.fromServer(server);
@@ -80,6 +105,7 @@ export async function cleanupDeletedItems(
         errors: 0,
         processMs: 0,
         totalProcessed: 0,
+        memoryMB: getMemoryUsageMB(),
         phase: "start",
       })
     );
@@ -92,8 +118,10 @@ export async function cleanupDeletedItems(
 
     metrics.databaseOperations++;
 
-    // Collect all Jellyfin items across all libraries
+    // Phase 1: Build global Jellyfin lookup maps (needed for cross-library matching)
     const jellyfinItemsMap = new Map<string, MinimalJellyfinItem>();
+    const providerIdToJellyfinItem = new Map<string, MinimalJellyfinItem>();
+    const episodeKeyToJellyfinItem = new Map<string, MinimalJellyfinItem>();
 
     for (const library of serverLibraries) {
       try {
@@ -101,9 +129,32 @@ export async function cleanupDeletedItems(
         const libraryItems = await client.getAllItemsMinimal(library.id);
         metrics.librariesScanned++;
 
+        // Build all lookup maps in a single pass
         for (const item of libraryItems) {
           jellyfinItemsMap.set(item.Id, item);
+
+          // Index by ProviderIds (IMDB, TMDB, etc.)
+          if (item.ProviderIds) {
+            for (const [provider, id] of Object.entries(item.ProviderIds)) {
+              if (id) {
+                providerIdToJellyfinItem.set(`${provider}:${id}`, item);
+              }
+            }
+          }
+
+          // Index episodes by series+season+episode
+          if (
+            item.Type === "Episode" &&
+            item.SeriesId &&
+            item.IndexNumber !== undefined &&
+            item.ParentIndexNumber !== undefined
+          ) {
+            const key = `${item.SeriesId}:${item.ParentIndexNumber}:${item.IndexNumber}`;
+            episodeKeyToJellyfinItem.set(key, item);
+          }
         }
+
+        updatePeakMemory();
 
         console.info(
           formatSyncLogLine("deleted-items-cleanup", {
@@ -117,6 +168,7 @@ export async function cleanupDeletedItems(
             totalProcessed: jellyfinItemsMap.size,
             libraryId: library.id,
             libraryName: library.name,
+            memoryMB: getMemoryUsageMB(),
             phase: "fetch",
           })
         );
@@ -132,24 +184,6 @@ export async function cleanupDeletedItems(
 
     metrics.jellyfinItemsCount = jellyfinItemsMap.size;
 
-    // Get all non-deleted items from database for this server
-    metrics.databaseOperations++;
-    const databaseItems = await db
-      .select({
-        id: items.id,
-        name: items.name,
-        type: items.type,
-        providerIds: items.providerIds,
-        seriesId: items.seriesId,
-        indexNumber: items.indexNumber,
-        parentIndexNumber: items.parentIndexNumber,
-      })
-      .from(items)
-      .where(and(eq(items.serverId, server.id), isNull(items.deletedAt)));
-
-    metrics.databaseItemsCount = databaseItems.length;
-    metrics.itemsScanned = databaseItems.length;
-
     console.info(
       formatSyncLogLine("deleted-items-cleanup", {
         server: server.name,
@@ -161,62 +195,57 @@ export async function cleanupDeletedItems(
         processMs: 0,
         totalProcessed: 0,
         jellyfinItems: metrics.jellyfinItemsCount,
-        databaseItems: metrics.databaseItemsCount,
-        phase: "compare",
+        providerIdEntries: providerIdToJellyfinItem.size,
+        episodeKeyEntries: episodeKeyToJellyfinItem.size,
+        memoryMB: getMemoryUsageMB(),
+        phase: "maps-built",
       })
     );
 
-    // Build a map for quick ProviderIds lookup from Jellyfin items
-    const providerIdToJellyfinItem = new Map<string, MinimalJellyfinItem>();
-    const episodeKeyToJellyfinItem = new Map<string, MinimalJellyfinItem>();
-
-    for (const [, jellyfinItem] of jellyfinItemsMap) {
-      // Index by ProviderIds (IMDB, TMDB, etc.)
-      if (jellyfinItem.ProviderIds) {
-        for (const [provider, id] of Object.entries(jellyfinItem.ProviderIds)) {
-          if (id) {
-            providerIdToJellyfinItem.set(`${provider}:${id}`, jellyfinItem);
-          }
-        }
-      }
-
-      // Index episodes by series+season+episode
-      if (
-        jellyfinItem.Type === "Episode" &&
-        jellyfinItem.SeriesId &&
-        jellyfinItem.IndexNumber !== undefined &&
-        jellyfinItem.ParentIndexNumber !== undefined
-      ) {
-        const key = `${jellyfinItem.SeriesId}:${jellyfinItem.ParentIndexNumber}:${jellyfinItem.IndexNumber}`;
-        episodeKeyToJellyfinItem.set(key, jellyfinItem);
-      }
-    }
-
-    // Process each database item
-    const itemsToDelete: string[] = [];
-    const itemsToMigrate: Array<{
+    // Phase 2: Process database items per-library to limit memory usage
+    const allItemsToDelete: string[] = [];
+    const allItemsToMigrate: Array<{
       oldId: string;
       newId: string;
       reason: string;
     }> = [];
 
-    for (const dbItem of databaseItems) {
-      const matchResult = matchItem(
-        dbItem,
+    for (const library of serverLibraries) {
+      const result = await processLibraryItems(
+        server.id,
+        library.id,
+        library.name,
         jellyfinItemsMap,
         providerIdToJellyfinItem,
-        episodeKeyToJellyfinItem
+        episodeKeyToJellyfinItem,
+        metrics
       );
 
-      if (matchResult.type === "deleted") {
-        itemsToDelete.push(dbItem.id);
-      } else if (matchResult.type === "migrated" && matchResult.newItemId) {
-        itemsToMigrate.push({
-          oldId: dbItem.id,
-          newId: matchResult.newItemId,
-          reason: matchResult.matchReason || "unknown",
-        });
-      }
+      allItemsToDelete.push(...result.itemsToDelete);
+      allItemsToMigrate.push(...result.itemsToMigrate);
+      metrics.itemsScanned += result.itemsScanned;
+      metrics.databaseItemsCount += result.itemsScanned;
+
+      updatePeakMemory();
+
+      console.info(
+        formatSyncLogLine("deleted-items-cleanup", {
+          server: server.name,
+          page: 0,
+          processed: result.itemsScanned,
+          inserted: 0,
+          updated: 0,
+          errors: 0,
+          processMs: 0,
+          totalProcessed: metrics.itemsScanned,
+          libraryId: library.id,
+          libraryName: library.name,
+          toDelete: result.itemsToDelete.length,
+          toMigrate: result.itemsToMigrate.length,
+          memoryMB: getMemoryUsageMB(),
+          phase: "library-processed",
+        })
+      );
     }
 
     console.info(
@@ -229,17 +258,18 @@ export async function cleanupDeletedItems(
         errors: 0,
         processMs: 0,
         totalProcessed: 0,
-        toDelete: itemsToDelete.length,
-        toMigrate: itemsToMigrate.length,
+        toDelete: allItemsToDelete.length,
+        toMigrate: allItemsToMigrate.length,
+        memoryMB: getMemoryUsageMB(),
         phase: "analysis",
       })
     );
 
-    // Process deletions in batches
-    if (itemsToDelete.length > 0) {
+    // Phase 3: Process deletions in batches
+    if (allItemsToDelete.length > 0) {
       const batchSize = 100;
-      for (let i = 0; i < itemsToDelete.length; i += batchSize) {
-        const batch = itemsToDelete.slice(i, i + batchSize);
+      for (let i = 0; i < allItemsToDelete.length; i += batchSize) {
+        const batch = allItemsToDelete.slice(i, i + batchSize);
 
         // Soft delete items
         metrics.databaseOperations++;
@@ -260,8 +290,8 @@ export async function cleanupDeletedItems(
       }
     }
 
-    // Process migrations
-    for (const migration of itemsToMigrate) {
+    // Phase 4: Process migrations
+    for (const migration of allItemsToMigrate) {
       try {
         await migrateItem(migration.oldId, migration.newId, metrics);
         metrics.itemsMigrated++;
@@ -277,6 +307,7 @@ export async function cleanupDeletedItems(
 
     metrics.endTime = new Date();
     metrics.duration = metrics.endTime.getTime() - metrics.startTime.getTime();
+    updatePeakMemory();
 
     console.info(
       formatSyncLogLine("deleted-items-cleanup", {
@@ -293,6 +324,7 @@ export async function cleanupDeletedItems(
         sessionsMigrated: metrics.sessionsMigrated,
         hiddenRecsDeleted: metrics.hiddenRecommendationsDeleted,
         hiddenRecsMigrated: metrics.hiddenRecommendationsMigrated,
+        peakMemoryMB: metrics.peakMemoryMB,
         phase: "complete",
       })
     );
@@ -328,6 +360,73 @@ export async function cleanupDeletedItems(
       errors: [error instanceof Error ? error.message : "Unknown error"],
     };
   }
+}
+
+/**
+ * Process database items for a single library.
+ * This limits memory usage by only loading one library's DB items at a time.
+ */
+async function processLibraryItems(
+  serverId: number,
+  libraryId: string,
+  libraryName: string,
+  jellyfinItemsMap: Map<string, MinimalJellyfinItem>,
+  providerIdToJellyfinItem: Map<string, MinimalJellyfinItem>,
+  episodeKeyToJellyfinItem: Map<string, MinimalJellyfinItem>,
+  metrics: CleanupMetrics
+): Promise<LibraryCleanupResult> {
+  // Fetch database items for THIS library only
+  metrics.databaseOperations++;
+  const databaseItems = await db
+    .select({
+      id: items.id,
+      name: items.name,
+      type: items.type,
+      providerIds: items.providerIds,
+      seriesId: items.seriesId,
+      indexNumber: items.indexNumber,
+      parentIndexNumber: items.parentIndexNumber,
+    })
+    .from(items)
+    .where(
+      and(
+        eq(items.serverId, serverId),
+        eq(items.libraryId, libraryId),
+        isNull(items.deletedAt)
+      )
+    );
+
+  const itemsToDelete: string[] = [];
+  const itemsToMigrate: Array<{
+    oldId: string;
+    newId: string;
+    reason: string;
+  }> = [];
+
+  for (const dbItem of databaseItems) {
+    const matchResult = matchItem(
+      dbItem,
+      jellyfinItemsMap,
+      providerIdToJellyfinItem,
+      episodeKeyToJellyfinItem
+    );
+
+    if (matchResult.type === "deleted") {
+      itemsToDelete.push(dbItem.id);
+    } else if (matchResult.type === "migrated" && matchResult.newItemId) {
+      itemsToMigrate.push({
+        oldId: dbItem.id,
+        newId: matchResult.newItemId,
+        reason: matchResult.matchReason || "unknown",
+      });
+    }
+  }
+
+  return {
+    itemsToDelete,
+    itemsToMigrate,
+    itemsScanned: databaseItems.length,
+  };
 }
 
 /**
@@ -432,5 +531,3 @@ async function migrateItem(
 }
 
 export { CleanupMetrics as DeletedItemsCleanupMetrics };
-
-
