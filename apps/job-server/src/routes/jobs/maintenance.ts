@@ -83,10 +83,15 @@ app.post("/cleanup-deleted-items", async (c) => {
       return c.json({ error: "Server ID is required" }, 400);
     }
 
+    const numericServerId = Number(serverId);
+    if (!Number.isFinite(numericServerId)) {
+      return c.json({ error: "Server ID must be a valid number" }, 400);
+    }
+
     const server = await db
       .select()
       .from(servers)
-      .where(eq(servers.id, Number(serverId)))
+      .where(eq(servers.id, numericServerId))
       .limit(1);
 
     if (!server.length) {
@@ -106,8 +111,10 @@ app.post("/cleanup-deleted-items", async (c) => {
         itemsSoftDeleted: result.metrics.itemsSoftDeleted,
         itemsMigrated: result.metrics.itemsMigrated,
         sessionsMigrated: result.metrics.sessionsMigrated,
-        hiddenRecommendationsDeleted: result.metrics.hiddenRecommendationsDeleted,
-        hiddenRecommendationsMigrated: result.metrics.hiddenRecommendationsMigrated,
+        hiddenRecommendationsDeleted:
+          result.metrics.hiddenRecommendationsDeleted,
+        hiddenRecommendationsMigrated:
+          result.metrics.hiddenRecommendationsMigrated,
         duration: result.metrics.duration,
         errors: result.metrics.errors,
       },
@@ -116,8 +123,8 @@ app.post("/cleanup-deleted-items", async (c) => {
         result.status === "success"
           ? `Cleanup completed: ${result.metrics.itemsSoftDeleted} items deleted, ${result.metrics.itemsMigrated} items migrated`
           : result.status === "partial"
-            ? `Cleanup completed with ${result.metrics.errors} errors`
-            : "Cleanup failed",
+          ? `Cleanup completed with ${result.metrics.errors} errors`
+          : "Cleanup failed",
     });
   } catch (error) {
     console.error("Error during deleted items cleanup:", error);
@@ -132,4 +139,3 @@ app.post("/cleanup-deleted-items", async (c) => {
 });
 
 export default app;
-

@@ -347,7 +347,9 @@ async function processItem(
 
   // If item exists but was deleted, clear the deletedAt flag (item is back)
   if (wasDeleted) {
-    console.info(`[items-sync] Item ${jellyfinItem.Id} was previously deleted, restoring it`);
+    console.info(
+      `[items-sync] Item ${jellyfinItem.Id} was previously deleted, restoring it`
+    );
   }
 
   if (!isNewItem && !hasChanged && !wasDeleted) {
@@ -370,6 +372,8 @@ async function processItem(
       indexNumber: jellyfinItem.IndexNumber || null,
       parentIndexNumber: jellyfinItem.ParentIndexNumber || null,
       providerIds: jellyfinItem.ProviderIds || null,
+      isFolder: jellyfinItem.IsFolder,
+      rawData: jellyfinItem,
       updatedAt: new Date(),
     };
     await checkAndMigrateDeletedItem(tempItemData);
@@ -664,8 +668,13 @@ export async function syncRecentlyAddedItems(
 
     // Process valid items - determine inserts vs updates
     metrics.incrementDatabaseOperations();
-    const { insertResult, updateResult, unchangedCount, itemsMigrated, sessionsMigrated } =
-      await processValidItems(allMappedItems, allInvalidItems, server.id);
+    const {
+      insertResult,
+      updateResult,
+      unchangedCount,
+      itemsMigrated,
+      sessionsMigrated,
+    } = await processValidItems(allMappedItems, allInvalidItems, server.id);
 
     metrics.incrementItemsInserted(insertResult);
     metrics.incrementItemsUpdated(updateResult);
@@ -1048,9 +1057,11 @@ function hasImageFieldsChanged(existing: any, newItem: any): boolean {
 /**
  * Insert new items and check for previously deleted items to migrate data from
  */
-async function processInserts(
-  itemsToInsert: NewItem[]
-): Promise<{ insertCount: number; itemsMigrated: number; sessionsMigrated: number }> {
+async function processInserts(itemsToInsert: NewItem[]): Promise<{
+  insertCount: number;
+  itemsMigrated: number;
+  sessionsMigrated: number;
+}> {
   if (itemsToInsert.length === 0) {
     return { insertCount: 0, itemsMigrated: 0, sessionsMigrated: 0 };
   }
@@ -1061,7 +1072,10 @@ async function processInserts(
   try {
     const start = Date.now();
 
-    // Before inserting, check each item for matches with deleted items
+    // Insert all items first (required before migrating sessions due to FK constraints)
+    await db.insert(items).values(itemsToInsert);
+
+    // After inserting, check each item for matches with deleted items and migrate data
     for (const item of itemsToInsert) {
       const migrationResult = await checkAndMigrateDeletedItem(item);
       if (migrationResult.migrated) {
@@ -1069,9 +1083,6 @@ async function processInserts(
         sessionsMigrated += migrationResult.sessionsMigrated;
       }
     }
-
-    // Insert all items
-    await db.insert(items).values(itemsToInsert);
 
     console.info(
       formatSyncLogLine("items-sync", {
@@ -1088,7 +1099,11 @@ async function processInserts(
         sessionsMigrated,
       })
     );
-    return { insertCount: itemsToInsert.length, itemsMigrated, sessionsMigrated };
+    return {
+      insertCount: itemsToInsert.length,
+      itemsMigrated,
+      sessionsMigrated,
+    };
   } catch (error) {
     console.error(
       formatSyncLogLine("items-sync", {
@@ -1182,10 +1197,16 @@ async function processUpdates(
  * Check if a new item matches a previously deleted item and migrate data if so.
  * Returns migration stats.
  */
-async function checkAndMigrateDeletedItem(
-  newItem: NewItem
-): Promise<{ migrated: boolean; sessionsMigrated: number; hiddenRecsMigrated: number }> {
-  const result = { migrated: false, sessionsMigrated: 0, hiddenRecsMigrated: 0 };
+async function checkAndMigrateDeletedItem(newItem: NewItem): Promise<{
+  migrated: boolean;
+  sessionsMigrated: number;
+  hiddenRecsMigrated: number;
+}> {
+  const result = {
+    migrated: false,
+    sessionsMigrated: 0,
+    hiddenRecsMigrated: 0,
+  };
 
   // Find deleted items with matching criteria
   const deletedMatch = await findDeletedItemMatch(newItem);
@@ -1235,7 +1256,7 @@ async function findDeletedItemMatch(
   // 1. Try to match by provider IDs (IMDB, TMDB, etc.)
   if (newItem.providerIds && typeof newItem.providerIds === "object") {
     const providerIds = newItem.providerIds as Record<string, string>;
-    
+
     // Get all deleted items for this server that have provider IDs
     const deletedItemsWithProviders = await db
       .select({ id: items.id, providerIds: items.providerIds })
@@ -1249,11 +1270,17 @@ async function findDeletedItemMatch(
       );
 
     for (const deletedItem of deletedItemsWithProviders) {
-      if (!deletedItem.providerIds || typeof deletedItem.providerIds !== "object") {
+      if (
+        !deletedItem.providerIds ||
+        typeof deletedItem.providerIds !== "object"
+      ) {
         continue;
       }
 
-      const deletedProviderIds = deletedItem.providerIds as Record<string, string>;
+      const deletedProviderIds = deletedItem.providerIds as Record<
+        string,
+        string
+      >;
 
       // Check if any provider ID matches
       for (const [provider, id] of Object.entries(providerIds)) {
@@ -1265,11 +1292,13 @@ async function findDeletedItemMatch(
   }
 
   // 2. For episodes, try to match by series ID + season + episode number
+  const indexNum = newItem.indexNumber;
+  const parentIndexNum = newItem.parentIndexNumber;
   if (
     newItem.type === "Episode" &&
     newItem.seriesId &&
-    newItem.indexNumber !== null &&
-    newItem.parentIndexNumber !== null
+    indexNum != null &&
+    parentIndexNum != null
   ) {
     const deletedEpisode = await db
       .select({ id: items.id })
@@ -1280,8 +1309,8 @@ async function findDeletedItemMatch(
           isNotNull(items.deletedAt),
           eq(items.type, "Episode"),
           eq(items.seriesId, newItem.seriesId),
-          eq(items.indexNumber, newItem.indexNumber),
-          eq(items.parentIndexNumber, newItem.parentIndexNumber)
+          eq(items.indexNumber, indexNum),
+          eq(items.parentIndexNumber, parentIndexNum)
         )
       )
       .limit(1);
@@ -1289,7 +1318,7 @@ async function findDeletedItemMatch(
     if (deletedEpisode.length > 0) {
       return {
         id: deletedEpisode[0].id,
-        matchReason: `episode:${newItem.seriesId}:S${newItem.parentIndexNumber}E${newItem.indexNumber}`,
+        matchReason: `episode:${newItem.seriesId}:S${parentIndexNum}E${indexNum}`,
       };
     }
   }

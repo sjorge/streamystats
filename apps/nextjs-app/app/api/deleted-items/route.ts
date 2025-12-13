@@ -2,7 +2,7 @@ import { requireApiKey } from "@/lib/api-auth";
 import { NextRequest } from "next/server";
 import { getServer } from "@/lib/db/server";
 import { db, items, servers, Server } from "@streamystats/database";
-import { and, eq, gte, isNotNull, desc, ilike } from "drizzle-orm";
+import { and, eq, gte, isNotNull, desc, ilike, count } from "drizzle-orm";
 
 /**
  * API Route: GET /api/deleted-items?serverId=123 OR ?serverName=MyServer
@@ -163,11 +163,11 @@ export async function GET(request: NextRequest) {
 
     // Get total count for pagination
     const totalCountResult = await db
-      .select({ count: items.id })
+      .select({ count: count() })
       .from(items)
       .where(and(...conditions));
 
-    const totalCount = totalCountResult.length;
+    const totalCount = totalCountResult[0]?.count ?? 0;
 
     return new Response(
       JSON.stringify({
