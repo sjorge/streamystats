@@ -257,7 +257,6 @@ app.post("/cancel-by-type", async (c) => {
       JobTypes.SYNC_SERVER_DATA,
       JobTypes.ADD_SERVER,
       JobTypes.GENERATE_ITEM_EMBEDDINGS,
-      JobTypes.SEQUENTIAL_SERVER_SYNC,
       ...Object.values(JELLYFIN_JOB_NAMES),
     ];
 
@@ -404,12 +403,6 @@ app.get("/servers/:serverId/status", async (c) => {
       name: string;
       category: "foreground" | "background";
     }> = [
-      {
-        key: "sequential-server-sync",
-        label: "Server sync",
-        name: JobTypes.SEQUENTIAL_SERVER_SYNC,
-        category: "foreground",
-      },
       {
         key: "generate-item-embeddings",
         label: "Embeddings",
@@ -735,7 +728,6 @@ app.get("/queue/stats", async (c) => {
       boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
       boss.getQueueSize(JobTypes.ADD_SERVER),
       boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
-      boss.getQueueSize(JobTypes.SEQUENTIAL_SERVER_SYNC),
     ]);
 
     return c.json({
@@ -744,7 +736,6 @@ app.get("/queue/stats", async (c) => {
         syncServerData: stats[0],
         addServer: stats[1],
         generateItemEmbeddings: stats[2],
-        sequentialServerSync: stats[3],
         total: stats.reduce((sum: number, stat: number) => sum + stat, 0),
       },
     });
@@ -881,9 +872,28 @@ app.post("/create-server", async (c) => {
         .returning();
 
       const boss = await getJobQueue();
-      const jobId = await boss.send(JobTypes.SEQUENTIAL_SERVER_SYNC, {
-        serverId: createdServer.id,
-      });
+      const jobId = await boss.send(
+        JELLYFIN_JOB_NAMES.FULL_SYNC,
+        {
+          serverId: createdServer.id,
+          options: {
+            userOptions: {},
+            libraryOptions: {},
+            itemOptions: {},
+            activityOptions: {
+              pageSize: 5000,
+              maxPages: 5000,
+              concurrency: 5,
+              apiRequestDelayMs: 100,
+            },
+          },
+        },
+        {
+          expireInMinutes: 360,
+          retryLimit: 1,
+          retryDelay: 300,
+        }
+      );
 
       return c.json(
         {
@@ -1202,7 +1212,6 @@ app.get("/server-status", async (c) => {
       boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
       boss.getQueueSize(JobTypes.ADD_SERVER),
       boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
-      boss.getQueueSize(JobTypes.SEQUENTIAL_SERVER_SYNC),
     ]);
 
     const jellyfinQueueSizes = await Promise.all([
@@ -1278,7 +1287,6 @@ app.get("/server-status", async (c) => {
         syncServerData: queueSizes[0],
         addServer: queueSizes[1],
         generateItemEmbeddings: queueSizes[2],
-        sequentialServerSync: queueSizes[3],
         jellyfinFullSync: jellyfinQueueSizes[0],
         jellyfinUsersSync: jellyfinQueueSizes[1],
         jellyfinLibrariesSync: jellyfinQueueSizes[2],

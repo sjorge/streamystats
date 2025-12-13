@@ -3,7 +3,6 @@ import {
   syncServerDataJob,
   addServerJob,
   generateItemEmbeddingsJob,
-  sequentialServerSyncJob,
   jellyfinFullSyncWorker,
   jellyfinUsersSyncWorker,
   jellyfinLibrariesSyncWorker,
@@ -60,13 +59,6 @@ async function registerJobHandlers(boss: PgBoss) {
     "generate-item-embeddings",
     { teamSize: 1, teamConcurrency: 1 }, // Limited for API rate limiting
     generateItemEmbeddingsJob
-  );
-
-  // Register new sequential server sync job type
-  await boss.work(
-    "sequential-server-sync",
-    { teamSize: 1, teamConcurrency: 1 },
-    sequentialServerSyncJob
   );
 
   // Register Jellyfin sync workers
@@ -127,5 +119,4 @@ export const JobTypes = {
   SYNC_SERVER_DATA: "sync-server-data",
   ADD_SERVER: "add-server",
   GENERATE_ITEM_EMBEDDINGS: "generate-item-embeddings",
-  SEQUENTIAL_SERVER_SYNC: "sequential-server-sync",
 } as const;

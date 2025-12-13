@@ -7,12 +7,12 @@ import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
 class SyncScheduler {
   private scheduledTasks: Map<string, cron.ScheduledTask> = new Map();
   private enabled: boolean = false;
-  private activitySyncInterval: string = "*/5 * * * *"; // Every 5 minutes
-  private recentItemsSyncInterval: string = "*/5 * * * *"; // Every 5 minutes
-  private userSyncInterval: string = "*/5 * * * *"; // Every 5 minutes
+  private activitySyncInterval: string = "*/1 * * * *"; // Every 5 minutes
+  private recentItemsSyncInterval: string = "*/1 * * * *"; // Every 5 minutes
+  private userSyncInterval: string = "*/1 * * * *"; // Every 5 minutes
   private peopleSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
   private embeddingsSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
-  private jobCleanupInterval: string = "*/5 * * * *"; // Every 5 minutes
+  private jobCleanupInterval: string = "*/1 * * * *"; // Every 5 minutes
   private oldJobCleanupInterval: string = "0 3 * * *"; // Daily at 3 AM
   private fullSyncInterval: string = "0 2 * * *"; // Daily at 2 AM
 
@@ -769,7 +769,9 @@ class SyncScheduler {
       }
 
       if (cleanedCount > 0) {
-        console.log(`[cleanup] type=stale-embedding cleanedCount=${cleanedCount}`);
+        console.log(
+          `[cleanup] type=stale-embedding cleanedCount=${cleanedCount}`
+        );
       }
     } catch (error) {
       console.error("Error during job cleanup:", error);

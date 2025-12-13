@@ -1,9 +1,5 @@
 // Export all job functions from their respective modules
-export {
-  syncServerDataJob,
-  addServerJob,
-  sequentialServerSyncJob,
-} from "./server-jobs";
+export { syncServerDataJob, addServerJob } from "./server-jobs";
 
 export { generateItemEmbeddingsJob } from "./embedding-jobs";
 
