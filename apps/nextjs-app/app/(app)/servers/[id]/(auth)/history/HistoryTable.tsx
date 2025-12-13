@@ -12,13 +12,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Trash2 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import JellyfinAvatar from "@/components/JellyfinAvatar";
 import { PlaybackMethodBadge } from "@/components/PlaybackMethodBadge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -102,13 +103,15 @@ export function HistoryTable({
     {
       accessorKey: "item_name",
       header: "Item",
-      cell: ({ row }) => (
-        <Link
-          href={`/servers/${server.id}/library/${row.original.item?.id}`}
-          className="flex flex-row items-center gap-4 cursor-pointer group"
-        >
-          <div className="shrink-0 rounded overflow-hidden transition-transform duration-200">
-            <Poster
+      cell: ({ row }) => {
+        const isDeleted = row.original.item?.deletedAt !== null && row.original.item?.deletedAt !== undefined;
+        return (
+          <Link
+            href={`/servers/${server.id}/library/${row.original.item?.id}`}
+            className="flex flex-row items-center gap-4 cursor-pointer group"
+          >
+            <div className={`shrink-0 rounded overflow-hidden transition-transform duration-200 ${isDeleted ? "opacity-60 grayscale" : ""}`}>
+              <Poster
               item={
                 {
                   id: row.original.item?.id,
@@ -237,27 +240,36 @@ export function HistoryTable({
               server={server}
             />
           </div>
-          <div className="flex flex-col">
-            <div className="capitalize font-medium transition-colors duration-200 group-hover:text-primary">
-              {row.getValue("item_name")}
-            </div>
-            {row.original.item?.seriesName && (
-              <div className="text-sm text-neutral-500 transition-colors duration-200 group-hover:text-primary/80">
-                {row.original.item?.seriesName}
-                {row.original.item?.seasonName &&
-                  ` • ${row.original.item?.seasonName}`}
-                {row.original.item?.indexNumber &&
-                  ` • Episode ${row.original.item?.indexNumber}`}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <div className="capitalize font-medium transition-colors duration-200 group-hover:text-primary">
+                  {row.getValue("item_name")}
+                </div>
+                {isDeleted && (
+                  <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                    <Trash2 className="w-3 h-3 mr-0.5" />
+                    Removed
+                  </Badge>
+                )}
               </div>
-            )}
-            <div className="text-sm text-neutral-500 transition-colors duration-200 group-hover:text-primary/80">
-              {row.original.item?.type}
-              {row.original.session.playDuration &&
-                ` • ${formatDuration(row.original.session.playDuration)}`}
+              {row.original.item?.seriesName && (
+                <div className="text-sm text-neutral-500 transition-colors duration-200 group-hover:text-primary/80">
+                  {row.original.item?.seriesName}
+                  {row.original.item?.seasonName &&
+                    ` • ${row.original.item?.seasonName}`}
+                  {row.original.item?.indexNumber &&
+                    ` • Episode ${row.original.item?.indexNumber}`}
+                </div>
+              )}
+              <div className="text-sm text-neutral-500 transition-colors duration-200 group-hover:text-primary/80">
+                {row.original.item?.type}
+                {row.original.session.playDuration &&
+                  ` • ${formatDuration(row.original.session.playDuration)}`}
+              </div>
             </div>
-          </div>
-        </Link>
-      ),
+          </Link>
+        );
+      },
     },
     {
       accessorKey: "user_name",
