@@ -37,6 +37,8 @@ import {
 import { fetch } from "@/lib/utils";
 import type { Server } from "@/lib/types";
 
+const ITEMS_PER_PAGE = 25;
+
 interface DangerousMergeManagerProps {
   server: Server;
 }
@@ -73,13 +75,14 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+  const [isMergingAll, setIsMergingAll] = useState(false);
   const [matches, setMatches] = useState<DangerousMatch[]>([]);
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(
     new Set()
   );
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 100,
+    limit: ITEMS_PER_PAGE,
     total: 0,
     totalPages: 0,
   });
@@ -93,7 +96,7 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
       setIsLoading(true);
       try {
         const response = await fetch(
-          `/api/items/dangerous-matches?serverId=${server.id}&page=${page}&limit=100`
+          `/api/items/dangerous-matches?serverId=${server.id}&page=${page}&limit=${ITEMS_PER_PAGE}`
         );
         const data = await response.json();
 
@@ -132,7 +135,7 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
     setIsOpen(false);
     setMatches([]);
     setSelectedMatches(new Set());
-    setPagination({ page: 1, limit: 100, total: 0, totalPages: 0 });
+    setPagination({ page: 1, limit: ITEMS_PER_PAGE, total: 0, totalPages: 0 });
   };
 
   const toggleMatch = (deletedItemId: string) => {
@@ -155,7 +158,7 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
     }
   };
 
-  const handleMerge = async () => {
+  const handleMergeSelected = async () => {
     if (selectedMatches.size === 0) return;
 
     setIsMerging(true);
@@ -194,6 +197,41 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
       });
     } finally {
       setIsMerging(false);
+    }
+  };
+
+  const handleMergeAll = async () => {
+    setIsMergingAll(true);
+    try {
+      const response = await fetch("/api/items/merge-all-dangerous", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serverId: server.id }),
+      });
+
+      const data = await response.json();
+
+      setLastResult({
+        result: data,
+        timestamp: new Date(),
+      });
+
+      if (data.success || data.metrics?.itemsMerged > 0) {
+        fetchMatches(1);
+      }
+    } catch (error) {
+      setLastResult({
+        result: {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to merge all items",
+        },
+        timestamp: new Date(),
+      });
+    } finally {
+      setIsMergingAll(false);
     }
   };
 
@@ -409,18 +447,18 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
             </Alert>
           )}
 
-          <DialogFooter className="border-t pt-4">
+          <DialogFooter className="border-t pt-4 flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={handleClose}
-              disabled={isMerging}
+              disabled={isMerging || isMergingAll}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={handleMerge}
-              disabled={selectedMatches.size === 0 || isMerging}
+              onClick={handleMergeSelected}
+              disabled={selectedMatches.size === 0 || isMerging || isMergingAll}
             >
               {isMerging ? (
                 <>
@@ -429,6 +467,20 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
                 </>
               ) : (
                 `Merge ${selectedMatches.size} Selected`
+              )}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleMergeAll}
+              disabled={pagination.total === 0 || isMerging || isMergingAll}
+            >
+              {isMergingAll ? (
+                <>
+                  <Loader className="h-4 w-4 animate-spin mr-2" />
+                  Merging All...
+                </>
+              ) : (
+                `Merge All (${pagination.total})`
               )}
             </Button>
           </DialogFooter>
