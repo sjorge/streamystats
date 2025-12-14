@@ -50,7 +50,7 @@ export async function syncActivities(
 
   try {
     console.info(
-      `Starting activities sync for server ${server.name} (pageSize: ${pageSize}, concurrency: ${concurrency}, apiRequestDelayMs: ${apiRequestDelayMs})`
+      `[activities-sync] server=${server.name} phase=start pageSize=${pageSize} concurrency=${concurrency} apiRequestDelayMs=${apiRequestDelayMs}`
     );
 
     let startIndex = 0;
@@ -87,7 +87,7 @@ export async function syncActivities(
               await processActivity(jellyfinActivity, server.id, metrics);
             } catch (error) {
               console.error(
-                `Error processing activity ${jellyfinActivity.Id}:`,
+                `[activities-sync] server=${server.name} activityId=${jellyfinActivity.Id} status=error`,
                 error
               );
               metrics.incrementErrors();
@@ -132,7 +132,9 @@ export async function syncActivities(
         }
       } catch (error) {
         console.error(
-          `Error fetching activities page ${pagesFetched + 1}:`,
+          `[activities-sync] server=${server.name} page=${
+            pagesFetched + 1
+          } status=fetch-error`,
           error
         );
         metrics.incrementErrors();
@@ -250,11 +252,11 @@ export async function syncRecentActivities(
       if (lastActivity.length > 0) {
         mostRecentDbActivityId = lastActivity[0].id;
         console.info(
-          `Most recent activity in DB: ${mostRecentDbActivityId} (${lastActivity[0].date})`
+          `[recent-activities-sync] server=${server.name} mostRecentActivityId=${mostRecentDbActivityId} mostRecentDate=${lastActivity[0].date}`
         );
       } else {
         console.info(
-          "No activities found in database, performing full recent sync"
+          `[recent-activities-sync] server=${server.name} status=no-existing-activities mode=full`
         );
       }
     }
@@ -281,7 +283,9 @@ export async function syncRecentActivities(
         const fetchMs = Date.now() - fetchStart;
 
         if (jellyfinActivities.length === 0) {
-          console.info("No more activities to fetch");
+          console.info(
+            `[recent-activities-sync] server=${server.name} status=no-more-activities`
+          );
           break;
         }
 
@@ -297,7 +301,7 @@ export async function syncRecentActivities(
 
           if (foundIndex >= 0) {
             console.info(
-              `Found last known activity at index ${foundIndex}, stopping intelligent sync`
+              `[recent-activities-sync] server=${server.name} foundAtIndex=${foundIndex} status=intelligent-stop`
             );
             // Only process activities before the found index (newer activities)
             const newActivities = jellyfinActivities.slice(0, foundIndex);
@@ -311,7 +315,7 @@ export async function syncRecentActivities(
                     activitiesProcessed++;
                   } catch (error) {
                     console.error(
-                      `Error processing recent activity ${jellyfinActivity.Id}:`,
+                      `[recent-activities-sync] server=${server.name} activityId=${jellyfinActivity.Id} status=error`,
                       error
                     );
                     metrics.incrementErrors();
@@ -358,7 +362,7 @@ export async function syncRecentActivities(
               activitiesProcessed++;
             } catch (error) {
               console.error(
-                `Error processing recent activity ${jellyfinActivity.Id}:`,
+                `[recent-activities-sync] server=${server.name} activityId=${jellyfinActivity.Id} status=error`,
                 error
               );
               metrics.incrementErrors();
@@ -400,19 +404,23 @@ export async function syncRecentActivities(
           activitiesProcessed >= pageSize * 3
         ) {
           console.info(
-            `Intelligent sync processed ${activitiesProcessed} activities without finding last known activity, stopping`
+            `[recent-activities-sync] server=${server.name} processed=${activitiesProcessed} status=intelligent-limit-reached`
           );
           break;
         }
 
         // Stop if we got fewer activities than requested (indicates end of data)
         if (jellyfinActivities.length < pageSize) {
-          console.info("Reached end of available activities");
+          console.info(
+            `[recent-activities-sync] server=${server.name} status=end-of-data`
+          );
           break;
         }
       } catch (error) {
         console.error(
-          `Error fetching activities page ${pagesFetched + 1}:`,
+          `[recent-activities-sync] server=${server.name} page=${
+            pagesFetched + 1
+          } status=fetch-error`,
           error
         );
         metrics.incrementErrors();
@@ -534,7 +542,8 @@ async function processActivity(
       }
     } catch (error) {
       console.warn(
-        `Error checking user existence for activity ${jellyfinActivity.Id}: ${error}. Setting userId to null.`
+        `[activities-sync] activityId=${jellyfinActivity.Id} status=user-check-error userId=null`,
+        error
       );
     }
   }

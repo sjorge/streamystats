@@ -89,7 +89,7 @@ export async function jellyfinSyncWorker(job: {
       case "recent_activities":
         result = await syncRecentActivities(server, {
           pageSize: 100,
-          maxPages: 10,
+          maxPages: 1,
           intelligent: options.activityOptions?.intelligent || false,
           ...options.activityOptions,
         });

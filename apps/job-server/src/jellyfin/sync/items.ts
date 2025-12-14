@@ -1,4 +1,4 @@
-import { eq, and, inArray, isNotNull, or } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, or, sql } from "drizzle-orm";
 import {
   db,
   items,
@@ -27,6 +27,7 @@ export interface ItemSyncOptions {
   itemConcurrency?: number;
   apiRequestDelayMs?: number;
   recentItemsLimit?: number;
+  libraryId?: string;
 }
 
 export interface ItemSyncData {
@@ -55,11 +56,37 @@ export async function syncItems(
   const errors: string[] = [];
 
   try {
-    // Get all libraries for this server
+    // Get libraries for this server, optionally filtered by libraryId
+    const libraryCondition = options.libraryId
+      ? and(
+          eq(libraries.serverId, server.id),
+          eq(libraries.id, options.libraryId)
+        )
+      : eq(libraries.serverId, server.id);
+
     const serverLibraries = await db
       .select()
       .from(libraries)
-      .where(eq(libraries.serverId, server.id));
+      .where(libraryCondition);
+
+    if (serverLibraries.length === 0) {
+      const errorMsg = options.libraryId
+        ? `Library ${options.libraryId} not found for server ${server.id}`
+        : `No libraries found for server ${server.id}`;
+      const finalMetrics = metrics.finish();
+      return createSyncResult<ItemSyncData>(
+        "error",
+        {
+          librariesProcessed: 0,
+          itemsProcessed: 0,
+          itemsInserted: 0,
+          itemsUpdated: 0,
+          itemsUnchanged: 0,
+        },
+        finalMetrics,
+        errorMsg
+      );
+    }
 
     console.info(
       formatSyncLogLine("items-sync", {
@@ -72,6 +99,7 @@ export async function syncItems(
         processMs: 0,
         totalProcessed: 0,
         libraries: serverLibraries.length,
+        libraryId: options.libraryId,
       })
     );
 
@@ -394,6 +422,8 @@ async function processItem(
       name: jellyfinItem.Name,
       type: jellyfinItem.Type,
       seriesId: jellyfinItem.SeriesId || null,
+      seriesName: jellyfinItem.SeriesName || null,
+      productionYear: jellyfinItem.ProductionYear || null,
       indexNumber: jellyfinItem.IndexNumber || null,
       parentIndexNumber: jellyfinItem.ParentIndexNumber || null,
       providerIds: jellyfinItem.ProviderIds || null,
@@ -1263,22 +1293,23 @@ async function checkAndMigrateDeletedItem(newItem: NewItem): Promise<{
   result.hiddenRecsMigrated = migratedRecs.length;
   result.migrated = true;
 
-  if (result.sessionsMigrated > 0 || result.hiddenRecsMigrated > 0) {
-    console.info(
-      `[items-sync] Migrated ${result.sessionsMigrated} sessions and ${result.hiddenRecsMigrated} hidden recommendations from ${deletedMatch.id} to ${newItem.id}`
-    );
-  }
+  // Hard-delete the old item since all related data has been migrated
+  await db.delete(items).where(eq(items.id, deletedMatch.id));
+
+  console.info(
+    `[items-sync] Migrated ${result.sessionsMigrated} sessions and ${result.hiddenRecsMigrated} hidden recommendations from ${deletedMatch.id} to ${newItem.id}, deleted old item`
+  );
 
   return result;
 }
 
 /**
- * Find a deleted item that matches the new item by provider IDs or episode details
+ * Find a deleted item that matches the new item by provider IDs or stable attributes
  */
 async function findDeletedItemMatch(
   newItem: NewItem
 ): Promise<{ id: string; matchReason: string } | null> {
-  // 1. Try to match by provider IDs (IMDB, TMDB, etc.)
+  // 1. Try to match by provider IDs first (IMDB, TMDB, etc.) - most reliable
   if (newItem.providerIds && typeof newItem.providerIds === "object") {
     const providerIds = newItem.providerIds as Record<string, string>;
 
@@ -1316,16 +1347,45 @@ async function findDeletedItemMatch(
     }
   }
 
-  // 2. For episodes, try to match by series ID + season + episode number
+  // 2. Fallback: Match by stable attributes (not IDs that change on re-add)
+
+  // Episodes: type + series_name + index_number + parent_index_number (+ optional production_year)
   const indexNum = newItem.indexNumber;
   const parentIndexNum = newItem.parentIndexNumber;
   if (
     newItem.type === "Episode" &&
-    newItem.seriesId &&
+    newItem.seriesName &&
     indexNum != null &&
     parentIndexNum != null
   ) {
-    const deletedEpisode = await db
+    // Try with production year first if available
+    if (newItem.productionYear) {
+      const deletedEpisode = await db
+        .select({ id: items.id })
+        .from(items)
+        .where(
+          and(
+            eq(items.serverId, newItem.serverId),
+            isNotNull(items.deletedAt),
+            eq(items.type, "Episode"),
+            sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
+            eq(items.productionYear, newItem.productionYear),
+            eq(items.indexNumber, indexNum),
+            eq(items.parentIndexNumber, parentIndexNum)
+          )
+        )
+        .limit(1);
+
+      if (deletedEpisode.length > 0) {
+        return {
+          id: deletedEpisode[0].id,
+          matchReason: `episode:${newItem.seriesName}:${newItem.productionYear}:S${parentIndexNum}E${indexNum}`,
+        };
+      }
+    }
+
+    // Fallback: search without production year
+    const deletedEpisodeNoYear = await db
       .select({ id: items.id })
       .from(items)
       .where(
@@ -1333,17 +1393,91 @@ async function findDeletedItemMatch(
           eq(items.serverId, newItem.serverId),
           isNotNull(items.deletedAt),
           eq(items.type, "Episode"),
-          eq(items.seriesId, newItem.seriesId),
+          sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
           eq(items.indexNumber, indexNum),
           eq(items.parentIndexNumber, parentIndexNum)
         )
       )
       .limit(1);
 
-    if (deletedEpisode.length > 0) {
+    if (deletedEpisodeNoYear.length > 0) {
       return {
-        id: deletedEpisode[0].id,
-        matchReason: `episode:${newItem.seriesId}:S${parentIndexNum}E${indexNum}`,
+        id: deletedEpisodeNoYear[0].id,
+        matchReason: `episode:${newItem.seriesName}:S${parentIndexNum}E${indexNum}`,
+      };
+    }
+  }
+
+  // Season: type + series_name + index_number (+ optional production_year)
+  if (newItem.type === "Season" && newItem.seriesName && indexNum != null) {
+    // Try with production year first if available
+    if (newItem.productionYear) {
+      const deletedSeason = await db
+        .select({ id: items.id })
+        .from(items)
+        .where(
+          and(
+            eq(items.serverId, newItem.serverId),
+            isNotNull(items.deletedAt),
+            eq(items.type, "Season"),
+            sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
+            eq(items.productionYear, newItem.productionYear),
+            eq(items.indexNumber, indexNum)
+          )
+        )
+        .limit(1);
+
+      if (deletedSeason.length > 0) {
+        return {
+          id: deletedSeason[0].id,
+          matchReason: `season:${newItem.seriesName}:${newItem.productionYear}:${indexNum}`,
+        };
+      }
+    }
+
+    // Fallback: search without production year
+    const deletedSeasonNoYear = await db
+      .select({ id: items.id })
+      .from(items)
+      .where(
+        and(
+          eq(items.serverId, newItem.serverId),
+          isNotNull(items.deletedAt),
+          eq(items.type, "Season"),
+          sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
+          eq(items.indexNumber, indexNum)
+        )
+      )
+      .limit(1);
+
+    if (deletedSeasonNoYear.length > 0) {
+      return {
+        id: deletedSeasonNoYear[0].id,
+        matchReason: `season:${newItem.seriesName}:${indexNum}`,
+      };
+    }
+  }
+
+  // Series: name + type + production_year
+  if (newItem.type === "Series" && newItem.name && newItem.productionYear) {
+    const deletedSeries = await db
+      .select({ id: items.id })
+      .from(items)
+      .where(
+        and(
+          eq(items.serverId, newItem.serverId),
+          isNotNull(items.deletedAt),
+          eq(items.type, "Series"),
+          sql`lower(${items.name}) = lower(${newItem.name})`,
+          eq(items.productionYear, newItem.productionYear)
+        )
+      )
+      .limit(1);
+
+    if (deletedSeries.length > 0) {
+      return {
+        id: deletedSeries[0].id,
+        matchReason: `series:${newItem.name}:${newItem.productionYear}`,
       };
     }
   }

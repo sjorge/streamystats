@@ -151,7 +151,10 @@ export async function cleanupDeletedItems(
     // Phase 1: Build global Jellyfin lookup maps (needed for cross-library matching)
     const jellyfinItemsMap = new Map<string, MinimalJellyfinItem>();
     const providerIdToJellyfinItem = new Map<string, MinimalJellyfinItem>();
+    // Fallback maps using stable attributes (not IDs that change on re-add)
     const episodeKeyToJellyfinItem = new Map<string, MinimalJellyfinItem>();
+    const seasonKeyToJellyfinItem = new Map<string, MinimalJellyfinItem>();
+    const seriesKeyToJellyfinItem = new Map<string, MinimalJellyfinItem>();
 
     for (const library of serverLibraries) {
       try {
@@ -172,15 +175,39 @@ export async function cleanupDeletedItems(
             }
           }
 
-          // Index episodes by series+season+episode
+          // Index episodes by seriesName + year + season + episode (stable across re-adds)
           if (
             item.Type === "Episode" &&
-            item.SeriesId &&
+            item.SeriesName &&
+            item.ProductionYear &&
             item.IndexNumber !== undefined &&
             item.ParentIndexNumber !== undefined
           ) {
-            const key = `${item.SeriesId}:${item.ParentIndexNumber}:${item.IndexNumber}`;
+            const key = `episode:${item.SeriesName.toLowerCase()}:${
+              item.ProductionYear
+            }:${item.ParentIndexNumber}:${item.IndexNumber}`;
             episodeKeyToJellyfinItem.set(key, item);
+          }
+
+          // Index seasons by seriesName + year + seasonNumber
+          if (
+            item.Type === "Season" &&
+            item.SeriesName &&
+            item.ProductionYear &&
+            item.IndexNumber !== undefined
+          ) {
+            const key = `season:${item.SeriesName.toLowerCase()}:${
+              item.ProductionYear
+            }:${item.IndexNumber}`;
+            seasonKeyToJellyfinItem.set(key, item);
+          }
+
+          // Index series by name + year
+          if (item.Type === "Series" && item.Name && item.ProductionYear) {
+            const key = `series:${item.Name.toLowerCase()}:${
+              item.ProductionYear
+            }`;
+            seriesKeyToJellyfinItem.set(key, item);
           }
         }
 
@@ -287,6 +314,8 @@ export async function cleanupDeletedItems(
         jellyfinItemsMap,
         providerIdToJellyfinItem,
         episodeKeyToJellyfinItem,
+        seasonKeyToJellyfinItem,
+        seriesKeyToJellyfinItem,
         metrics
       );
 
@@ -442,6 +471,8 @@ async function processLibraryItems(
   jellyfinItemsMap: Map<string, MinimalJellyfinItem>,
   providerIdToJellyfinItem: Map<string, MinimalJellyfinItem>,
   episodeKeyToJellyfinItem: Map<string, MinimalJellyfinItem>,
+  seasonKeyToJellyfinItem: Map<string, MinimalJellyfinItem>,
+  seriesKeyToJellyfinItem: Map<string, MinimalJellyfinItem>,
   metrics: CleanupMetrics
 ): Promise<LibraryCleanupResult> {
   // Fetch database items for THIS library only
@@ -452,7 +483,8 @@ async function processLibraryItems(
       name: items.name,
       type: items.type,
       providerIds: items.providerIds,
-      seriesId: items.seriesId,
+      seriesName: items.seriesName,
+      productionYear: items.productionYear,
       indexNumber: items.indexNumber,
       parentIndexNumber: items.parentIndexNumber,
     })
@@ -477,7 +509,9 @@ async function processLibraryItems(
       dbItem,
       jellyfinItemsMap,
       providerIdToJellyfinItem,
-      episodeKeyToJellyfinItem
+      episodeKeyToJellyfinItem,
+      seasonKeyToJellyfinItem,
+      seriesKeyToJellyfinItem
     );
 
     if (matchResult.type === "deleted") {
@@ -507,13 +541,16 @@ function matchItem(
     name: string;
     type: string;
     providerIds: unknown;
-    seriesId: string | null;
+    seriesName: string | null;
+    productionYear: number | null;
     indexNumber: number | null;
     parentIndexNumber: number | null;
   },
   jellyfinItemsMap: Map<string, MinimalJellyfinItem>,
   providerIdToJellyfinItem: Map<string, MinimalJellyfinItem>,
-  episodeKeyToJellyfinItem: Map<string, MinimalJellyfinItem>
+  episodeKeyToJellyfinItem: Map<string, MinimalJellyfinItem>,
+  seasonKeyToJellyfinItem: Map<string, MinimalJellyfinItem>,
+  seriesKeyToJellyfinItem: Map<string, MinimalJellyfinItem>
 ): MatchResult {
   // Check if item exists with same ID
   if (jellyfinItemsMap.has(dbItem.id)) {
@@ -522,7 +559,7 @@ function matchItem(
 
   // Item not found by ID - check if it was re-added with different ID
 
-  // Check by ProviderIds (IMDB, TMDB, etc.)
+  // 1. Check by ProviderIds first (IMDB, TMDB, etc.) - most reliable
   const providerIds = dbItem.providerIds as Record<string, string> | null;
   if (providerIds) {
     for (const [provider, id] of Object.entries(providerIds)) {
@@ -540,21 +577,97 @@ function matchItem(
     }
   }
 
-  // Check episodes by series+season+episode
+  // 2. Fallback: Match by stable attributes (name, year, etc.)
+  // Episodes: type + series_name + index_number + parent_index_number (+ optional production_year)
   if (
     dbItem.type === "Episode" &&
-    dbItem.seriesId &&
+    dbItem.seriesName &&
     dbItem.indexNumber !== null &&
     dbItem.parentIndexNumber !== null
   ) {
-    const key = `${dbItem.seriesId}:${dbItem.parentIndexNumber}:${dbItem.indexNumber}`;
-    const match = episodeKeyToJellyfinItem.get(key);
+    // Try with production year first if available
+    if (dbItem.productionYear) {
+      const keyWithYear = `episode:${dbItem.seriesName.toLowerCase()}:${
+        dbItem.productionYear
+      }:${dbItem.parentIndexNumber}:${dbItem.indexNumber}`;
+      const match = episodeKeyToJellyfinItem.get(keyWithYear);
+      if (match && match.Id !== dbItem.id) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: match.Id,
+          matchReason: keyWithYear,
+        };
+      }
+    }
+    // Fallback: search without year by iterating through all episode keys
+    for (const [key, item] of episodeKeyToJellyfinItem) {
+      const keyParts = key.split(":");
+      if (
+        keyParts[1] === dbItem.seriesName.toLowerCase() &&
+        keyParts[3] === String(dbItem.parentIndexNumber) &&
+        keyParts[4] === String(dbItem.indexNumber) &&
+        item.Id !== dbItem.id
+      ) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: item.Id,
+          matchReason: `episode:${dbItem.seriesName}:S${dbItem.parentIndexNumber}E${dbItem.indexNumber}`,
+        };
+      }
+    }
+  }
+
+  // Season: type + series_name + index_number (+ optional production_year)
+  if (
+    dbItem.type === "Season" &&
+    dbItem.seriesName &&
+    dbItem.indexNumber !== null
+  ) {
+    // Try with production year first if available
+    if (dbItem.productionYear) {
+      const keyWithYear = `season:${dbItem.seriesName.toLowerCase()}:${
+        dbItem.productionYear
+      }:${dbItem.indexNumber}`;
+      const match = seasonKeyToJellyfinItem.get(keyWithYear);
+      if (match && match.Id !== dbItem.id) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: match.Id,
+          matchReason: keyWithYear,
+        };
+      }
+    }
+    // Fallback: search without year by iterating through all season keys
+    for (const [key, item] of seasonKeyToJellyfinItem) {
+      const keyParts = key.split(":");
+      if (
+        keyParts[1] === dbItem.seriesName.toLowerCase() &&
+        keyParts[3] === String(dbItem.indexNumber) &&
+        item.Id !== dbItem.id
+      ) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: item.Id,
+          matchReason: `season:${dbItem.seriesName}:${dbItem.indexNumber}`,
+        };
+      }
+    }
+  }
+
+  // Series: name + type + production_year
+  if (dbItem.type === "Series" && dbItem.name && dbItem.productionYear) {
+    const key = `series:${dbItem.name.toLowerCase()}:${dbItem.productionYear}`;
+    const match = seriesKeyToJellyfinItem.get(key);
     if (match && match.Id !== dbItem.id) {
       return {
         type: "migrated",
         oldItemId: dbItem.id,
         newItemId: match.Id,
-        matchReason: `episode:${key}`,
+        matchReason: key,
       };
     }
   }

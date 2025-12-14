@@ -105,6 +105,43 @@ app.post("/scheduler/trigger-full-sync", async (c) => {
   }
 });
 
+app.post("/scheduler/trigger-library-sync", async (c) => {
+  try {
+    const { serverId, libraryId } = await c.req.json();
+
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
+    }
+
+    if (!libraryId) {
+      return c.json({ error: "Library ID is required" }, 400);
+    }
+
+    const server = await db
+      .select({ id: servers.id, name: servers.name })
+      .from(servers)
+      .where(eq(servers.id, parseInt(serverId)))
+      .limit(1);
+
+    if (!server.length) {
+      return c.json({ error: "Server not found" }, 404);
+    }
+
+    await activityScheduler.triggerLibraryItemsSync(
+      parseInt(serverId),
+      libraryId
+    );
+
+    return c.json({
+      success: true,
+      message: `Library sync triggered for server: ${server[0].name}`,
+    });
+  } catch (error) {
+    console.error("Error triggering library sync:", error);
+    return c.json({ error: "Failed to trigger library sync" }, 500);
+  }
+});
+
 app.post("/scheduler/config", async (c) => {
   try {
     const body = await c.req.json();
@@ -186,4 +223,3 @@ app.post("/scheduler/config", async (c) => {
 });
 
 export default app;
-

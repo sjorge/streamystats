@@ -73,13 +73,13 @@ app.onError((err, c) => {
 
 async function startServer() {
   try {
-    console.log("Initializing job queue...");
+    console.log("[job-server] phase=init step=job-queue");
     await getJobQueue();
 
-    console.log("Starting sync scheduler...");
+    console.log("[job-server] phase=init step=scheduler");
     await activityScheduler.start();
 
-    console.log("Starting session poller...");
+    console.log("[job-server] phase=init step=session-poller");
     await sessionPoller.start();
 
     const server = Bun.serve({
@@ -89,38 +89,17 @@ async function startServer() {
     });
 
     console.log(
-      `Job server running on http://${server.hostname}:${server.port}`
-    );
-    console.log(
-      `Health check: http://${server.hostname}:${server.port}/health`
-    );
-    console.log(`API docs: http://${server.hostname}:${server.port}/`);
-
-    const status = activityScheduler.getStatus();
-    console.log(
-      `[scheduler] started=activity-sync interval=${status.activitySyncInterval}`
-    );
-    console.log(
-      `[scheduler] started=recent-items-sync interval=${status.recentItemsSyncInterval}`
-    );
-    console.log(
-      `[scheduler] started=user-sync interval=${status.userSyncInterval}`
-    );
-    console.log(
-      `[scheduler] started=people-sync interval=${status.peopleSyncInterval}`
-    );
-    console.log(
-      `[scheduler] started=full-sync interval=${status.fullSyncInterval}`
+      `[job-server] status=running host=${server.hostname} port=${server.port}`
     );
     console.log(`[scheduler] started=session-poller interval=5s`);
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error("[job-server] status=start-failed", error);
     process.exit(1);
   }
 }
 
 async function shutdown() {
-  console.log("Shutting down gracefully...");
+  console.log("[job-server] status=shutting-down");
   activityScheduler.stop();
   sessionPoller.stop();
   await closeJobQueue();
