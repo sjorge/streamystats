@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,24 +12,17 @@ import {
   Clock,
   Calendar,
   ExternalLink,
-  Folder,
-  Tag,
   Trash2,
+  Tv,
+  ArrowLeft,
 } from "lucide-react";
-
-interface ItemDetailsResponse {
-  item: Item;
-  totalViews: number;
-  totalWatchTime: number;
-  completionRate: number;
-  firstWatched: string | null;
-  lastWatched: string | null;
-}
+import type { ItemDetailsResponse } from "./types";
 
 interface ItemHeaderProps {
   item: Item;
   server: Server;
   statistics: ItemDetailsResponse;
+  serverId: number;
 }
 
 function formatRuntime(runtimeTicks: number): string {
@@ -41,13 +35,17 @@ function formatRating(rating: number): string {
   return rating.toFixed(1);
 }
 
-export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
+export function ItemHeader({
+  item,
+  server,
+  statistics,
+  serverId,
+}: ItemHeaderProps) {
   const isDeleted = item.deletedAt !== null;
 
   return (
     <Card className={isDeleted ? "border-destructive/50" : undefined}>
       <CardContent className="p-6 relative">
-        {/* Deleted Banner */}
         {isDeleted && (
           <div className="absolute top-0 left-0 right-0 bg-destructive/10 border-b border-destructive/30 px-4 py-2 flex items-center gap-2 rounded-t-lg">
             <Trash2 className="w-4 h-4 text-destructive" />
@@ -57,7 +55,6 @@ export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
           </div>
         )}
 
-        {/* Open in Jellyfin Button - Top Right */}
         <div
           className={`absolute ${isDeleted ? "top-14" : "top-4"} right-4 z-10`}
         >
@@ -113,13 +110,25 @@ export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
                 )}
               </div>
               {item.type === "Episode" && (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <div className="flex gap-4 text-sm text-muted-foreground">
                     {item.seasonName && <span>{item.seasonName}</span>}
                     {item.indexNumber && (
                       <span>Episode {item.indexNumber}</span>
                     )}
                   </div>
+                  {item.seriesId && item.seriesName && (
+                    <Link
+                      href={`/servers/${serverId}/library/${item.seriesId}`}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-accent border border-border hover:border-primary/50 transition-colors group"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <Tv className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <span className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                        {item.seriesName}
+                      </span>
+                    </Link>
+                  )}
                 </div>
               )}
               {item.originalTitle && item.originalTitle !== item.name && (
@@ -162,42 +171,13 @@ export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
                 )}
             </div>
 
-            {item.overview && (
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Overview</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {item.overview}
-                </p>
-              </div>
-            )}
-
-            {item.genres && item.genres.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                  <Tag className="w-4 h-4" />
-                  Genres
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {item.genres.map((genre) => (
-                    <Badge key={genre} variant="secondary">
-                      {genre}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {item.path && (
-              <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                  <Folder className="w-4 h-4" />
-                  File Path
-                </h3>
-                <p className="text-sm font-mono bg-muted px-3 py-2 rounded break-all text-muted-foreground">
-                  {item.path}
-                </p>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+              <span>{item.type}</span>
+              <span>
+                {statistics.totalViews} view{statistics.totalViews === 1 ? "" : "s"}
+              </span>
+              <span>{formatDuration(statistics.totalWatchTime)} watched</span>
+            </div>
           </div>
         </div>
       </CardContent>

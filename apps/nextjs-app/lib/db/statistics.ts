@@ -1,4 +1,5 @@
 import { Item, db, sessions, items, libraries } from "@streamystats/database";
+import { unstable_cache } from "next/cache";
 import {
   and,
   eq,
@@ -23,7 +24,9 @@ interface MostWatchedItems {
   Series: ItemWithStats[];
 }
 
-export const getMostWatchedItems = async ({
+const CACHE_TTL = 60 * 60 * 1; // 1 hour
+
+const getMostWatchedItemsImpl = async ({
   serverId,
   userId,
 }: {
@@ -166,6 +169,12 @@ export const getMostWatchedItems = async ({
   return grouped;
 };
 
+export const getMostWatchedItems = unstable_cache(
+  getMostWatchedItemsImpl,
+  ["db-statistics", "getMostWatchedItems"],
+  { revalidate: CACHE_TTL }
+);
+
 export interface WatchTimePerType {
   [key: string]: {
     type: string;
@@ -173,7 +182,7 @@ export interface WatchTimePerType {
   };
 }
 
-export const getWatchTimePerType = async ({
+const getWatchTimePerTypeImpl = async ({
   serverId,
   startDate,
   endDate,
@@ -288,6 +297,12 @@ export const getWatchTimePerType = async ({
   return statistics;
 };
 
+export const getWatchTimePerType = unstable_cache(
+  getWatchTimePerTypeImpl,
+  ["db-statistics", "getWatchTimePerType"],
+  { revalidate: CACHE_TTL }
+);
+
 export interface LibraryWatchTime {
   [key: string]: {
     libraryId: string;
@@ -297,7 +312,7 @@ export interface LibraryWatchTime {
   };
 }
 
-export const getWatchTimeByLibrary = async ({
+const getWatchTimeByLibraryImpl = async ({
   serverId,
   startDate,
   endDate,
@@ -351,3 +366,9 @@ export const getWatchTimeByLibrary = async ({
 
   return statistics;
 };
+
+export const getWatchTimeByLibrary = unstable_cache(
+  getWatchTimeByLibraryImpl,
+  ["db-statistics", "getWatchTimeByLibrary"],
+  { revalidate: CACHE_TTL }
+);

@@ -1,10 +1,11 @@
 "use client";
 
-import type { Item, Server } from "@/lib/types";
+import type { Server } from "@/lib/types";
 import { Film, Tv } from "lucide-react";
 import Image from "next/image";
 import { memo, useEffect, useMemo, useState } from "react";
 import { Blurhash } from "react-blurhash";
+import type { RecommendationCardItem } from "./recommendation-types";
 
 // Define the possible image types that can be requested
 export type ImageType = "Primary" | "Backdrop" | "Thumb" | "Logo";
@@ -19,25 +20,20 @@ export type ImageType = "Primary" | "Backdrop" | "Thumb" | "Logo";
  *
  * @param type The type of image being requested
  * @param isEpisode Whether the item is an episode
- * @returns Object containing blurhash dimensions and CSS aspect ratio
+ * @returns Object containing CSS aspect ratio
  */
 const getImageDimensions = (type: ImageType, isEpisode: boolean) => {
-  const x = 32;
-  let y: number | undefined;
   let aspectRatio: string | undefined;
 
   if ((!isEpisode && type === "Primary") || (type === "Logo" && !isEpisode)) {
-    y = Math.round(x * (3 / 2));
     aspectRatio = "0.71";
   } else if (type === "Backdrop" || type === "Thumb" || isEpisode) {
-    y = Math.round(x * (9 / 16));
     aspectRatio = "16/9";
   } else {
-    y = x;
     aspectRatio = "1/1";
   }
 
-  return { blurhashX: x, blurhashY: y, aspectRatio };
+  return { aspectRatio };
 };
 
 const PosterComponent = ({
@@ -49,7 +45,7 @@ const PosterComponent = ({
   preferredImageType = "Primary",
   size = "default",
 }: {
-  item: Item;
+  item: RecommendationCardItem;
   server: Server;
   width?: number;
   height?: number;
@@ -62,10 +58,7 @@ const PosterComponent = ({
   const [blurHash, setBlurHash] = useState<string | null>(null);
 
   const isEpisode = item.type === "Episode";
-  const { blurhashX, blurhashY, aspectRatio } = getImageDimensions(
-    preferredImageType,
-    isEpisode
-  );
+  const { aspectRatio } = getImageDimensions(preferredImageType, isEpisode);
   const containerClassName = `relative ${
     size === "large" ? "w-24" : "w-16"
   } ${className} overflow-hidden rounded-md bg-muted`;
@@ -278,14 +271,17 @@ const PosterComponent = ({
   return (
     <div className={containerClassName} style={{ aspectRatio }}>
       {blurHash && isLoading && (
-        <Blurhash
-          hash={blurHash}
-          width={blurhashX}
-          height={blurhashY}
-          resolutionX={32}
-          resolutionY={32}
-          punch={1}
-        />
+        <div className="absolute inset-0">
+          <Blurhash
+            hash={blurHash}
+            width="100%"
+            height="100%"
+            resolutionX={32}
+            resolutionY={32}
+            punch={1}
+            style={{ width: "100%", height: "100%" }}
+          />
+        </div>
       )}
       <Image
         src={imageUrl}
