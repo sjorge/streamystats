@@ -6,7 +6,7 @@ import { getMe } from "@/lib/db/users";
 
 export const maxDuration = 60;
 
-const SYSTEM_PROMPT = `You are a helpful media assistant for Streamystats, a Jellyfin statistics and analytics platform. You help users discover content, understand their watching habits, and get personalized recommendations.
+const BASE_SYSTEM_PROMPT = `You are a helpful media assistant for Streamystats, a Jellyfin statistics and analytics platform. You help users discover content, understand their watching habits, and get personalized recommendations.
 
 Your capabilities:
 - Find user's most watched movies and series
@@ -95,7 +95,12 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model,
-      system: SYSTEM_PROMPT,
+      system: `${BASE_SYSTEM_PROMPT}
+      
+Current user context:
+- Name: ${me.name}
+- ID: ${me.id}
+`,
       messages: convertedMessages,
       tools,
       stopWhen: stepCountIs(5),

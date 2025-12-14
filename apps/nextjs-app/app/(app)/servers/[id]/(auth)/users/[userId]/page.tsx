@@ -17,6 +17,7 @@ import { GenreStatsGraph } from "./GenreStatsGraph";
 import { TopItemsList } from "./TopItems";
 import UserBadges from "./UserBadges";
 import { WatchTimePerDay } from "./WatchTimePerDay";
+import { UserSimilarity } from "./UserSimilarity";
 
 export default async function User({
   params,
@@ -111,6 +112,9 @@ export default async function User({
           items={mostWatched.Series}
           server={server}
         />
+      </div>
+      <div className="mt-6">
+        <UserSimilarity serverId={server.id} userId={user.id} />
       </div>
       <HistoryTable server={server} data={userHistory} hideUserColumn={true} />
     </Container>
