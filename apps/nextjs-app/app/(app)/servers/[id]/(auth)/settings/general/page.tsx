@@ -30,7 +30,7 @@ export default async function GeneralSettings(props: {
         <UpdateConnection serverId={server.id} />
         <SyncManager serverId={server.id} serverName={server.name} />
         {isAdmin ? <CleanupManager serverId={server.id} /> : null}
-        {isAdmin ? <MergeItemsManager serverId={server.id} /> : null}
+        {isAdmin ? <MergeItemsManager server={server} /> : null}
         <DeleteServer server={server} />
       </div>
     </Container>
