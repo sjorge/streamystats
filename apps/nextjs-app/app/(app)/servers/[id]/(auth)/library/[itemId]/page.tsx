@@ -1,5 +1,4 @@
 import { Container } from "@/components/Container";
-import { PageTitle } from "@/components/PageTitle";
 import { getServer } from "@/lib/db/server";
 import { getItemDetails, getSeasonsAndEpisodes } from "@/lib/db/items";
 import {
@@ -56,12 +55,7 @@ export default async function ItemDetailsPage({
 
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
-      <PageTitle
-        title={itemDetails.item.name}
-        subtitle={`${itemDetails.item.type} Details`}
-      />
-
-      <div className="space-y-6">
+      <div className="space-y-6 pb-10">
         <ItemHeader
           item={itemDetails.item}
           server={server}

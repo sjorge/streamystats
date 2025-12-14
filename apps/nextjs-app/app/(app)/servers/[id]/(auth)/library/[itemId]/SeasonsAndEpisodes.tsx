@@ -132,13 +132,13 @@ export function SeasonsAndEpisodes({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
           <Play className="w-5 h-5" />
           Seasons & Episodes
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         <Accordion type="single" collapsible className="w-full">
           {seasons.map((season) => (
             <AccordionItem

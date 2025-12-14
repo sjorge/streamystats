@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,38 +9,13 @@ import { Item } from "@streamystats/database/schema";
 import {
   TrendingUp,
   Users,
-  Calendar,
   Percent,
-  Clock,
   Video,
-  Folder,
   Tag,
-  Play,
-  CheckCircle,
   BarChart3,
 } from "lucide-react";
 import { ViewerDetailsDialog } from "./ViewerDetailsDialog";
-import { ItemUserStats } from "@/lib/db/items";
-
-interface SeriesEpisodeStats {
-  totalSeasons: number;
-  totalEpisodes: number;
-  watchedEpisodes: number;
-  watchedSeasons: number;
-}
-
-interface ItemDetailsResponse {
-  item: Item;
-  totalViews: number;
-  totalWatchTime: number;
-  completionRate: number;
-  firstWatched: string | null;
-  lastWatched: string | null;
-  usersWatched: ItemUserStats[];
-  watchHistory: any[];
-  watchCountByMonth: any[];
-  episodeStats?: SeriesEpisodeStats;
-}
+import type { ItemDetailsResponse } from "./types";
 
 interface ItemMetadataProps {
   item: Item;
@@ -50,7 +25,61 @@ interface ItemMetadataProps {
   itemId: string;
 }
 
-export function ItemMetadata({ item, statistics, showAdminStats = false, serverId, itemId }: ItemMetadataProps) {
+function formatDateOnlyUS(date: string | Date | null): string {
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(date));
+}
+
+function StatTile({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="mt-1 text-xl font-semibold text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function KeyValueRow({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: React.ReactNode;
+  valueClassName?: string;
+}) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  return (
+    <div className="flex items-start justify-between gap-6">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={valueClassName ?? "text-sm text-foreground"}>{value}</span>
+    </div>
+  );
+}
+
+export function ItemMetadata({
+  item,
+  statistics,
+  showAdminStats = false,
+  serverId,
+  itemId,
+}: ItemMetadataProps) {
   const [showViewersDialog, setShowViewersDialog] = useState(false);
   const {
     totalViews,
@@ -62,244 +91,188 @@ export function ItemMetadata({ item, statistics, showAdminStats = false, serverI
   } = statistics;
 
   const canViewAnalytics = showAdminStats && usersWatched.length > 0;
+  const openViewersDialog = useCallback(() => {
+    setShowViewersDialog(true);
+  }, []);
+
+  const genres = useMemo(() => item.genres ?? [], [item.genres]);
+  const tags = useMemo(() => item.tags ?? [], [item.tags]);
+  const hasAbout = Boolean(item.overview) || genres.length > 0 || tags.length > 0;
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Watch Statistics */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Watch Statistics
-              </CardTitle>
-              {canViewAnalytics && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowViewersDialog(true)}
-                  className="h-9 w-9 hover:bg-muted"
-                  title="View detailed analytics"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <span className="text-2xl font-bold text-primary">
-                  {totalViews}
-                </span>
-                <span className="text-sm text-muted-foreground">Total Views</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-2xl font-bold text-primary">
-                  {formatDuration(totalWatchTime)}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  Total Watch Time
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1">
-                  <Percent className="w-4 h-4" />
-                  <span className="text-lg font-semibold">
-                    {completionRate.toFixed(1)}%
-                  </span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  Avg Completion
-                </span>
-              </div>
-              <div
-                className={`flex flex-col ${
-                  canViewAnalytics ? "cursor-pointer group" : ""
-                }`}
-                onClick={() => canViewAnalytics && setShowViewersDialog(true)}
-              >
-                <div className="flex items-center gap-1">
-                  <Users className={`w-4 h-4 ${canViewAnalytics ? "group-hover:text-primary transition-colors" : ""}`} />
-                  <span className={`text-lg font-semibold ${canViewAnalytics ? "group-hover:text-primary transition-colors" : ""}`}>
-                    {usersWatched.length}
-                  </span>
-                </div>
-                <span className={`text-sm ${canViewAnalytics ? "text-primary group-hover:underline" : "text-muted-foreground"}`}>
-                  Unique Viewers
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  First Watched:
-                </span>
-                <span className="text-sm">{formatDateUS(firstWatched)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  Last Watched:
-                </span>
-                <span className="text-sm">{formatDateUS(lastWatched)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Series Episode Statistics - Only show for Series */}
-        {item.type === "Series" && statistics.episodeStats && (
+      <div className="space-y-6">
+        {hasAbout && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Play className="w-5 h-5" />
-                Episode Statistics
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">About</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <span className="text-2xl font-bold text-primary">
-                    {statistics.episodeStats.totalSeasons}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    Total Seasons
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-2xl font-bold text-primary">
-                    {statistics.episodeStats.totalEpisodes}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    Total Episodes
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="text-lg font-semibold">
-                      {statistics.episodeStats.watchedSeasons}
-                    </span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    Watched Seasons
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="text-lg font-semibold">
-                      {statistics.episodeStats.watchedEpisodes}
-                    </span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    Watched Episodes
-                  </span>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {item.overview && (
+                  <p className="lg:col-span-2 text-sm leading-relaxed text-muted-foreground">
+                    {item.overview}
+                  </p>
+                )}
+                <div className="space-y-4">
+                  {genres.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-foreground">
+                        Genres
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {genres.map((genre) => (
+                          <Badge key={genre} variant="secondary">
+                            {genre}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {tags.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <Tag className="w-4 h-4" />
+                        Tags
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {tags.map((t) => (
+                          <Badge key={t} variant="secondary">
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Technical Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Video className="w-5 h-5" />
-              Technical Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-3">
-              {item.container && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Container:
-                  </span>
-                  <Badge variant="outline">{item.container.toUpperCase()}</Badge>
-                </div>
-              )}
-
-              {item.width && item.height && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Resolution:
-                  </span>
-                  <Badge variant="outline">
-                    {item.width}×{item.height}
-                  </Badge>
-                </div>
-              )}
-
-              {item.hasSubtitles !== null && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Subtitles:
-                  </span>
-                  <Badge variant={item.hasSubtitles ? "default" : "secondary"}>
-                    {item.hasSubtitles ? "Available" : "None"}
-                  </Badge>
-                </div>
-              )}
-
-              {item.videoType && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Video Type:
-                  </span>
-                  <Badge variant="outline">{item.videoType}</Badge>
-                </div>
-              )}
-
-              {item.premiereDate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Premiere:
-                  </span>
-                  <span className="text-sm">
-                    {new Intl.DateTimeFormat("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    }).format(new Date(item.premiereDate))}
-                  </span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tags */}
-        {item.tags && item.tags.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="w-5 h-5" />
-                Tags
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Stats
+                </CardTitle>
+                {canViewAnalytics && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={openViewersDialog}
+                    className="h-9 w-9 hover:bg-muted"
+                    title="View detailed analytics"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {item.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary">
-                    {tag}
-                  </Badge>
-                ))}
+            <CardContent className="pt-0 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <StatTile label="Views" value={totalViews} />
+                <StatTile label="Watch time" value={formatDuration(totalWatchTime)} />
+                <StatTile
+                  label="Avg completion"
+                  value={`${completionRate.toFixed(1)}%`}
+                  icon={<Percent className="w-4 h-4" />}
+                />
+                {canViewAnalytics ? (
+                  <Button
+                    variant="outline"
+                    className="h-auto justify-between px-4 py-3"
+                    onClick={openViewersDialog}
+                  >
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      Unique viewers
+                    </div>
+                    <div className="text-xl font-semibold text-foreground">
+                      {usersWatched.length}
+                    </div>
+                  </Button>
+                ) : (
+                  <StatTile
+                    label="Unique viewers"
+                    value={usersWatched.length}
+                    icon={<Users className="w-4 h-4" />}
+                  />
+                )}
+              </div>
+
+              {item.type === "Series" && statistics.episodeStats && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <StatTile
+                    label="Seasons"
+                    value={`${statistics.episodeStats.watchedSeasons}/${statistics.episodeStats.totalSeasons}`}
+                  />
+                  <StatTile
+                    label="Episodes"
+                    value={`${statistics.episodeStats.watchedEpisodes}/${statistics.episodeStats.totalEpisodes}`}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <KeyValueRow label="First watched" value={formatDateUS(firstWatched)} />
+                <KeyValueRow label="Last watched" value={formatDateUS(lastWatched)} />
               </div>
             </CardContent>
           </Card>
-        )}
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Video className="w-4 h-4" />
+                Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              <KeyValueRow
+                label="Premiere"
+                value={item.premiereDate ? formatDateOnlyUS(item.premiereDate) : undefined}
+              />
+              <KeyValueRow
+                label="Container"
+                value={item.container ? item.container.toUpperCase() : undefined}
+              />
+              <KeyValueRow
+                label="Resolution"
+                value={
+                  item.width && item.height ? (
+                    <Badge variant="outline">
+                      {item.width}×{item.height}
+                    </Badge>
+                  ) : undefined
+                }
+              />
+              <KeyValueRow
+                label="Subtitles"
+                value={
+                  item.hasSubtitles === null ? undefined : (
+                    <Badge variant={item.hasSubtitles ? "default" : "secondary"}>
+                      {item.hasSubtitles ? "Available" : "None"}
+                    </Badge>
+                  )
+                }
+              />
+              <KeyValueRow
+                label="Video type"
+                value={item.videoType ? <Badge variant="outline">{item.videoType}</Badge> : undefined}
+              />
+              <KeyValueRow
+                label="Path"
+                value={item.path ?? undefined}
+                valueClassName="text-xs font-mono text-muted-foreground break-all text-right"
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Viewer Details Dialog */}
       <ViewerDetailsDialog
         isOpen={showViewersDialog}
         onOpenChange={setShowViewersDialog}
