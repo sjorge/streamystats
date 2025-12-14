@@ -552,23 +552,50 @@ export function createChatTools(serverId: number, userId: string) {
         });
 
         return {
-          history: history.map((item) => ({
-            itemName: item.item?.name || item.session.itemName || "Unknown",
-            itemId: item.item?.id || item.session.itemId,
-            itemType: item.item?.type || "Unknown",
-            userName: item.user?.name || item.session.userName || "Unknown",
-            userId: item.user?.id || item.session.userId,
-            watchDate: item.session.startTime
-              ? item.session.startTime.toISOString()
-              : null,
-            watchDuration: item.session.playDuration || 0,
-            watchDurationFormatted: formatDuration(
-              item.session.playDuration || 0
-            ),
-            completionPercentage: item.session.percentComplete || 0,
-            deviceName: item.session.deviceName,
-            clientName: item.session.clientName,
-          })),
+          history: history.map((item) => {
+            const seriesId =
+              item.item?.seriesId || item.session.seriesId || null;
+            const seriesName =
+              item.item?.seriesName || item.session.seriesName || null;
+            const seasonId =
+              item.item?.seasonId || item.session.seasonId || null;
+            const seasonName = item.item?.seasonName || null;
+            const episodeNumber = item.item?.indexNumber || null;
+            const seasonNumber = item.item?.parentIndexNumber || null;
+
+            return {
+              itemName: item.item?.name || item.session.itemName || "Unknown",
+              itemId: item.item?.id || item.session.itemId,
+              itemType: item.item?.type || "Unknown",
+              userName: item.user?.name || item.session.userName || "Unknown",
+              userId: item.user?.id || item.session.userId,
+              watchDate: item.session.startTime
+                ? item.session.startTime.toISOString()
+                : null,
+              watchDuration: item.session.playDuration || 0,
+              watchDurationFormatted: formatDuration(
+                item.session.playDuration || 0
+              ),
+              completionPercentage: item.session.percentComplete || 0,
+              deviceName: item.session.deviceName,
+              clientName: item.session.clientName,
+              seriesId,
+              seriesName,
+              seasonId,
+              seasonName,
+              episodeNumber,
+              seasonNumber,
+              ...(seriesName && {
+                displayName: `${seriesName}${
+                  seasonNumber && episodeNumber
+                    ? ` - S${seasonNumber}E${episodeNumber}`
+                    : seasonNumber
+                    ? ` - Season ${seasonNumber}`
+                    : ""
+                } - ${item.item?.name || item.session.itemName || "Unknown"}`,
+              }),
+            };
+          }),
           message:
             history.length > 0
               ? `Found ${history.length} history item${
