@@ -2,8 +2,10 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { requireAdmin } from "@/lib/api-auth";
 import { db } from "@streamystats/database";
-import { type NewSession, sessions } from "@streamystats/database/schema";
-import { NextRequest, NextResponse } from "next/server";
+import { sessions } from "@streamystats/database/schema";
+import type { NewSession } from "@streamystats/database/schema";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 // @ts-ignore - stream-json doesn't have types
 import { parser } from "stream-json";
 // @ts-ignore - stream-json doesn't have types

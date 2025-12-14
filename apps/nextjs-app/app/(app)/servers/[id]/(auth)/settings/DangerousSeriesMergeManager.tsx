@@ -225,13 +225,16 @@ export function DangerousSeriesMergeManager({
     try {
       const pairs = seriesGroups
         .flatMap((g) => g.episodes)
-        .filter(
-          (e) => selectedEpisodes.has(e.deletedEpisode.id) && e.activeEpisode
-        )
-        .map((e) => ({
-          deletedEpisodeId: e.deletedEpisode.id,
-          activeEpisodeId: e.activeEpisode!.id,
-        }));
+        .flatMap((e) =>
+          selectedEpisodes.has(e.deletedEpisode.id) && e.activeEpisode
+            ? [
+                {
+                  deletedEpisodeId: e.deletedEpisode.id,
+                  activeEpisodeId: e.activeEpisode.id,
+                },
+              ]
+            : []
+        );
 
       const response = await fetch("/api/items/merge-episodes-bulk", {
         method: "POST",

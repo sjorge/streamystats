@@ -16,11 +16,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart";
 import {
   Popover,
   PopoverContent,
@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQueryParams } from "@/hooks/useQueryParams";
-import { WatchTimePerType } from "@/lib/db/statistics";
+import type { WatchTimePerType } from "@/lib/db/statistics";
 import { cn, formatDuration } from "@/lib/utils";
 import { Suspense, useTransition } from "react";
 
@@ -72,19 +72,18 @@ function WatchTimeChartView({
 }) {
   const { startDate, endDate } = dateRange;
 
-  const getDefaultStartDate = () => {
+  const defaultStartDate = React.useMemo(() => {
     const date = new Date();
-    date.setDate(date.getDate() - 90); // Default to 90 days
+    date.setDate(date.getDate() - 90);
     return date;
-  };
-
-  const defaultEndDate = new Date();
+  }, []);
+  const defaultEndDate = React.useMemo(() => new Date(), []);
 
   const filteredData = React.useMemo(() => {
     if (!data) return [];
 
-    const start = startDate || getDefaultStartDate();
-    const end = endDate || defaultEndDate;
+    const start = startDate ?? defaultStartDate;
+    const end = endDate ?? defaultEndDate;
 
     // Group data by date
     const dataByDate: Record<
@@ -143,7 +142,7 @@ function WatchTimeChartView({
     }
 
     return result;
-  }, [data, startDate, endDate]);
+  }, [data, startDate, endDate, defaultStartDate, defaultEndDate]);
 
   return (
     <ChartContainer
