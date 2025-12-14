@@ -23,7 +23,11 @@ import {
   getSimilarStatistics,
   getSimilarItemsForItem,
 } from "@/lib/db/similar-statistics";
-import { getUserWatchStats, getUsers } from "@/lib/db/users";
+import {
+  getUserWatchStats,
+  getUsers,
+  getUserStatsSummaryForServer,
+} from "@/lib/db/users";
 
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
@@ -456,6 +460,51 @@ export function createChatTools(serverId: number, userId: string) {
           message: `User has watched ${formatDuration(
             stats.total_watch_time
           )} total with ${stats.total_plays} plays`,
+        };
+      },
+    }),
+
+    getWatchtimeByInterval: tool({
+      description:
+        "Get watchtime statistics for users within a specific date range. Can filter by user and item type. Returns results sorted by watchtime (highest first). ALWAYS use this tool when asked about watchtime for a specific time period (yesterday, last week, this month, etc.) or when asked 'who watched the most' for any time period. Examples: 'who watched the most yesterday?', 'how much did user X watch last week?', 'who watched the most movies this month?'",
+      inputSchema: z.object({
+        startDate: z.string().describe("Start date in ISO format (YYYY-MM-DD)"),
+        endDate: z.string().describe("End date in ISO format (YYYY-MM-DD)"),
+        userId: z
+          .string()
+          .optional()
+          .describe(
+            "Optional user ID to filter by specific user. If not provided, returns data for all users."
+          ),
+        itemType: z
+          .enum(["Movie", "Series", "Episode", "all"])
+          .optional()
+          .default("all")
+          .describe("Filter by item type. Defaults to 'all'."),
+      }),
+      execute: async ({ startDate, endDate, userId, itemType }) => {
+        const results = await getUserStatsSummaryForServer({
+          serverId,
+          startDate,
+          endDate,
+          userId,
+          itemType: itemType || "all",
+        });
+
+        return {
+          users: results.map((user) => ({
+            userId: user.userId,
+            userName: user.userName,
+            watchTime: formatDuration(user.totalWatchTime),
+            watchTimeSeconds: user.totalWatchTime,
+            playCount: user.sessionCount,
+          })),
+          message:
+            results.length > 0
+              ? `Found ${results.length} user${
+                  results.length === 1 ? "" : "s"
+                } with watchtime data`
+              : "No watchtime data found for the specified criteria",
         };
       },
     }),

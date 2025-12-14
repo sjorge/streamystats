@@ -1,7 +1,7 @@
 "use server";
 
 import { db, User, users, sessions, items } from "@streamystats/database";
-import { and, eq, sum, inArray, gte, lte, sql } from "drizzle-orm";
+import { and, eq, sum, inArray, gte, lte, sql, isNotNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { getServer } from "./server";
 import { getSession, destroySession } from "../session";
@@ -357,10 +357,42 @@ export interface UserStatsSummary {
 
 export const getUserStatsSummaryForServer = async ({
   serverId,
+  startDate,
+  endDate,
+  userId,
+  itemType,
 }: {
   serverId: string | number;
+  startDate?: string;
+  endDate?: string;
+  userId?: string;
+  itemType?: "Movie" | "Series" | "Episode" | "all";
 }): Promise<UserStatsSummary[]> => {
-  const results = await db
+  const whereConditions = [
+    eq(sessions.serverId, Number(serverId)),
+    isNotNull(sessions.startTime),
+  ];
+
+  if (startDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    whereConditions.push(gte(sessions.startTime, start));
+  }
+
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    whereConditions.push(lte(sessions.startTime, end));
+  }
+
+  if (userId) {
+    whereConditions.push(eq(sessions.userId, userId));
+  }
+
+  const needsItemJoin =
+    itemType && itemType !== "all" && itemType !== undefined;
+
+  let query = db
     .select({
       userId: sessions.userId,
       userName: users.name,
@@ -368,8 +400,22 @@ export const getUserStatsSummaryForServer = async ({
       sessionCount: sql<number>`COUNT(${sessions.id})`.as("sessionCount"),
     })
     .from(sessions)
-    .leftJoin(users, eq(sessions.userId, users.id))
-    .where(eq(sessions.serverId, Number(serverId)))
+    .leftJoin(users, eq(sessions.userId, users.id));
+
+  if (needsItemJoin) {
+    query = query.innerJoin(items, eq(sessions.itemId, items.id));
+
+    if (itemType === "Series") {
+      whereConditions.push(eq(items.type, "Episode"));
+    } else {
+      whereConditions.push(eq(items.type, itemType));
+    }
+
+    whereConditions.push(isNotNull(sessions.itemId));
+  }
+
+  const results = await query
+    .where(and(...whereConditions))
     .groupBy(sessions.userId, users.name)
     .orderBy(sql`SUM(${sessions.playDuration}) DESC`);
 

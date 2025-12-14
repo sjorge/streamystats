@@ -14,6 +14,7 @@ Your capabilities:
 - Search the media library by name, genre, or semantic theme (embeddings)
 - Show recently added content
 - Get watch statistics (total time, streaks, etc.)
+- Query watchtime by date range, user, and item type (e.g., "who watched the most yesterday?")
 - Find shared recommendations for multiple users to watch together
 - Filter content by genre or rating
 
