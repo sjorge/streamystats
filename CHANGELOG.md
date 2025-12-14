@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.9.0](https://github.com/fredrikburmester/streamystats/compare/v2.8.0...v2.9.0) (2025-12-14)
+
+
+### Features
+
+* ai tool watchtime per user and time interval ([c5a2b21](https://github.com/fredrikburmester/streamystats/commit/c5a2b21e7e01f894595b909f9ece1a13363fb8cd))
+* dangerously merge similar items ([94e9532](https://github.com/fredrikburmester/streamystats/commit/94e9532d02b0b13fd4b967bf645c38e2c9850cec))
+* include history tool ([4f8a817](https://github.com/fredrikburmester/streamystats/commit/4f8a8171bd71715ce3116753a09029b3cbb3c2a4))
+* match and merge series ([d88ad55](https://github.com/fredrikburmester/streamystats/commit/d88ad55526b62dac46c9e3b004afe8b57c519c2a))
+* merge all at once ([682908d](https://github.com/fredrikburmester/streamystats/commit/682908db95de6b7a0f5711e058427e53d8ed6809))
+* merge item stats ([afa66c6](https://github.com/fredrikburmester/streamystats/commit/afa66c6102d4861627d8eb28e38c36a314b9a43a))
+
+
+### Bug Fixes
+
+* add confirm modal ([48ee7ac](https://github.com/fredrikburmester/streamystats/commit/48ee7ac5caf93ccd82df1fc61626d12287c26a52))
+* add force insert provider id if missing ([6c0fc43](https://github.com/fredrikburmester/streamystats/commit/6c0fc43fb2638d5df4b47d6dacc148889026f7f7))
+* better copy for skipped job because of server budy ([b8af5a8](https://github.com/fredrikburmester/streamystats/commit/b8af5a82f1d6caff01e225a5adf63270a80aa384))
+* better design ([79e9387](https://github.com/fredrikburmester/streamystats/commit/79e938729fa0b3153d69a18468e5392a8f524820))
+* better match logic ([9041a72](https://github.com/fredrikburmester/streamystats/commit/9041a72b9f01e568f662efc675e4f86c1671da34))
+* better matching ([e0d4ce5](https://github.com/fredrikburmester/streamystats/commit/e0d4ce5237ba4e520d134948d31a6e42246b7b54))
+* build error ([9fee75a](https://github.com/fredrikburmester/streamystats/commit/9fee75a9e1fb7a8656ca75d708d9e807cdc0d8a5))
+* correctly show total count to be merged ([4ce9e06](https://github.com/fredrikburmester/streamystats/commit/4ce9e06ef03020623eabbd45a7527a12bf2cdf8a))
+* delete old deletedAt item in favor of new item with data ([e2e1ee0](https://github.com/fredrikburmester/streamystats/commit/e2e1ee016023945befa8f892b3466dc46a800662))
+* design ([63c2d73](https://github.com/fredrikburmester/streamystats/commit/63c2d733ed219149507bb7684b19c6674b6bb9a9))
+* design and load improvements ([a2fdead](https://github.com/fredrikburmester/streamystats/commit/a2fdeadc6291a90bb21c26a4ac40abe981e9faa1))
+* hard delete the old item after merge ([d8b8608](https://github.com/fredrikburmester/streamystats/commit/d8b86088dd542cf3b73a6c6f8e24879f0a76152d))
+* include more fields ([866b6bc](https://github.com/fredrikburmester/streamystats/commit/866b6bc2312c3ae1537f298ebb0a055abd37cf5e))
+* include provider ids in sync process ([21ccb03](https://github.com/fredrikburmester/streamystats/commit/21ccb032148d0b46be40adf885613ca65275aa35))
+* movies only ([9f5f1bf](https://github.com/fredrikburmester/streamystats/commit/9f5f1bf93c85d8482c7aa519ef3cd858f22d7a12))
+* poster lqip loading ([aec5c25](https://github.com/fredrikburmester/streamystats/commit/aec5c25867ba3fb543f8d0788b9c976bf5c3180a))
+* series episode list ([64e1074](https://github.com/fredrikburmester/streamystats/commit/64e1074ba29e9b942238d2752f1054d0fa15b5d5))
+* sync items on start ([56a14a9](https://github.com/fredrikburmester/streamystats/commit/56a14a98f0837393eac6c8c21b3d763fbd3e8d4f))
+
 ## [2.8.0](https://github.com/fredrikburmester/streamystats/compare/v2.7.0...v2.8.0) (2025-12-13)
 
 
