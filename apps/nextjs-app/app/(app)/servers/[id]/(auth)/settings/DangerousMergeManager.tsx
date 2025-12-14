@@ -210,9 +210,9 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
             Dangerous: Merge Re-added Items
           </CardTitle>
           <CardDescription>
-            Find and merge deleted items with new items that have the same name
-            and year. This matches without provider IDs and may cause incorrect
-            merges.
+            Find and merge deleted movies with new movies that have the same
+            name and year. This matches without provider IDs and may cause
+            incorrect merges. Only works for Movies.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -220,10 +220,10 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
             <p className="text-sm text-muted-foreground">This will:</p>
             <ul className="text-sm text-muted-foreground space-y-1 ml-4">
               <li>
-                - Find deleted items matching active items by name + year only
+                - Find deleted movies matching active movies by name + year
               </li>
-              <li>- Migrate watch sessions from deleted to active items</li>
-              <li>- Permanently delete the old items</li>
+              <li>- Migrate watch sessions from deleted to active movies</li>
+              <li>- Permanently delete the old movies</li>
             </ul>
           </div>
 
@@ -250,11 +250,11 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Dangerous Merge: Items by Name + Year
+              Dangerous Merge: Movies by Name + Year
             </DialogTitle>
             <DialogDescription>
-              Select items to merge. Deleted items will have their watch history
-              transferred to the matching active item.
+              Select movies to merge. Deleted movies will have their watch
+              history transferred to the matching active movie.
             </DialogDescription>
           </DialogHeader>
 

@@ -46,6 +46,20 @@ export async function GET(request: Request) {
       );
     }
 
+    const serverIdNum = parseInt(serverId);
+    if (isNaN(serverIdNum)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "serverId must be a valid number",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const deletedItems = db
       .select({
         id: items.id,
@@ -57,7 +71,8 @@ export async function GET(request: Request) {
       .from(items)
       .where(
         and(
-          eq(items.serverId, parseInt(serverId)),
+          eq(items.serverId, serverIdNum),
+          eq(items.type, "Movie"),
           isNotNull(items.deletedAt),
           isNotNull(items.productionYear)
         )
@@ -74,7 +89,8 @@ export async function GET(request: Request) {
       .from(items)
       .where(
         and(
-          eq(items.serverId, parseInt(serverId)),
+          eq(items.serverId, serverIdNum),
+          eq(items.type, "Movie"),
           isNull(items.deletedAt),
           isNotNull(items.productionYear)
         )

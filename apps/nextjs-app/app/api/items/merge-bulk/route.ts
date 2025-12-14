@@ -40,6 +40,11 @@ export async function POST(request: Request) {
 
     for (const pair of pairs) {
       try {
+        if (pair.deletedItemId === pair.activeItemId) {
+          errors.push(`Cannot merge item ${pair.deletedItemId} into itself`);
+          continue;
+        }
+
         const deletedItem = await db
           .select()
           .from(items)
@@ -69,6 +74,13 @@ export async function POST(request: Request) {
 
         if (activeItem[0].deletedAt) {
           errors.push(`Target item ${pair.activeItemId} is deleted`);
+          continue;
+        }
+
+        if (deletedItem[0].serverId !== activeItem[0].serverId) {
+          errors.push(
+            `Items ${pair.deletedItemId} and ${pair.activeItemId} are from different servers`
+          );
           continue;
         }
 
