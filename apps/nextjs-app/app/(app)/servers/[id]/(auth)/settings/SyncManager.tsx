@@ -121,8 +121,8 @@ export function SyncManager({ serverId, serverName }: SyncManagerProps) {
           </Alert>
         )}
 
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-sm text-yellow-800">
+        <div className="bg-muted/50 border rounded-lg p-3">
+          <p className="text-sm text-muted-foreground">
             <strong>Note:</strong> Full syncs can take several minutes to hours
             depending on your library size. The sync will run in the background
             and you can monitor progress from the dashboard.
