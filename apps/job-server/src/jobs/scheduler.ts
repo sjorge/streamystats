@@ -9,12 +9,12 @@ import { cancelJobsByName } from "../routes/jobs/utils";
 class SyncScheduler {
   private scheduledTasks: Map<string, cron.ScheduledTask> = new Map();
   private enabled: boolean = false;
-  private activitySyncInterval: string = "*/1 * * * *"; // Every 5 minutes
-  private recentItemsSyncInterval: string = "*/1 * * * *"; // Every 5 minutes
-  private userSyncInterval: string = "*/1 * * * *"; // Every 5 minutes
+  private activitySyncInterval: string = "*/1 * * * *"; // Every minute
+  private recentItemsSyncInterval: string = "*/1 * * * *"; // Every minute
+  private userSyncInterval: string = "*/1 * * * *"; // Every minute
   private peopleSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
   private embeddingsSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
-  private jobCleanupInterval: string = "*/1 * * * *"; // Every 5 minutes
+  private jobCleanupInterval: string = "*/1 * * * *"; // Every minute
   private oldJobCleanupInterval: string = "0 3 * * *"; // Daily at 3 AM
   private fullSyncInterval: string = "0 2 * * *"; // Daily at 2 AM
   private deletedItemsCleanupInterval: string = "0 * * * *"; // Every hour
@@ -317,7 +317,9 @@ class SyncScheduler {
               serverId: server.id,
               options: {
                 activityOptions: {
-                  limit: 100, // Default limit
+                  pageSize: 100,
+                  maxPages: 1,
+                  intelligent: true,
                 },
               },
             },
