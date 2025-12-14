@@ -676,11 +676,11 @@ export const getSimilarSeriesForItem = async (
 
     // Filter for good similarity scores
     const qualifiedSimilarSeries = similarSeries.filter(
-      (result) => Number(result.similarity) > 0.6
+      (result) => Number(result.similarity) > 0.4
     );
 
     debugLog(
-      `✅ ${qualifiedSimilarSeries.length} series with similarity > 0.6:`
+      `✅ ${qualifiedSimilarSeries.length} series with similarity > 0.4:`
     );
     qualifiedSimilarSeries
       .slice(0, Math.min(5, limit))

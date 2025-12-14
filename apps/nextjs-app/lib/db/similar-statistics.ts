@@ -714,10 +714,10 @@ export const getSimilarItemsForItem = async (
 
     // Filter for good similarity scores (threshold can be adjusted)
     const qualifiedSimilarItems = similarItems.filter(
-      (result) => Number(result.similarity) > 0.6
+      (result) => Number(result.similarity) > 0.4
     );
 
-    debugLog(`✅ ${qualifiedSimilarItems.length} items with similarity > 0.6:`);
+    debugLog(`✅ ${qualifiedSimilarItems.length} items with similarity > 0.4:`);
     qualifiedSimilarItems
       .slice(0, Math.min(5, limit))
       .forEach((result, index) => {

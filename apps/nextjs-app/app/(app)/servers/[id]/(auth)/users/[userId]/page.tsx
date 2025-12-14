@@ -2,6 +2,7 @@ import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { getUserHistory } from "@/lib/db/history";
 import { getServer } from "@/lib/db/server";
+import { getMostWatchedItems } from "@/lib/db/statistics";
 import {
   getUserById,
   getUserGenreStats,
@@ -9,12 +10,13 @@ import {
   getWatchTimePerWeekDay,
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
+import { showAdminStatistics } from "@/utils/adminTools";
 import { redirect } from "next/navigation";
 import { HistoryTable } from "../../history/HistoryTable";
 import { GenreStatsGraph } from "./GenreStatsGraph";
+import { TopItemsList } from "./TopItems";
 import UserBadges from "./UserBadges";
 import { WatchTimePerDay } from "./WatchTimePerDay";
-import { showAdminStatistics } from "@/utils/adminTools";
 
 export default async function User({
   params,
@@ -45,22 +47,28 @@ export default async function User({
 
   // Get additional user statistics and history
   const currentPage = parseInt(page);
-  const [watchStats, watchTimePerWeekday, userHistory, genreStats] =
-    await Promise.all([
-      getUserWatchStats({ serverId: server.id, userId: user.id }),
-      getWatchTimePerWeekDay({
-        serverId: server.id,
-        userId: showAdminStats ? undefined : user.id,
-      }),
-      getUserHistory(server.id, user.id, {
-        page: currentPage,
-        perPage: 50,
-        search: search || undefined,
-        sortBy: sort_by || undefined,
-        sortOrder: (sort_order as "asc" | "desc") || undefined,
-      }),
-      getUserGenreStats({ userId: user.id, serverId: server.id }),
-    ]);
+  const [
+    watchStats,
+    watchTimePerWeekday,
+    userHistory,
+    genreStats,
+    mostWatched,
+  ] = await Promise.all([
+    getUserWatchStats({ serverId: server.id, userId: user.id }),
+    getWatchTimePerWeekDay({
+      serverId: server.id,
+      userId: showAdminStats ? undefined : user.id,
+    }),
+    getUserHistory(server.id, user.id, {
+      page: currentPage,
+      perPage: 50,
+      search: search || undefined,
+      sortBy: sort_by || undefined,
+      sortOrder: (sort_order as "asc" | "desc") || undefined,
+    }),
+    getUserGenreStats({ userId: user.id, serverId: server.id }),
+    getMostWatchedItems({ serverId: server.id, userId: user.id }),
+  ]);
 
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
@@ -89,6 +97,20 @@ export default async function User({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
         <GenreStatsGraph data={genreStats} />
         <WatchTimePerDay data={watchTimePerWeekday} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+        <TopItemsList
+          title="Top Movies"
+          type="movie"
+          items={mostWatched.Movie}
+          server={server}
+        />
+        <TopItemsList
+          title="Top TV Shows"
+          type="series"
+          items={mostWatched.Series}
+          server={server}
+        />
       </div>
       <HistoryTable server={server} data={userHistory} hideUserColumn={true} />
     </Container>

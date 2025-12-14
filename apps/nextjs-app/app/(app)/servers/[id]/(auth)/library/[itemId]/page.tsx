@@ -43,9 +43,9 @@ export default async function ItemDetailsPage({
   let similarItems: Array<RecommendationItem | SeriesRecommendationItem> = [];
 
   if (itemDetails.item.type === "Series") {
-    similarItems = await getSimilarSeriesForItem(server.id, itemId, 8);
+    similarItems = await getSimilarSeriesForItem(server.id, itemId, 20);
   } else if (itemDetails.item.type === "Movie") {
-    similarItems = await getSimilarItemsForItem(server.id, itemId, 8);
+    similarItems = await getSimilarItemsForItem(server.id, itemId, 20);
   }
 
   // Get seasons and episodes for series
