@@ -115,7 +115,7 @@ export function MergeItemsManager({ serverId }: MergeItemsManagerProps) {
             <li>
               - Migrate hidden recommendations from left item to right item
             </li>
-            <li>- Soft delete the left item</li>
+            <li>- Delete the left item from the database</li>
             <li>- Preserve all watch statistics and history</li>
           </ul>
         </div>
@@ -198,9 +198,9 @@ export function MergeItemsManager({ serverId }: MergeItemsManagerProps) {
         <div className="bg-muted/50 border rounded-lg p-3">
           <p className="text-sm text-muted-foreground">
             <strong>Note:</strong> This operation merges the left item into the
-            right item. The left item will be soft-deleted and all its watch
-            history and recommendations will be transferred to the right item.
-            Both items must exist and be from the same server.
+            right item. The left item will be permanently deleted and all its
+            watch history and recommendations will be transferred to the right
+            item. Both items must exist and be from the same server.
           </p>
         </div>
       </CardContent>

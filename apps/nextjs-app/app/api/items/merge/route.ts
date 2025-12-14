@@ -115,10 +115,7 @@ export async function POST(request: Request) {
       .where(eq(hiddenRecommendations.itemId, leftId))
       .returning({ id: hiddenRecommendations.id });
 
-    await db
-      .update(items)
-      .set({ deletedAt: new Date() })
-      .where(eq(items.id, leftId));
+    await db.delete(items).where(eq(items.id, leftId));
 
     return new Response(
       JSON.stringify({
