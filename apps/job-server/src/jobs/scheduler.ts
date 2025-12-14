@@ -18,22 +18,6 @@ class SyncScheduler {
   private fullSyncInterval: string = "0 2 * * *"; // Daily at 2 AM
   private deletedItemsCleanupInterval: string = "0 * * * *"; // Every hour
 
-  constructor() {
-    // Auto-start if not explicitly disabled
-    const autoStart = Bun.env.SCHEDULER_AUTO_START !== "false";
-    if (autoStart) {
-      this.startWithCleanup();
-    }
-  }
-
-  /**
-   * Start scheduler with initial cleanup of stale states
-   */
-  private async startWithCleanup(): Promise<void> {
-    await this.performStartupCleanup();
-    this.start();
-  }
-
   /**
    * Reset any servers stuck in "syncing" status on startup
    * This handles cases where the server crashed mid-sync
@@ -72,11 +56,15 @@ class SyncScheduler {
   /**
    * Start the scheduler with current configuration
    */
-  start(): void {
+  async start(): Promise<void> {
     if (this.enabled) {
       console.log("Scheduler is already running");
       return;
     }
+
+    await this.performStartupCleanup();
+    console.log("[scheduler] trigger=startup-full-sync");
+    await this.triggerFullSync();
 
     this.enabled = true;
 
@@ -151,7 +139,10 @@ class SyncScheduler {
         this.deletedItemsCleanupInterval,
         () => {
           this.triggerDeletedItemsCleanup().catch((error) => {
-            console.error("Error during scheduled deleted items cleanup:", error);
+            console.error(
+              "Error during scheduled deleted items cleanup:",
+              error
+            );
           });
         }
       );
