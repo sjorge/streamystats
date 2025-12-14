@@ -4,8 +4,8 @@ import { getServer } from "@/lib/db/server";
 import { getSimilarSeriesForItem } from "@/lib/db/similar-series-statistics";
 import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
 import {
-  getSimilarItemsForItem,
   type RecommendationItem,
+  getSimilarItemsForItem,
 } from "@/lib/db/similar-statistics";
 import { getMe } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
