@@ -97,33 +97,33 @@ export async function GET(request: Request) {
       )
       .as("active_items");
 
-    const matchesQuery = db
-      .select({
-        deletedId: deletedItems.id,
-        deletedName: deletedItems.name,
-        deletedType: deletedItems.type,
-        deletedYear: deletedItems.productionYear,
-        deletedAt: deletedItems.deletedAt,
-        activeId: activeItems.id,
-        activeName: activeItems.name,
-        activeType: activeItems.type,
-        activeYear: activeItems.productionYear,
-      })
-      .from(deletedItems)
-      .innerJoin(
-        activeItems,
-        and(
-          sql`lower(${deletedItems.name}) = lower(${activeItems.name})`,
-          eq(deletedItems.productionYear, activeItems.productionYear),
-          eq(deletedItems.type, activeItems.type)
-        )
-      );
+    const joinCondition = and(
+      sql`lower(${deletedItems.name}) = lower(${activeItems.name})`,
+      eq(deletedItems.productionYear, activeItems.productionYear),
+      eq(deletedItems.type, activeItems.type)
+    );
 
     const [matches, totalResult] = await Promise.all([
-      matchesQuery.limit(limit).offset(offset),
+      db
+        .select({
+          deletedId: deletedItems.id,
+          deletedName: deletedItems.name,
+          deletedType: deletedItems.type,
+          deletedYear: deletedItems.productionYear,
+          deletedAt: deletedItems.deletedAt,
+          activeId: activeItems.id,
+          activeName: activeItems.name,
+          activeType: activeItems.type,
+          activeYear: activeItems.productionYear,
+        })
+        .from(deletedItems)
+        .innerJoin(activeItems, joinCondition)
+        .limit(limit)
+        .offset(offset),
       db
         .select({ count: sql<number>`count(*)::int` })
-        .from(matchesQuery.as("matches")),
+        .from(deletedItems)
+        .innerJoin(activeItems, joinCondition),
     ]);
 
     const matchesWithSessions = await Promise.all(
