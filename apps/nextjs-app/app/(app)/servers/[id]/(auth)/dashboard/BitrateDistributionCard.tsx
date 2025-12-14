@@ -71,7 +71,7 @@ export const BitrateDistributionCard = ({
     return ranges
       .map((range) => {
         const valuesInRange = values.filter(
-          (b) => b >= range.min && b <= range.max
+          (b) => b >= range.min && b <= range.max,
         );
         return {
           range: range.label,
@@ -101,7 +101,7 @@ export const BitrateDistributionCard = ({
     const maxHeightPerBar = 35;
     return Math.min(
       Math.max(minHeightPerBar, 200 / fixedLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 
@@ -120,7 +120,7 @@ export const BitrateDistributionCard = ({
       labelWithPercent: `${item.range} - ${
         total > 0 ? ((item.count / total) * 100).toFixed(1) : "0.0"
       }%`,
-    })
+    }),
   );
 
   return (

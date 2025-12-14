@@ -358,7 +358,7 @@ export function WatchTimeGraph({ data, onLoadingChange }: Props) {
   React.useEffect(() => {
     const updateDateFromParam = (
       param: string | null,
-      setter: (date: Date) => void
+      setter: (date: Date) => void,
     ) => {
       if (param) {
         try {

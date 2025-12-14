@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
     if (!serverId) {
       return NextResponse.json(
         { error: "Server ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
     }
 
     const input = Readable.fromWeb(
-      req.body as import("stream/web").ReadableStream
+      req.body as import("stream/web").ReadableStream,
     );
     let processedCount = 0;
     let importedCount = 0;
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
                 try {
                   const imported = await importSession(
                     session as JellystatsSession,
-                    serverIdNum
+                    serverIdNum,
                   );
                   if (imported) {
                     importedCount++;
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
             try {
               const imported = await importSession(
                 value as JellystatsSession,
-                serverIdNum
+                serverIdNum,
               );
               if (imported) {
                 importedCount++;
@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
             }
           }
         }
-      }
+      },
     );
 
     if (processedCount === 0) {
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
           error: "No valid sessions found. Please check the file format.",
           message: "Import failed - no sessions found",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -243,14 +243,14 @@ export async function POST(req: NextRequest) {
         error: error instanceof Error ? error.message : "Import failed",
         success: false,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 async function importSession(
   session: JellystatsSession,
-  serverId: number
+  serverId: number,
 ): Promise<boolean> {
   // Skip if already imported
   if (session.imported) {

@@ -52,7 +52,7 @@ export function UpdateNotifier() {
               // Go to latest release
               window.open(
                 "https://github.com/fredrikburmester/streamystats/releases/latest",
-                "_blank"
+                "_blank",
               );
               toast.dismiss();
             }}
@@ -78,7 +78,7 @@ export function UpdateNotifier() {
         ),
       });
     },
-    [toasts]
+    [toasts],
   );
 
   useEffect(() => {

@@ -35,7 +35,7 @@ export function TopItemsList({
     <Card
       className={cn(
         "w-full bg-background/40 backdrop-blur-md border-white/10 shadow-xl overflow-hidden",
-        className
+        className,
       )}
     >
       <CardHeader className="pb-3 border-b border-white/5">
