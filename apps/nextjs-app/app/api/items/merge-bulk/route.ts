@@ -5,11 +5,80 @@ import {
   sessions,
   hiddenRecommendations,
 } from "@streamystats/database";
-import { eq, isNotNull } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 interface MergePair {
   deletedItemId: string;
   activeItemId: string;
+}
+
+interface MergeResult {
+  sessionsMigrated: number;
+  recsMigrated: number;
+  duplicateRecsRemoved: number;
+}
+
+async function mergeSinglePair(
+  pair: MergePair,
+  serverId: number
+): Promise<MergeResult> {
+  return await db.transaction(async (tx) => {
+    const migratedSessions = await tx
+      .update(sessions)
+      .set({ itemId: pair.activeItemId })
+      .where(
+        and(
+          eq(sessions.serverId, serverId),
+          eq(sessions.itemId, pair.deletedItemId)
+        )
+      )
+      .returning({ id: sessions.id });
+
+    const existingRightRecs = await tx
+      .select({ userId: hiddenRecommendations.userId })
+      .from(hiddenRecommendations)
+      .where(
+        and(
+          eq(hiddenRecommendations.serverId, serverId),
+          eq(hiddenRecommendations.itemId, pair.activeItemId)
+        )
+      );
+    const existingUserIds = existingRightRecs.map((r) => r.userId);
+
+    let deletedDuplicateRecs = 0;
+    if (existingUserIds.length > 0) {
+      const deleted = await tx
+        .delete(hiddenRecommendations)
+        .where(
+          and(
+            eq(hiddenRecommendations.serverId, serverId),
+            eq(hiddenRecommendations.itemId, pair.deletedItemId),
+            inArray(hiddenRecommendations.userId, existingUserIds)
+          )
+        )
+        .returning({ id: hiddenRecommendations.id });
+      deletedDuplicateRecs = deleted.length;
+    }
+
+    const migratedRecs = await tx
+      .update(hiddenRecommendations)
+      .set({ itemId: pair.activeItemId })
+      .where(
+        and(
+          eq(hiddenRecommendations.serverId, serverId),
+          eq(hiddenRecommendations.itemId, pair.deletedItemId)
+        )
+      )
+      .returning({ id: hiddenRecommendations.id });
+
+    await tx.delete(items).where(eq(items.id, pair.deletedItemId));
+
+    return {
+      sessionsMigrated: migratedSessions.length,
+      recsMigrated: migratedRecs.length,
+      duplicateRecsRemoved: deletedDuplicateRecs,
+    };
+  });
 }
 
 export async function POST(request: Request) {
@@ -36,6 +105,7 @@ export async function POST(request: Request) {
     let totalSessionsMigrated = 0;
     let totalRecsMigrated = 0;
     let totalItemsDeleted = 0;
+    let totalDuplicateRecsRemoved = 0;
     const errors: string[] = [];
 
     for (const pair of pairs) {
@@ -77,30 +147,18 @@ export async function POST(request: Request) {
           continue;
         }
 
-        if (deletedItem[0].serverId !== activeItem[0].serverId) {
+        const serverId = deletedItem[0].serverId;
+        if (serverId !== activeItem[0].serverId) {
           errors.push(
             `Items ${pair.deletedItemId} and ${pair.activeItemId} are from different servers`
           );
           continue;
         }
 
-        const migratedSessions = await db
-          .update(sessions)
-          .set({ itemId: pair.activeItemId })
-          .where(eq(sessions.itemId, pair.deletedItemId))
-          .returning({ id: sessions.id });
-
-        totalSessionsMigrated += migratedSessions.length;
-
-        const migratedRecs = await db
-          .update(hiddenRecommendations)
-          .set({ itemId: pair.activeItemId })
-          .where(eq(hiddenRecommendations.itemId, pair.deletedItemId))
-          .returning({ id: hiddenRecommendations.id });
-
-        totalRecsMigrated += migratedRecs.length;
-
-        await db.delete(items).where(eq(items.id, pair.deletedItemId));
+        const result = await mergeSinglePair(pair, serverId);
+        totalSessionsMigrated += result.sessionsMigrated;
+        totalRecsMigrated += result.recsMigrated;
+        totalDuplicateRecsRemoved += result.duplicateRecsRemoved;
         totalItemsDeleted++;
       } catch (pairError) {
         errors.push(
@@ -131,6 +189,7 @@ export async function POST(request: Request) {
           itemsMerged: totalItemsDeleted,
           sessionsMigrated: totalSessionsMigrated,
           hiddenRecommendationsMigrated: totalRecsMigrated,
+          duplicateRecsRemoved: totalDuplicateRecsRemoved,
         },
         errors: errors.length > 0 ? errors : undefined,
       }),

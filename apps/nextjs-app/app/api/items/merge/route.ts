@@ -5,7 +5,7 @@ import {
   sessions,
   hiddenRecommendations,
 } from "@streamystats/database";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 
 export async function POST(request: Request) {
   try {
@@ -88,7 +88,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (leftItem[0].serverId !== rightItem[0].serverId) {
+    const serverId = leftItem[0].serverId;
+
+    if (serverId !== rightItem[0].serverId) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -103,28 +105,66 @@ export async function POST(request: Request) {
       );
     }
 
-    const migratedSessions = await db
-      .update(sessions)
-      .set({ itemId: rightId })
-      .where(eq(sessions.itemId, leftId))
-      .returning({ id: sessions.id });
+    const result = await db.transaction(async (tx) => {
+      const migratedSessions = await tx
+        .update(sessions)
+        .set({ itemId: rightId })
+        .where(
+          and(eq(sessions.serverId, serverId), eq(sessions.itemId, leftId))
+        )
+        .returning({ id: sessions.id });
 
-    const migratedRecs = await db
-      .update(hiddenRecommendations)
-      .set({ itemId: rightId })
-      .where(eq(hiddenRecommendations.itemId, leftId))
-      .returning({ id: hiddenRecommendations.id });
+      const existingRightRecs = await tx
+        .select({ userId: hiddenRecommendations.userId })
+        .from(hiddenRecommendations)
+        .where(
+          and(
+            eq(hiddenRecommendations.serverId, serverId),
+            eq(hiddenRecommendations.itemId, rightId)
+          )
+        );
+      const existingUserIds = existingRightRecs.map((r) => r.userId);
 
-    await db.delete(items).where(eq(items.id, leftId));
+      let deletedDuplicateRecs = 0;
+      if (existingUserIds.length > 0) {
+        const deleted = await tx
+          .delete(hiddenRecommendations)
+          .where(
+            and(
+              eq(hiddenRecommendations.serverId, serverId),
+              eq(hiddenRecommendations.itemId, leftId),
+              inArray(hiddenRecommendations.userId, existingUserIds)
+            )
+          )
+          .returning({ id: hiddenRecommendations.id });
+        deletedDuplicateRecs = deleted.length;
+      }
+
+      const migratedRecs = await tx
+        .update(hiddenRecommendations)
+        .set({ itemId: rightId })
+        .where(
+          and(
+            eq(hiddenRecommendations.serverId, serverId),
+            eq(hiddenRecommendations.itemId, leftId)
+          )
+        )
+        .returning({ id: hiddenRecommendations.id });
+
+      await tx.delete(items).where(eq(items.id, leftId));
+
+      return {
+        sessionsMigrated: migratedSessions.length,
+        hiddenRecommendationsMigrated: migratedRecs.length,
+        duplicateRecsRemoved: deletedDuplicateRecs,
+      };
+    });
 
     return new Response(
       JSON.stringify({
         success: true,
         message: `Successfully merged item ${leftId} into ${rightId}`,
-        metrics: {
-          sessionsMigrated: migratedSessions.length,
-          hiddenRecommendationsMigrated: migratedRecs.length,
-        },
+        metrics: result,
       }),
       {
         status: 200,

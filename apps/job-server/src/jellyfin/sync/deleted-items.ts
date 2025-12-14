@@ -578,46 +578,83 @@ function matchItem(
   }
 
   // 2. Fallback: Match by stable attributes (name, year, etc.)
-  // Episodes: type + production_year + series_name + index_number + parent_index_number
+  // Episodes: type + series_name + index_number + parent_index_number (+ optional production_year)
   if (
     dbItem.type === "Episode" &&
     dbItem.seriesName &&
-    dbItem.productionYear &&
     dbItem.indexNumber !== null &&
     dbItem.parentIndexNumber !== null
   ) {
-    const key = `episode:${dbItem.seriesName.toLowerCase()}:${
-      dbItem.productionYear
-    }:${dbItem.parentIndexNumber}:${dbItem.indexNumber}`;
-    const match = episodeKeyToJellyfinItem.get(key);
-    if (match && match.Id !== dbItem.id) {
-      return {
-        type: "migrated",
-        oldItemId: dbItem.id,
-        newItemId: match.Id,
-        matchReason: key,
-      };
+    // Try with production year first if available
+    if (dbItem.productionYear) {
+      const keyWithYear = `episode:${dbItem.seriesName.toLowerCase()}:${
+        dbItem.productionYear
+      }:${dbItem.parentIndexNumber}:${dbItem.indexNumber}`;
+      const match = episodeKeyToJellyfinItem.get(keyWithYear);
+      if (match && match.Id !== dbItem.id) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: match.Id,
+          matchReason: keyWithYear,
+        };
+      }
+    }
+    // Fallback: search without year by iterating through all episode keys
+    for (const [key, item] of episodeKeyToJellyfinItem) {
+      const keyParts = key.split(":");
+      if (
+        keyParts[1] === dbItem.seriesName.toLowerCase() &&
+        keyParts[3] === String(dbItem.parentIndexNumber) &&
+        keyParts[4] === String(dbItem.indexNumber) &&
+        item.Id !== dbItem.id
+      ) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: item.Id,
+          matchReason: `episode:${dbItem.seriesName}:S${dbItem.parentIndexNumber}E${dbItem.indexNumber}`,
+        };
+      }
     }
   }
 
-  // Season: type + production_year + index_number + series_name
+  // Season: type + series_name + index_number (+ optional production_year)
   if (
     dbItem.type === "Season" &&
     dbItem.seriesName &&
-    dbItem.productionYear &&
     dbItem.indexNumber !== null
   ) {
-    const key = `season:${dbItem.seriesName.toLowerCase()}:${
-      dbItem.productionYear
-    }:${dbItem.indexNumber}`;
-    const match = seasonKeyToJellyfinItem.get(key);
-    if (match && match.Id !== dbItem.id) {
-      return {
-        type: "migrated",
-        oldItemId: dbItem.id,
-        newItemId: match.Id,
-        matchReason: key,
-      };
+    // Try with production year first if available
+    if (dbItem.productionYear) {
+      const keyWithYear = `season:${dbItem.seriesName.toLowerCase()}:${
+        dbItem.productionYear
+      }:${dbItem.indexNumber}`;
+      const match = seasonKeyToJellyfinItem.get(keyWithYear);
+      if (match && match.Id !== dbItem.id) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: match.Id,
+          matchReason: keyWithYear,
+        };
+      }
+    }
+    // Fallback: search without year by iterating through all season keys
+    for (const [key, item] of seasonKeyToJellyfinItem) {
+      const keyParts = key.split(":");
+      if (
+        keyParts[1] === dbItem.seriesName.toLowerCase() &&
+        keyParts[3] === String(dbItem.indexNumber) &&
+        item.Id !== dbItem.id
+      ) {
+        return {
+          type: "migrated",
+          oldItemId: dbItem.id,
+          newItemId: item.Id,
+          matchReason: `season:${dbItem.seriesName}:${dbItem.indexNumber}`,
+        };
+      }
     }
   }
 

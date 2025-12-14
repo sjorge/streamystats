@@ -422,6 +422,8 @@ async function processItem(
       name: jellyfinItem.Name,
       type: jellyfinItem.Type,
       seriesId: jellyfinItem.SeriesId || null,
+      seriesName: jellyfinItem.SeriesName || null,
+      productionYear: jellyfinItem.ProductionYear || null,
       indexNumber: jellyfinItem.IndexNumber || null,
       parentIndexNumber: jellyfinItem.ParentIndexNumber || null,
       providerIds: jellyfinItem.ProviderIds || null,
@@ -1347,17 +1349,43 @@ async function findDeletedItemMatch(
 
   // 2. Fallback: Match by stable attributes (not IDs that change on re-add)
 
-  // Episodes: type + production_year + series_name + index_number + parent_index_number
+  // Episodes: type + series_name + index_number + parent_index_number (+ optional production_year)
   const indexNum = newItem.indexNumber;
   const parentIndexNum = newItem.parentIndexNumber;
   if (
     newItem.type === "Episode" &&
     newItem.seriesName &&
-    newItem.productionYear &&
     indexNum != null &&
     parentIndexNum != null
   ) {
-    const deletedEpisode = await db
+    // Try with production year first if available
+    if (newItem.productionYear) {
+      const deletedEpisode = await db
+        .select({ id: items.id })
+        .from(items)
+        .where(
+          and(
+            eq(items.serverId, newItem.serverId),
+            isNotNull(items.deletedAt),
+            eq(items.type, "Episode"),
+            sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
+            eq(items.productionYear, newItem.productionYear),
+            eq(items.indexNumber, indexNum),
+            eq(items.parentIndexNumber, parentIndexNum)
+          )
+        )
+        .limit(1);
+
+      if (deletedEpisode.length > 0) {
+        return {
+          id: deletedEpisode[0].id,
+          matchReason: `episode:${newItem.seriesName}:${newItem.productionYear}:S${parentIndexNum}E${indexNum}`,
+        };
+      }
+    }
+
+    // Fallback: search without production year
+    const deletedEpisodeNoYear = await db
       .select({ id: items.id })
       .from(items)
       .where(
@@ -1366,29 +1394,49 @@ async function findDeletedItemMatch(
           isNotNull(items.deletedAt),
           eq(items.type, "Episode"),
           sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
-          eq(items.productionYear, newItem.productionYear),
           eq(items.indexNumber, indexNum),
           eq(items.parentIndexNumber, parentIndexNum)
         )
       )
       .limit(1);
 
-    if (deletedEpisode.length > 0) {
+    if (deletedEpisodeNoYear.length > 0) {
       return {
-        id: deletedEpisode[0].id,
-        matchReason: `episode:${newItem.seriesName}:${newItem.productionYear}:S${parentIndexNum}E${indexNum}`,
+        id: deletedEpisodeNoYear[0].id,
+        matchReason: `episode:${newItem.seriesName}:S${parentIndexNum}E${indexNum}`,
       };
     }
   }
 
-  // Season: type + production_year + index_number + series_name
-  if (
-    newItem.type === "Season" &&
-    newItem.seriesName &&
-    newItem.productionYear &&
-    indexNum != null
-  ) {
-    const deletedSeason = await db
+  // Season: type + series_name + index_number (+ optional production_year)
+  if (newItem.type === "Season" && newItem.seriesName && indexNum != null) {
+    // Try with production year first if available
+    if (newItem.productionYear) {
+      const deletedSeason = await db
+        .select({ id: items.id })
+        .from(items)
+        .where(
+          and(
+            eq(items.serverId, newItem.serverId),
+            isNotNull(items.deletedAt),
+            eq(items.type, "Season"),
+            sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
+            eq(items.productionYear, newItem.productionYear),
+            eq(items.indexNumber, indexNum)
+          )
+        )
+        .limit(1);
+
+      if (deletedSeason.length > 0) {
+        return {
+          id: deletedSeason[0].id,
+          matchReason: `season:${newItem.seriesName}:${newItem.productionYear}:${indexNum}`,
+        };
+      }
+    }
+
+    // Fallback: search without production year
+    const deletedSeasonNoYear = await db
       .select({ id: items.id })
       .from(items)
       .where(
@@ -1397,16 +1445,15 @@ async function findDeletedItemMatch(
           isNotNull(items.deletedAt),
           eq(items.type, "Season"),
           sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
-          eq(items.productionYear, newItem.productionYear),
           eq(items.indexNumber, indexNum)
         )
       )
       .limit(1);
 
-    if (deletedSeason.length > 0) {
+    if (deletedSeasonNoYear.length > 0) {
       return {
-        id: deletedSeason[0].id,
-        matchReason: `season:${newItem.seriesName}:${newItem.productionYear}:${indexNum}`,
+        id: deletedSeasonNoYear[0].id,
+        matchReason: `season:${newItem.seriesName}:${indexNum}`,
       };
     }
   }

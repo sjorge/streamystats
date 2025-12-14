@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/api-auth";
 import { db, items, sessions } from "@streamystats/database";
-import { eq, and, isNotNull, isNull, sql, count } from "drizzle-orm";
+import { eq, and, isNotNull, isNull, sql } from "drizzle-orm";
 
 export interface DangerousMatch {
   deletedItem: {
@@ -129,7 +129,7 @@ export async function GET(request: Request) {
     const matchesWithSessions = await Promise.all(
       matches.map(async (match) => {
         const sessionCount = await db
-          .select({ count: count() })
+          .select({ count: sql<number>`count(*)::int` })
           .from(sessions)
           .where(eq(sessions.itemId, match.deletedId));
 
@@ -147,7 +147,7 @@ export async function GET(request: Request) {
             type: match.activeType,
             productionYear: match.activeYear,
           },
-          sessionsCount: sessionCount[0]?.count || 0,
+          sessionsCount: sessionCount[0]?.count ?? 0,
         } as DangerousMatch;
       })
     );
