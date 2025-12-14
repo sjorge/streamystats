@@ -90,7 +90,7 @@ const settings_items = [
     icon: TrendingUp,
   },
   {
-    title: "Chat AI",
+    title: "AI Chat",
     url: "/settings/chat",
     icon: MessageSquare,
   },

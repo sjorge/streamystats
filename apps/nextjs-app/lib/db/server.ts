@@ -718,7 +718,7 @@ export const updateServerConnection = async ({
   }
 };
 
-// Chat AI configuration functions
+// AI Chat configuration functions
 
 export type ChatProvider = "openai-compatible" | "ollama" | "anthropic";
 
@@ -841,7 +841,9 @@ export const testChatConnection = async ({
       if (!models.some((m: string) => m.includes(config.model))) {
         return {
           success: false,
-          message: `Model "${config.model}" not found. Available: ${models.join(", ")}`,
+          message: `Model "${config.model}" not found. Available: ${models.join(
+            ", "
+          )}`,
         };
       }
       return { success: true, message: "Connection successful" };

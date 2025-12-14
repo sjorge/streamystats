@@ -166,12 +166,12 @@ export function ChatAIManager({ server }: { server: Server }) {
       });
       setActionResult({
         type: "success",
-        message: "Chat AI configuration saved",
+        message: "AI Chat configuration saved",
       });
     } catch (error) {
       setActionResult({
         type: "error",
-        message: "Failed to save chat AI configuration",
+        message: "Failed to save AI Chat configuration",
       });
     } finally {
       setIsSaving(false);
@@ -219,7 +219,7 @@ export function ChatAIManager({ server }: { server: Server }) {
       await clearChatConfig({ serverId: server.id });
       setActionResult({
         type: "success",
-        message: "Chat AI configuration cleared",
+        message: "AI Chat configuration cleared",
       });
       setBaseUrl(PROVIDER_PRESETS.openai.baseUrl);
       setApiKey("");
@@ -242,7 +242,7 @@ export function ChatAIManager({ server }: { server: Server }) {
     <>
       <Card className="w-full mb-6">
         <CardHeader>
-          <CardTitle>Chat AI</CardTitle>
+          <CardTitle>AI Chat</CardTitle>
           <CardDescription>
             Configure an AI provider to enable the chat assistant. Use Cmd+K to
             ask questions about your watch history and get recommendations.
@@ -379,7 +379,7 @@ export function ChatAIManager({ server }: { server: Server }) {
           <div className="space-y-4">
             <h3 className="text-sm font-medium">Clear Configuration</h3>
             <p className="text-sm text-gray-400">
-              Remove the chat AI configuration from this server.
+              Remove the AI Chat configuration from this server.
             </p>
             <Button
               variant="destructive"
@@ -395,9 +395,9 @@ export function ChatAIManager({ server }: { server: Server }) {
       <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear Chat AI Configuration?</AlertDialogTitle>
+            <AlertDialogTitle>Clear AI Chat Configuration?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the chat AI configuration. The chat feature will
+              This will remove the AI Chat configuration. The chat feature will
               be disabled until you configure a new provider.
             </AlertDialogDescription>
           </AlertDialogHeader>

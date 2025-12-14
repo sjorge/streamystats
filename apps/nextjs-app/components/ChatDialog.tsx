@@ -332,10 +332,10 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="text-center space-y-3">
                 <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground" />
-                <h3 className="font-semibold">Chat AI Not Configured</h3>
+                <h3 className="font-semibold">AI Chat Not Configured</h3>
                 <p className="text-sm text-muted-foreground max-w-sm">
                   To use the AI assistant, configure a chat provider in Settings
-                  &gt; Chat AI.
+                  &gt; AI Chat.
                 </p>
               </div>
             </div>

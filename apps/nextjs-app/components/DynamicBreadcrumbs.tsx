@@ -41,7 +41,7 @@ const _map = {
   users: "Users",
   library: "Library",
   dashboard: "Dashboard",
-  chat: "Chat AI",
+  chat: "AI Chat",
   ai: "AI Recommendations",
   general: "General",
 };

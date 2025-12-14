@@ -188,9 +188,14 @@ export function RecommendationsSection({
                                     handleHideRecommendation(recommendation);
                                   }}
                                   disabled={hidingItems.has(item.id)}
-                                  className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 backdrop-blur-sm border-0 shadow-lg hover:bg-destructive/10 hover:text-destructive h-7 w-7 p-0"
+                                  className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out bg-background/90 backdrop-blur-sm border-0 shadow-lg h-7 w-7 hover:w-[70px] p-0 group/btn overflow-hidden flex items-center justify-start"
                                 >
-                                  <EyeOffIcon className="h-3.5 w-3.5" />
+                                  <div className="flex items-center justify-center w-7 h-7 flex-shrink-0">
+                                    <EyeOffIcon className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="text-xs font-medium opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300 whitespace-nowrap pr-2">
+                                    Hide
+                                  </span>
                                 </Button>
                               )}
                             </div>

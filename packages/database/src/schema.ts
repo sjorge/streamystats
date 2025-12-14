@@ -66,7 +66,7 @@ export const servers = pgTable(
     embeddingModel: text("embedding_model"),
     embeddingDimensions: integer("embedding_dimensions").default(1536),
 
-    // Chat AI configuration (separate from embedding AI)
+    // AI Chat configuration (separate from embedding AI)
     // Supports OpenAI-compatible, Anthropic, Ollama, etc.
     chatProvider: text("chat_provider"), // "openai-compatible" | "ollama" | "anthropic"
     chatBaseUrl: text("chat_base_url"),
