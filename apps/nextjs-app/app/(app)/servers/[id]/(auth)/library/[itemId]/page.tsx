@@ -3,7 +3,7 @@ import { getItemDetails, getSeasonsAndEpisodes } from "@/lib/db/items";
 import { getServer } from "@/lib/db/server";
 import { getSimilarSeriesForItem } from "@/lib/db/similar-series-statistics";
 import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
-import {
+import type {
   RecommendationItem,
   getSimilarItemsForItem,
 } from "@/lib/db/similar-statistics";
