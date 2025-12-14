@@ -336,7 +336,11 @@ async function processItem(
 ): Promise<void> {
   // Check if item already exists and compare etag for changes
   const existingItem = await db
-    .select({ etag: items.etag, deletedAt: items.deletedAt })
+    .select({
+      etag: items.etag,
+      deletedAt: items.deletedAt,
+      providerIds: items.providerIds,
+    })
     .from(items)
     .where(eq(items.id, jellyfinItem.Id))
     .limit(1);
@@ -345,6 +349,16 @@ async function processItem(
   const wasDeleted = !isNewItem && existingItem[0].deletedAt !== null;
   const hasChanged = !isNewItem && existingItem[0].etag !== jellyfinItem.Etag;
 
+  // Check if ProviderIds are missing in existing item but present in new item
+  const needsProviderIdsUpdate =
+    !isNewItem &&
+    (!existingItem[0].providerIds ||
+      (typeof existingItem[0].providerIds === "object" &&
+        Object.keys(existingItem[0].providerIds).length === 0)) &&
+    jellyfinItem.ProviderIds &&
+    typeof jellyfinItem.ProviderIds === "object" &&
+    Object.keys(jellyfinItem.ProviderIds).length > 0;
+
   // If item exists but was deleted, clear the deletedAt flag (item is back)
   if (wasDeleted) {
     console.info(
@@ -352,10 +366,21 @@ async function processItem(
     );
   }
 
-  if (!isNewItem && !hasChanged && !wasDeleted) {
+  // Log when ProviderIds are being added to existing item
+  if (needsProviderIdsUpdate) {
+    console.info(
+      `[items-sync] Item ${
+        jellyfinItem.Id
+      } missing ProviderIds, adding: ${JSON.stringify(
+        jellyfinItem.ProviderIds
+      )}`
+    );
+  }
+
+  if (!isNewItem && !hasChanged && !wasDeleted && !needsProviderIdsUpdate) {
     metrics.incrementItemsUnchanged();
     metrics.incrementItemsProcessed();
-    return; // Skip if item hasn't changed and wasn't deleted
+    return; // Skip if item hasn't changed and wasn't deleted and doesn't need ProviderIds update
   }
 
   const serverId = await getServerIdFromLibrary(libraryId);
