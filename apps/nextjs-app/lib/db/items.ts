@@ -730,3 +730,49 @@ export const getSeriesEpisodeStats = async ({
     watchedSeasons: watchedSeasons,
   };
 };
+
+export interface SeasonEpisode {
+  seasonNumber: number;
+  episodes: Item[];
+}
+
+/**
+ * Get all seasons and episodes for a series, grouped by season
+ */
+export const getSeasonsAndEpisodes = async ({
+  seriesId,
+}: {
+  seriesId: string;
+}): Promise<SeasonEpisode[]> => {
+  const allEpisodes = await db
+    .select()
+    .from(items)
+    .where(
+      and(
+        eq(items.type, "Episode"),
+        eq(items.seriesId, seriesId),
+        isNotNull(items.parentIndexNumber),
+        isNotNull(items.indexNumber)
+      )
+    )
+    .orderBy(asc(items.parentIndexNumber), asc(items.indexNumber));
+
+  const seasonMap = new Map<number, Item[]>();
+
+  for (const episode of allEpisodes) {
+    const seasonNum = episode.parentIndexNumber!;
+    if (!seasonMap.has(seasonNum)) {
+      seasonMap.set(seasonNum, []);
+    }
+    seasonMap.get(seasonNum)!.push(episode);
+  }
+
+  const seasons: SeasonEpisode[] = Array.from(seasonMap.entries())
+    .map(([seasonNumber, episodes]) => ({
+      seasonNumber,
+      episodes,
+    }))
+    .sort((a, b) => a.seasonNumber - b.seasonNumber);
+
+  return seasons;
+};

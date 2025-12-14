@@ -1,7 +1,7 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { getServer } from "@/lib/db/server";
-import { getItemDetails } from "@/lib/db/items";
+import { getItemDetails, getSeasonsAndEpisodes } from "@/lib/db/items";
 import {
   getSimilarItemsForItem,
   RecommendationItem,
@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { ItemHeader } from "./ItemHeader";
 import { ItemMetadata } from "./ItemMetadata";
 import { SimilarItemsList } from "./SimilarItemsList";
+import { SeasonsAndEpisodes } from "./SeasonsAndEpisodes";
 import { getMe } from "@/lib/db/users";
 
 export default async function ItemDetailsPage({
@@ -47,6 +48,12 @@ export default async function ItemDetailsPage({
     similarItems = await getSimilarItemsForItem(server.id, itemId, 8);
   }
 
+  // Get seasons and episodes for series
+  const seasons =
+    itemDetails.item.type === "Series"
+      ? await getSeasonsAndEpisodes({ seriesId: itemId })
+      : [];
+
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
       <PageTitle
@@ -59,6 +66,7 @@ export default async function ItemDetailsPage({
           item={itemDetails.item}
           server={server}
           statistics={itemDetails}
+          serverId={id}
         />
         <ItemMetadata
           item={itemDetails.item}
@@ -67,6 +75,9 @@ export default async function ItemDetailsPage({
           serverId={id}
           itemId={itemId}
         />
+        {itemDetails.item.type === "Series" && seasons.length > 0 && (
+          <SeasonsAndEpisodes seasons={seasons} serverId={id} server={server} />
+        )}
         {(itemDetails.item.type === "Series" ||
           itemDetails.item.type === "Movie") &&
           similarItems.length > 0 && (

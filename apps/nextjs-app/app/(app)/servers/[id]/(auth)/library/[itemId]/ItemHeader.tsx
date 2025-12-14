@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import {
   Folder,
   Tag,
   Trash2,
+  Tv,
+  ArrowLeft,
 } from "lucide-react";
 
 interface ItemDetailsResponse {
@@ -29,6 +32,7 @@ interface ItemHeaderProps {
   item: Item;
   server: Server;
   statistics: ItemDetailsResponse;
+  serverId: number;
 }
 
 function formatRuntime(runtimeTicks: number): string {
@@ -41,7 +45,12 @@ function formatRating(rating: number): string {
   return rating.toFixed(1);
 }
 
-export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
+export function ItemHeader({
+  item,
+  server,
+  statistics,
+  serverId,
+}: ItemHeaderProps) {
   const isDeleted = item.deletedAt !== null;
 
   return (
@@ -113,13 +122,25 @@ export function ItemHeader({ item, server, statistics }: ItemHeaderProps) {
                 )}
               </div>
               {item.type === "Episode" && (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <div className="flex gap-4 text-sm text-muted-foreground">
                     {item.seasonName && <span>{item.seasonName}</span>}
                     {item.indexNumber && (
                       <span>Episode {item.indexNumber}</span>
                     )}
                   </div>
+                  {item.seriesId && item.seriesName && (
+                    <Link
+                      href={`/servers/${serverId}/library/${item.seriesId}`}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted hover:bg-accent border border-border hover:border-primary/50 transition-colors group"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <Tv className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <span className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                        {item.seriesName}
+                      </span>
+                    </Link>
+                  )}
                 </div>
               )}
               {item.originalTitle && item.originalTitle !== item.name && (
