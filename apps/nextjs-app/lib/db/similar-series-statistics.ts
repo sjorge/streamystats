@@ -36,12 +36,95 @@ const debugLog = (...args: any[]) => {
 };
 
 export interface SeriesRecommendationItem {
-  item: Item;
+  item: SeriesRecommendationCardItem;
   similarity: number;
-  basedOn: Item[];
+  basedOn: SeriesRecommendationCardItem[];
 }
 
-const CACHE_TTL = 60 * 30; // 30 minutes
+export interface SeriesRecommendationCardItem {
+  id: string;
+  name: string;
+  type: string | null;
+  productionYear: number | null;
+  runtimeTicks: number | null;
+  genres: string[] | null;
+  communityRating: number | null;
+
+  primaryImageTag: string | null;
+  primaryImageThumbTag: string | null;
+  primaryImageLogoTag: string | null;
+
+  backdropImageTags: string[] | null;
+
+  seriesId: string | null;
+  seriesPrimaryImageTag: string | null;
+
+  parentBackdropItemId: string | null;
+  parentBackdropImageTags: string[] | null;
+
+  parentThumbItemId: string | null;
+  parentThumbImageTag: string | null;
+}
+
+type SeriesRecommendationCardItemWithEmbedding =
+  SeriesRecommendationCardItem & {
+    embedding: Item["embedding"];
+  };
+
+const itemCardSelect = {
+  id: items.id,
+  name: items.name,
+  type: items.type,
+  productionYear: items.productionYear,
+  runtimeTicks: items.runtimeTicks,
+  genres: items.genres,
+  communityRating: items.communityRating,
+  primaryImageTag: items.primaryImageTag,
+  primaryImageThumbTag: items.primaryImageThumbTag,
+  primaryImageLogoTag: items.primaryImageLogoTag,
+  backdropImageTags: items.backdropImageTags,
+  seriesId: items.seriesId,
+  seriesPrimaryImageTag: items.seriesPrimaryImageTag,
+  parentBackdropItemId: items.parentBackdropItemId,
+  parentBackdropImageTags: items.parentBackdropImageTags,
+  parentThumbItemId: items.parentThumbItemId,
+  parentThumbImageTag: items.parentThumbImageTag,
+} as const;
+
+const itemCardWithEmbeddingSelect = {
+  ...itemCardSelect,
+  embedding: items.embedding,
+} as const;
+
+const itemCardWithEmbeddingColumns = {
+  id: true,
+  name: true,
+  type: true,
+  productionYear: true,
+  runtimeTicks: true,
+  genres: true,
+  communityRating: true,
+  primaryImageTag: true,
+  primaryImageThumbTag: true,
+  primaryImageLogoTag: true,
+  backdropImageTags: true,
+  seriesId: true,
+  seriesPrimaryImageTag: true,
+  parentBackdropItemId: true,
+  parentBackdropImageTags: true,
+  parentThumbItemId: true,
+  parentThumbImageTag: true,
+  embedding: true,
+} as const;
+
+const stripEmbedding = (
+  item: SeriesRecommendationCardItemWithEmbedding
+): SeriesRecommendationCardItem => {
+  const { embedding: _embedding, ...card } = item;
+  return card;
+};
+
+const CACHE_TTL = 60 * 60 * 1; // 1 hour
 
 const getSimilarSeriesUncached = async (
   serverId: number,
@@ -197,7 +280,7 @@ async function getUserSpecificSeriesRecommendations(
   }
 
   const watchedSeriesItems = await db
-    .select()
+    .select(itemCardWithEmbeddingSelect)
     .from(items)
     .where(
       and(
@@ -319,7 +402,11 @@ async function getUserSpecificSeriesRecommendations(
   // Get candidate series similar to any of the base series
   const candidateSeries = new Map<
     string,
-    { item: Item; similarities: number[]; basedOn: Item[] }
+    {
+      item: SeriesRecommendationCardItem;
+      similarities: number[];
+      basedOn: SeriesRecommendationCardItemWithEmbedding[];
+    }
   >();
 
   for (const watchedSeriesItem of baseSeries) {
@@ -339,7 +426,7 @@ async function getUserSpecificSeriesRecommendations(
 
     const similarSeries = await db
       .select({
-        item: items,
+        item: itemCardSelect,
         similarity: similarity,
       })
       .from(items)
@@ -404,7 +491,7 @@ async function getUserSpecificSeriesRecommendations(
       similarity:
         candidate.similarities.reduce((sum, sim) => sum + sim, 0) /
         candidate.similarities.length,
-      basedOn: candidate.basedOn.slice(0, 3), // Limit to 3 base series for clarity
+      basedOn: candidate.basedOn.slice(0, 3).map(stripEmbedding), // Limit to 3 base series for clarity
     }))
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, limit);
@@ -481,7 +568,7 @@ async function getPopularSeriesRecommendations(
   // Get popular series based on episode watch count
   const popularSeriesQuery = db
     .select({
-      item: items,
+      item: itemCardSelect,
       episodeWatchCount: count(sessions.id).as("episodeWatchCount"),
     })
     .from(items)
@@ -551,6 +638,7 @@ export const getSimilarSeriesForItem = async (
         eq(items.type, "Series"),
         isNotNull(items.embedding)
       ),
+      columns: itemCardWithEmbeddingColumns,
     });
 
     if (!targetSeries || !targetSeries.embedding) {
@@ -568,7 +656,7 @@ export const getSimilarSeriesForItem = async (
 
     const similarSeries = await db
       .select({
-        item: items,
+        item: itemCardSelect,
         similarity: similarity,
       })
       .from(items)
@@ -610,7 +698,11 @@ export const getSimilarSeriesForItem = async (
       .map((result) => ({
         item: result.item,
         similarity: Number(result.similarity),
-        basedOn: [targetSeries], // Based on the target series
+        basedOn: [
+          stripEmbedding(
+            targetSeries as SeriesRecommendationCardItemWithEmbedding
+          ),
+        ], // Based on the target series
       }));
 
     debugLog(`\n🎉 Returning ${recommendations.length} similar series`);

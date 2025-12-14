@@ -1,10 +1,11 @@
 "use client";
 
-import type { Item, Server } from "@/lib/types";
+import type { Server } from "@/lib/types";
 import { Film, Tv } from "lucide-react";
 import Image from "next/image";
 import { memo, useEffect, useMemo, useState } from "react";
 import { Blurhash } from "react-blurhash";
+import type { RecommendationCardItem } from "./recommendation-types";
 
 // Define the possible image types that can be requested
 export type ImageType = "Primary" | "Backdrop" | "Thumb" | "Logo";
@@ -44,7 +45,7 @@ const PosterComponent = ({
   preferredImageType = "Primary",
   size = "default",
 }: {
-  item: Item;
+  item: RecommendationCardItem;
   server: Server;
   width?: number;
   height?: number;

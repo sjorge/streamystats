@@ -17,6 +17,7 @@ import {
 import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import { CategoryStat } from "@/lib/db/transcoding-statistics";
 import { InfoIcon } from "lucide-react";
+import { useCallback } from "react";
 import {
   Bar,
   BarChart,
@@ -42,7 +43,6 @@ function cleanReasonLabel(label: string): string {
       }
     } catch (error) {
       // If parsing fails, return the original label
-      console.warn("Failed to parse reason label:", label);
     }
   }
 
@@ -72,12 +72,19 @@ export const TranscodingReasonsCard = ({
 
   // Calculate bar height based on number of items
   const getBarHeight = (dataLength: number) => {
-    const minHeightPerBar = 30;
-    const maxHeightPerBar = 40;
+    const minHeightPerBar = 38;
+    const maxHeightPerBar = 56;
     return Math.min(
       Math.max(minHeightPerBar, 200 / dataLength),
       maxHeightPerBar
     );
+  };
+
+  const getChartHeight = (dataLength: number) => {
+    const minHeight = 240;
+    const maxHeight = 420;
+    const heightPerBar = 48;
+    return Math.min(Math.max(minHeight, dataLength * heightPerBar), maxHeight);
   };
 
   const maxCount = Math.max(...reasonsData.map((d) => d.count));
@@ -89,6 +96,35 @@ export const TranscodingReasonsCard = ({
       total > 0 ? ((item.count / total) * 100).toFixed(1) : "0.0"
     }%`,
   }));
+
+  const renderBarLabel = useCallback(
+    ({
+      x,
+      y,
+      width,
+      height,
+      value,
+    }: {
+      x?: number | string;
+      y?: number | string;
+      width?: number | string;
+      height?: number | string;
+      value?: unknown;
+    }) => (
+      <CustomBarLabel
+        x={Number(x)}
+        y={Number(y)}
+        width={Number(width)}
+        height={Number(height)}
+        value={value}
+        fill="#d6e3ff"
+        fontSize={12}
+        containerWidth={400}
+        alwaysOutside
+      />
+    ),
+    []
+  );
 
   // Find the most common reason (highest count)
   const mostCommonReason =
@@ -108,7 +144,8 @@ export const TranscodingReasonsCard = ({
         <ChartContainer
           id="transcoding-reasons"
           config={reasonsConfig}
-          className="h-[200px]"
+          className="w-full aspect-auto"
+          style={{ height: getChartHeight(reasonsDataWithPercent.length) }}
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
@@ -145,19 +182,7 @@ export const TranscodingReasonsCard = ({
               >
                 <LabelList
                   dataKey="labelWithPercent"
-                  content={({ x, y, width, height, value }) => (
-                    <CustomBarLabel
-                      x={Number(x)}
-                      y={Number(y)}
-                      width={Number(width)}
-                      height={Number(height)}
-                      value={value}
-                      fill="#d6e3ff"
-                      fontSize={12}
-                      containerWidth={400}
-                      alwaysOutside
-                    />
-                  )}
+                  content={renderBarLabel}
                 />
               </Bar>
             </BarChart>

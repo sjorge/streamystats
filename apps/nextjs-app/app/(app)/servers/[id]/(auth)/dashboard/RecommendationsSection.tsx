@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Server } from "@streamystats/database";
-import { Item } from "@/lib/types";
 import { EyeOffIcon, TrendingUp, Link2, LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -16,18 +15,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-interface RecommendationItem {
-  item: Item;
-  similarity: number;
-  basedOn: Item[];
-}
+import type {
+  RecommendationCardItem,
+  RecommendationListItem,
+} from "./recommendation-types";
 
 interface RecommendationsSectionProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  recommendations: RecommendationItem[];
+  recommendations: RecommendationListItem[];
   server: Server;
   onHideRecommendation: (
     serverId: string | number,
@@ -41,12 +38,6 @@ interface RecommendationsSectionProps {
   emptyMessage: string;
 }
 
-type AnyRecommendationItem = {
-  item: Item;
-  similarity: number;
-  basedOn: Item[];
-};
-
 export function RecommendationsSection({
   title,
   description,
@@ -57,13 +48,13 @@ export function RecommendationsSection({
   formatRuntime,
   emptyMessage,
 }: RecommendationsSectionProps & {
-  recommendations: AnyRecommendationItem[];
+  recommendations: RecommendationListItem[];
 }) {
   const [items, setItems] = useState(recommendations);
   const [hidingItems, setHidingItems] = useState<Set<string>>(new Set());
 
   const handleHideRecommendation = async (
-    recommendation: RecommendationItem
+    recommendation: RecommendationListItem
   ) => {
     const { item } = recommendation;
     if (!item.id || hidingItems.has(item.id)) {
@@ -244,45 +235,50 @@ export function RecommendationsSection({
                                   <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                                     {basedOn
                                       .slice(0, 3)
-                                      .map((basedItem: Item, idx: number) => (
-                                        <TooltipProvider
-                                          key={basedItem.id || idx}
-                                        >
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Link
-                                                href={`/servers/${server.id}/library/${basedItem.id}`}
-                                                onClick={(e) =>
-                                                  e.stopPropagation()
-                                                }
-                                                className="flex-shrink-0 group/based"
-                                              >
-                                                <div className="relative w-12 h-18 rounded overflow-hidden border border-border/50 hover:border-primary transition-colors">
-                                                  <Poster
-                                                    item={basedItem}
-                                                    server={server}
-                                                    width={48}
-                                                    height={72}
-                                                    preferredImageType="Primary"
-                                                    className="w-full h-full rounded"
-                                                  />
-                                                  <div className="absolute inset-0 bg-primary/0 group-hover/based:bg-primary/10 transition-colors" />
-                                                </div>
-                                              </Link>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              <p className="font-medium text-xs">
-                                                {basedItem.name}
-                                              </p>
-                                              {basedItem.productionYear && (
-                                                <p className="text-[10px] text-muted-foreground">
-                                                  {basedItem.productionYear}
+                                      .map(
+                                        (
+                                          basedItem: RecommendationCardItem,
+                                          idx: number
+                                        ) => (
+                                          <TooltipProvider
+                                            key={basedItem.id || idx}
+                                          >
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Link
+                                                  href={`/servers/${server.id}/library/${basedItem.id}`}
+                                                  onClick={(e) =>
+                                                    e.stopPropagation()
+                                                  }
+                                                  className="flex-shrink-0 group/based"
+                                                >
+                                                  <div className="relative w-12 h-18 rounded overflow-hidden border border-border/50 hover:border-primary transition-colors">
+                                                    <Poster
+                                                      item={basedItem}
+                                                      server={server}
+                                                      width={48}
+                                                      height={72}
+                                                      preferredImageType="Primary"
+                                                      className="w-full h-full rounded"
+                                                    />
+                                                    <div className="absolute inset-0 bg-primary/0 group-hover/based:bg-primary/10 transition-colors" />
+                                                  </div>
+                                                </Link>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p className="font-medium text-xs">
+                                                  {basedItem.name}
                                                 </p>
-                                              )}
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                      ))}
+                                                {basedItem.productionYear && (
+                                                  <p className="text-[10px] text-muted-foreground">
+                                                    {basedItem.productionYear}
+                                                  </p>
+                                                )}
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )
+                                      )}
                                     {basedOn.length > 3 && (
                                       <div className="flex-shrink-0 w-12 h-18 rounded border border-border/50 bg-muted flex items-center justify-center">
                                         <span className="text-[10px] text-muted-foreground">

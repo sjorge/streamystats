@@ -6,6 +6,7 @@ import {
   RecommendationItem,
 } from "@/lib/db/similar-statistics";
 import { getSimilarSeriesForItem } from "@/lib/db/similar-series-statistics";
+import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
 import { showAdminStatistics } from "@/utils/adminTools";
 import { redirect } from "next/navigation";
 import { ItemHeader } from "./ItemHeader";
@@ -39,7 +40,7 @@ export default async function ItemDetailsPage({
   }
 
   // Get similar items based on the specific item (not user-based)
-  let similarItems: RecommendationItem[] = [];
+  let similarItems: Array<RecommendationItem | SeriesRecommendationItem> = [];
 
   if (itemDetails.item.type === "Series") {
     similarItems = await getSimilarSeriesForItem(server.id, itemId, 8);

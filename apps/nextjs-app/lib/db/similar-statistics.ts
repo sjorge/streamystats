@@ -36,12 +36,94 @@ const debugLog = (...args: any[]) => {
 };
 
 export interface RecommendationItem {
-  item: Item;
+  item: RecommendationCardItem;
   similarity: number;
-  basedOn: Item[];
+  basedOn: RecommendationCardItem[];
 }
 
-const CACHE_TTL = 60 * 30; // 30 minutes
+export interface RecommendationCardItem {
+  id: string;
+  name: string;
+  type: string | null;
+  productionYear: number | null;
+  runtimeTicks: number | null;
+  genres: string[] | null;
+  communityRating: number | null;
+
+  primaryImageTag: string | null;
+  primaryImageThumbTag: string | null;
+  primaryImageLogoTag: string | null;
+
+  backdropImageTags: string[] | null;
+
+  seriesId: string | null;
+  seriesPrimaryImageTag: string | null;
+
+  parentBackdropItemId: string | null;
+  parentBackdropImageTags: string[] | null;
+
+  parentThumbItemId: string | null;
+  parentThumbImageTag: string | null;
+}
+
+type RecommendationCardItemWithEmbedding = RecommendationCardItem & {
+  embedding: Item["embedding"];
+};
+
+const itemCardSelect = {
+  id: items.id,
+  name: items.name,
+  type: items.type,
+  productionYear: items.productionYear,
+  runtimeTicks: items.runtimeTicks,
+  genres: items.genres,
+  communityRating: items.communityRating,
+  primaryImageTag: items.primaryImageTag,
+  primaryImageThumbTag: items.primaryImageThumbTag,
+  primaryImageLogoTag: items.primaryImageLogoTag,
+  backdropImageTags: items.backdropImageTags,
+  seriesId: items.seriesId,
+  seriesPrimaryImageTag: items.seriesPrimaryImageTag,
+  parentBackdropItemId: items.parentBackdropItemId,
+  parentBackdropImageTags: items.parentBackdropImageTags,
+  parentThumbItemId: items.parentThumbItemId,
+  parentThumbImageTag: items.parentThumbImageTag,
+} as const;
+
+const itemCardWithEmbeddingSelect = {
+  ...itemCardSelect,
+  embedding: items.embedding,
+} as const;
+
+const itemCardWithEmbeddingColumns = {
+  id: true,
+  name: true,
+  type: true,
+  productionYear: true,
+  runtimeTicks: true,
+  genres: true,
+  communityRating: true,
+  primaryImageTag: true,
+  primaryImageThumbTag: true,
+  primaryImageLogoTag: true,
+  backdropImageTags: true,
+  seriesId: true,
+  seriesPrimaryImageTag: true,
+  parentBackdropItemId: true,
+  parentBackdropImageTags: true,
+  parentThumbItemId: true,
+  parentThumbImageTag: true,
+  embedding: true,
+} as const;
+
+const stripEmbedding = (
+  item: RecommendationCardItemWithEmbedding
+): RecommendationCardItem => {
+  const { embedding: _embedding, ...card } = item;
+  return card;
+};
+
+const CACHE_TTL = 60 * 60 * 1; // 1 hour
 
 const getSimilarStatisticsUncached = async (
   serverId: number,
@@ -159,7 +241,7 @@ async function getUserSpecificRecommendations(
   const userWatchHistory = await db
     .select({
       itemId: sessions.itemId,
-      item: items,
+      item: itemCardWithEmbeddingSelect,
       totalPlayDuration: sql<number>`SUM(${sessions.playDuration})`.as(
         "totalPlayDuration"
       ),
@@ -193,15 +275,8 @@ async function getUserSpecificRecommendations(
   }
 
   // Extract watched items and their IDs
-  const watchedItems = userWatchHistory.map(
-    (w: {
-      itemId: string | null;
-      item: Item;
-      totalPlayDuration: number;
-      lastWatched: Date;
-    }) => w.item
-  );
-  const watchedItemIds = watchedItems.map((item: Item) => item.id);
+  const watchedItems = userWatchHistory.map((w) => w.item);
+  const watchedItemIds = watchedItems.map((item) => item.id);
 
   // Get hidden recommendations for this user
   let hiddenItems: { itemId: string }[] = [];
@@ -239,7 +314,7 @@ async function getUserSpecificRecommendations(
   const topWatchedHistory = await db
     .select({
       itemId: sessions.itemId,
-      item: items,
+      item: itemCardWithEmbeddingSelect,
       totalPlayDuration: sql<number>`SUM(${sessions.playDuration})`.as(
         "totalPlayDuration"
       ),
@@ -291,7 +366,11 @@ async function getUserSpecificRecommendations(
   // Get candidate items similar to any of the base movies
   const candidateItems = new Map<
     string,
-    { item: Item; similarities: number[]; basedOn: Item[] }
+    {
+      item: RecommendationCardItem;
+      similarities: number[];
+      basedOn: RecommendationCardItemWithEmbedding[];
+    }
   >();
 
   for (const watchedItem of baseMovies) {
@@ -311,7 +390,7 @@ async function getUserSpecificRecommendations(
     // First, let's see the distribution of similarity scores
     const allSimilarItems = await db
       .select({
-        item: items,
+        item: itemCardSelect,
         similarity: similarity,
       })
       .from(items)
@@ -394,7 +473,7 @@ async function getUserSpecificRecommendations(
       recommendationsPerBaseMovie.get(baseMovie.id)!.push({
         item: candidate.item,
         similarity,
-        basedOn: [baseMovie],
+        basedOn: [stripEmbedding(baseMovie)],
       });
     }
   }
@@ -426,7 +505,7 @@ async function getUserSpecificRecommendations(
       similarity:
         candidate.similarities.reduce((sum, sim) => sum + sim, 0) /
         candidate.similarities.length,
-      basedOn: candidate.basedOn.slice(0, 3),
+      basedOn: candidate.basedOn.slice(0, 3).map(stripEmbedding),
     }))
     .sort((a, b) => b.similarity - a.similarity);
 
@@ -531,7 +610,7 @@ async function getPopularRecommendations(
   // Get popular items based on watch count
   const popularItemsQuery = db
     .select({
-      item: items,
+      item: itemCardSelect,
       watchCount: count(sessions.id).as("watchCount"),
     })
     .from(items)
@@ -597,6 +676,7 @@ export const getSimilarItemsForItem = async (
         eq(items.serverId, serverIdNum),
         isNotNull(items.embedding)
       ),
+      columns: itemCardWithEmbeddingColumns,
     });
 
     if (!targetItem || !targetItem.embedding) {
@@ -614,7 +694,7 @@ export const getSimilarItemsForItem = async (
 
     const similarItems = await db
       .select({
-        item: items,
+        item: itemCardSelect,
         similarity: similarity,
       })
       .from(items)
@@ -654,7 +734,9 @@ export const getSimilarItemsForItem = async (
       .map((result) => ({
         item: result.item,
         similarity: Number(result.similarity),
-        basedOn: [targetItem], // Based on the target item
+        basedOn: [
+          stripEmbedding(targetItem as RecommendationCardItemWithEmbedding),
+        ], // Based on the target item
       }));
 
     debugLog(`\n🎉 Returning ${recommendations.length} similar items`);

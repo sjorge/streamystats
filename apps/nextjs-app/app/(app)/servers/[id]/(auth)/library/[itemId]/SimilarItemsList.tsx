@@ -5,18 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { formatDuration } from "@/lib/utils";
-import { Item, Server } from "@streamystats/database/schema";
+import type { RecommendationItem } from "@/lib/db/similar-statistics";
+import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
+import { Server } from "@streamystats/database/schema";
 import { Clock, Sparkles } from "lucide-react";
 import Link from "next/link";
 
-interface RecommendationItem {
-  item: Item;
-  similarity: number;
-  basedOn: Item[];
-}
-
 interface SimilarItemsProps {
-  items: RecommendationItem[];
+  items: Array<RecommendationItem | SeriesRecommendationItem>;
   server: Server;
   currentItemType: string;
 }
@@ -101,31 +97,13 @@ export function SimilarItemsList({
                           {item.productionYear && (
                             <span>{item.productionYear}</span>
                           )}
-                          {item.runtimeTicks && (
+                          {item.runtimeTicks != null && (
                             <div className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {formatRuntime(item.runtimeTicks)}
                             </div>
                           )}
                         </div>
-
-                        {item.type === "Episode" && (
-                          <div className="text-xs text-muted-foreground">
-                            {item.seriesName && (
-                              <div className="line-clamp-1">
-                                {item.seriesName}
-                              </div>
-                            )}
-                            <div className="flex gap-2">
-                              {item.seasonName && (
-                                <span>{item.seasonName}</span>
-                              )}
-                              {item.indexNumber && (
-                                <span>Ep. {item.indexNumber}</span>
-                              )}
-                            </div>
-                          </div>
-                        )}
 
                         <div className="flex items-center justify-between">
                           <Badge variant="secondary" className="text-xs">
