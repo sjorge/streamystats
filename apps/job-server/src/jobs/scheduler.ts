@@ -302,7 +302,9 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("[scheduler] trigger=activity-sync status=no-servers");
+        console.log(
+          "[scheduler] trigger=activity-sync status=skipped-servers-busy"
+        );
         return;
       }
 
@@ -358,7 +360,9 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("[scheduler] trigger=recent-items-sync status=no-servers");
+        console.log(
+          "[scheduler] trigger=recent-items-sync status=skipped-servers-busy"
+        );
         return;
       }
 
@@ -417,7 +421,9 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("[scheduler] trigger=user-sync status=no-servers");
+        console.log(
+          "[scheduler] trigger=user-sync status=skipped-servers-busy"
+        );
         return;
       }
 
@@ -613,7 +619,9 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("[scheduler] trigger=full-sync status=no-servers");
+        console.log(
+          "[scheduler] trigger=full-sync status=skipped-servers-busy"
+        );
         return;
       }
 
@@ -816,7 +824,7 @@ class SyncScheduler {
 
       if (activeServers.length === 0) {
         console.log(
-          "[scheduler] trigger=deleted-items-cleanup status=no-servers"
+          "[scheduler] trigger=deleted-items-cleanup status=skipped-servers-busy"
         );
         return;
       }
