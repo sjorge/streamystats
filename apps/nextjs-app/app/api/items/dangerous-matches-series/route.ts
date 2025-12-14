@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/api-auth";
 import { db, items, sessions } from "@streamystats/database";
-import { eq, and, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
 interface DeletedEpisode {
   id: string;
@@ -57,12 +57,12 @@ export async function GET(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
-    const serverIdNum = parseInt(serverId);
-    if (isNaN(serverIdNum)) {
+    const serverIdNum = Number.parseInt(serverId);
+    if (Number.isNaN(serverIdNum)) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -93,8 +93,8 @@ export async function GET(request: Request) {
           eq(items.serverId, serverIdNum),
           eq(items.type, "Episode"),
           isNotNull(items.deletedAt),
-          isNotNull(items.seriesName)
-        )
+          isNotNull(items.seriesName),
+        ),
       );
 
     if (deletedEpisodes.length === 0) {
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
         {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -127,14 +127,14 @@ export async function GET(request: Request) {
           eq(sessions.serverId, serverIdNum),
           sql`${sessions.itemId} IN (${sql.join(
             deletedEpisodes.map((e) => sql`${e.id}`),
-            sql`, `
-          )})`
-        )
+            sql`, `,
+          )})`,
+        ),
       )
       .groupBy(sessions.itemId);
 
     const sessionCountMap = new Map(
-      sessionCounts.map((s) => [s.itemId, s.count])
+      sessionCounts.map((s) => [s.itemId, s.count]),
     );
 
     // Find all active episodes for matching
@@ -155,8 +155,8 @@ export async function GET(request: Request) {
           eq(items.serverId, serverIdNum),
           eq(items.type, "Episode"),
           isNull(items.deletedAt),
-          isNotNull(items.seriesName)
-        )
+          isNotNull(items.seriesName),
+        ),
       );
 
     // Build a map for quick matching: seriesName:seasonNum:episodeNum -> activeEpisode
@@ -289,7 +289,7 @@ export async function GET(request: Request) {
 
     const totalSessions = seriesGroups.reduce(
       (sum, g) => sum + g.totalSessions,
-      0
+      0,
     );
 
     return new Response(
@@ -302,18 +302,18 @@ export async function GET(request: Request) {
           totalSessions,
           totalMatched: seriesGroups.reduce(
             (sum, g) => sum + g.matchedCount,
-            0
+            0,
           ),
           totalUnmatched: seriesGroups.reduce(
             (sum, g) => sum + g.unmatchedCount,
-            0
+            0,
           ),
         },
       }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error finding dangerous series matches:", error);
@@ -326,7 +326,7 @@ export async function GET(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

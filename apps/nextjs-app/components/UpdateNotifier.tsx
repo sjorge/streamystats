@@ -82,8 +82,6 @@ export function UpdateNotifier() {
   );
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-
     const checkForUpdates = async () => {
       try {
         const response = await fetch("/api/version");
@@ -97,7 +95,7 @@ export function UpdateNotifier() {
       }
     };
 
-    intervalId = setInterval(checkForUpdates, 15 * 60 * 1000);
+    const intervalId = setInterval(checkForUpdates, 15 * 60 * 1000);
 
     setTimeout(checkForUpdates, 1000);
 

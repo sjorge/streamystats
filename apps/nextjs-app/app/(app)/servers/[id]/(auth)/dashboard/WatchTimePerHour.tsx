@@ -1,9 +1,9 @@
 "use client";
 
-import * as React from "react";
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { format, parseISO } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
+import * as React from "react";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 
 import {
   Card,
@@ -18,9 +18,9 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { formatDuration } from "@/lib/utils";
-import { utcHourToLocalHour } from "@/lib/timezone";
 import { WatchTimePerHour as IWatchTimePerHour } from "@/lib/db/users";
+import { utcHourToLocalHour } from "@/lib/timezone";
+import { formatDuration } from "@/lib/utils";
 
 const chartConfig = {
   minutes: {

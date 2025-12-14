@@ -59,7 +59,3 @@ export default function GlobalError({ error, reset }: Props) {
     </html>
   );
 }
-
-
-
-

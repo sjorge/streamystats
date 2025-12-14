@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest) {
   const currentSha = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7) || "";
   const buildTime = Number.parseInt(
     process.env.NEXT_PUBLIC_BUILD_TIME || "0",
-    10
+    10,
   );
 
   let latestVersion = currentVersion;
@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest) {
       {
         headers: { Accept: "application/vnd.github.v3+json" },
         next: { revalidate: 60 },
-      }
+      },
     );
 
     if (releaseRes.ok) {
@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest) {
         {
           headers: { Accept: "application/vnd.github.v3+json" },
           next: { revalidate: 60 },
-        }
+        },
       );
 
       if (commitRes.ok) {
@@ -66,7 +66,7 @@ export async function GET(_req: NextRequest) {
       }),
       {
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (err) {
     console.error("Error checking version:", err);
@@ -79,7 +79,7 @@ export async function GET(_req: NextRequest) {
       }),
       {
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

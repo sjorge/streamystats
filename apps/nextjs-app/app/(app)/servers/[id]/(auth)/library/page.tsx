@@ -2,17 +2,17 @@ import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
-import { ItemWatchStatsTable } from "./ItemWatchStatsTable";
-import { LibraryStatisticsCards } from "./LibraryStatisticsCards";
-import { isUserAdmin } from "@/lib/db/users";
-import { getServer } from "@/lib/db/server";
 import { getLibraries } from "@/lib/db/libraries";
 import {
   getAggregatedLibraryStatistics,
   getLibraryItemsWithStats,
 } from "@/lib/db/library-statistics";
+import { getServer } from "@/lib/db/server";
+import { isUserAdmin } from "@/lib/db/users";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { ItemWatchStatsTable } from "./ItemWatchStatsTable";
+import { LibraryStatisticsCards } from "./LibraryStatisticsCards";
 
 export default async function DashboardPage({
   params,
@@ -46,7 +46,9 @@ export default async function DashboardPage({
   }
 
   const libraries = await getLibraries({ serverId: server.id });
-  const libraryStats = await getAggregatedLibraryStatistics({ serverId: server.id });
+  const libraryStats = await getAggregatedLibraryStatistics({
+    serverId: server.id,
+  });
   const items = await getLibraryItemsWithStats({
     serverId: server.id,
     page,
@@ -54,7 +56,7 @@ export default async function DashboardPage({
     sortBy: sort_by,
     type,
     search,
-    libraryIds
+    libraryIds,
   });
 
   return (

@@ -1,7 +1,7 @@
-import { getItemDetails } from "@/lib/db/items";
 import { requireApiKey } from "@/lib/api-auth";
-import { NextRequest } from "next/server";
+import { getItemDetails } from "@/lib/db/items";
 import { getServer } from "@/lib/db/server";
+import { NextRequest } from "next/server";
 
 /**
  * API Route: GET /api/get-item-details/[itemId]?serverId=123
@@ -36,7 +36,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ itemId: string }> }
+  { params }: { params: Promise<{ itemId: string }> },
 ) {
   const { itemId } = await params;
   const { searchParams } = new URL(request.url);
@@ -54,7 +54,7 @@ export async function GET(
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -68,7 +68,7 @@ export async function GET(
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -78,7 +78,7 @@ export async function GET(
       return new Response(
         JSON.stringify({
           error: "Server not found",
-        })
+        }),
       );
     }
 
@@ -107,12 +107,12 @@ export async function GET(
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
     // Optional: Verify item belongs to the specified server for additional security
-    if (itemDetails.item.serverId !== parseInt(serverId, 10)) {
+    if (itemDetails.item.serverId !== Number.parseInt(serverId, 10)) {
       return new Response(
         JSON.stringify({
           error: "Item does not belong to the specified server",
@@ -122,7 +122,7 @@ export async function GET(
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -144,7 +144,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

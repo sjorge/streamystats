@@ -2,7 +2,7 @@ import { db, libraries } from "@streamystats/database";
 import { and, eq } from "drizzle-orm";
 
 export const getLibraries = async ({
-  serverId
+  serverId,
 }: {
   serverId: number;
 }) => {
@@ -13,7 +13,7 @@ export const getLibraries = async ({
 
 export const getLibrary = async ({
   serverId,
-  libraryId
+  libraryId,
 }: {
   serverId: number;
   libraryId: number;
@@ -21,7 +21,7 @@ export const getLibrary = async ({
   return await db.query.libraries.findFirst({
     where: and(
       eq(libraries.serverId, serverId),
-      eq(libraries.id, String(libraryId))
+      eq(libraries.id, String(libraryId)),
     ),
   });
 };

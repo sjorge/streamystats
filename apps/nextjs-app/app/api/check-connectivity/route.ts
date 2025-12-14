@@ -21,7 +21,7 @@ export async function GET() {
   try {
     const servers = await getServers();
     let hasConnectivityIssue = false;
-    let serverErrors = [];
+    const serverErrors = [];
 
     // Check each server for connectivity issues
     for (const server of servers) {
@@ -72,7 +72,7 @@ export async function GET() {
           headers: {
             "x-server-connectivity-error": "true",
           },
-        }
+        },
       );
     }
 
@@ -88,7 +88,7 @@ export async function GET() {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }

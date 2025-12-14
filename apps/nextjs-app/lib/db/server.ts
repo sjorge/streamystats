@@ -1,16 +1,16 @@
 "use server";
 
 import {
-  db,
-  servers,
-  users,
-  items,
-  sessions,
   activities,
-  libraries,
+  db,
+  items,
   jobResults,
+  libraries,
+  servers,
+  sessions,
+  users,
 } from "@streamystats/database";
-import { eq, sql, and, count, desc } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 
 import { Server } from "@streamystats/database/schema";
 
@@ -105,7 +105,7 @@ export const saveEmbeddingConfig = async ({
   } catch (error) {
     console.error(
       `Error saving embedding config for server ${serverId}:`,
-      error
+      error,
     );
     throw new Error("Failed to save embedding configuration");
   }
@@ -173,7 +173,7 @@ export const getExistingEmbeddingDimension = async ({
       .select({ embedding: items.embedding })
       .from(items)
       .where(
-        and(eq(items.serverId, serverId), sql`${items.embedding} IS NOT NULL`)
+        and(eq(items.serverId, serverId), sql`${items.embedding} IS NOT NULL`),
       )
       .limit(1);
 
@@ -187,7 +187,7 @@ export const getExistingEmbeddingDimension = async ({
   } catch (error) {
     console.error(
       `Error getting embedding dimension for server ${serverId}:`,
-      error
+      error,
     );
     return null;
   }
@@ -206,8 +206,8 @@ export const getEmbeddingProgress = async ({
       .where(
         and(
           eq(items.serverId, serverId),
-          sql`${items.type} IN ('Movie', 'Series')`
-        )
+          sql`${items.type} IN ('Movie', 'Series')`,
+        ),
       );
 
     const total = totalResult[0]?.count || 0;
@@ -220,8 +220,8 @@ export const getEmbeddingProgress = async ({
         and(
           eq(items.serverId, serverId),
           eq(items.processed, true),
-          sql`${items.type} IN ('Movie', 'Series')`
-        )
+          sql`${items.type} IN ('Movie', 'Series')`,
+        ),
       );
 
     const processed = processedResult[0]?.count || 0;
@@ -233,8 +233,8 @@ export const getEmbeddingProgress = async ({
       .where(
         and(
           eq(jobResults.jobName, "generate-item-embeddings"),
-          sql`${jobResults.result}->>'serverId' = ${serverId.toString()}`
-        )
+          sql`${jobResults.result}->>'serverId' = ${serverId.toString()}`,
+        ),
       )
       .orderBy(desc(jobResults.createdAt))
       .limit(1);
@@ -256,7 +256,7 @@ export const getEmbeddingProgress = async ({
 
         if (isStale || isHeartbeatStale) {
           console.warn(
-            `Detected stale embedding job for server ${serverId}, marking as failed`
+            `Detected stale embedding job for server ${serverId}, marking as failed`,
           );
 
           // Mark the stale job as failed
@@ -300,7 +300,7 @@ export const getEmbeddingProgress = async ({
   } catch (error) {
     console.error(
       `Error getting embedding progress for server ${serverId}:`,
-      error
+      error,
     );
     throw new Error("Failed to get embedding progress");
   }
@@ -317,8 +317,8 @@ export const cleanupStaleEmbeddingJobs = async (): Promise<number> => {
         and(
           eq(jobResults.jobName, "generate-item-embeddings"),
           eq(jobResults.status, "processing"),
-          sql`${jobResults.createdAt} < NOW() - INTERVAL '10 minutes'`
-        )
+          sql`${jobResults.createdAt} < NOW() - INTERVAL '10 minutes'`,
+        ),
       );
 
     let cleanedCount = 0;
@@ -339,7 +339,7 @@ export const cleanupStaleEmbeddingJobs = async (): Promise<number> => {
           if (heartbeatAge > 2 * 60 * 1000) {
             const processingTime = Math.min(
               Date.now() - new Date(staleJob.createdAt).getTime(),
-              3600000
+              3600000,
             );
 
             await db
@@ -359,7 +359,7 @@ export const cleanupStaleEmbeddingJobs = async (): Promise<number> => {
 
             cleanedCount++;
             console.log(
-              `Cleaned up stale embedding job for server ${serverId}`
+              `Cleaned up stale embedding job for server ${serverId}`,
             );
           }
         }
@@ -394,7 +394,7 @@ export const startEmbedding = async ({ serverId }: { serverId: number }) => {
 
     if (!server.embeddingBaseUrl || !server.embeddingModel) {
       throw new Error(
-        "Embedding configuration incomplete. Please configure the base URL and model"
+        "Embedding configuration incomplete. Please configure the base URL and model",
       );
     }
 
@@ -412,9 +412,7 @@ export const startEmbedding = async ({ serverId }: { serverId: number }) => {
 
     if (existingDimension && existingDimension !== configuredDimension) {
       throw new Error(
-        `Dimension mismatch: existing embeddings have ${existingDimension} dimensions, ` +
-          `but configured dimension is ${configuredDimension}. ` +
-          `Please clear existing embeddings before changing dimensions.`
+        `Dimension mismatch: existing embeddings have ${existingDimension} dimensions, but configured dimension is ${configuredDimension}. Please clear existing embeddings before changing dimensions.`,
       );
     }
 
@@ -450,7 +448,7 @@ export const startEmbedding = async ({ serverId }: { serverId: number }) => {
     throw new Error(
       error instanceof Error
         ? error.message
-        : "Failed to start embedding process"
+        : "Failed to start embedding process",
     );
   }
 };
@@ -489,7 +487,7 @@ export const stopEmbedding = async ({ serverId }: { serverId: number }) => {
     throw new Error(
       error instanceof Error
         ? error.message
-        : "Failed to stop embedding process"
+        : "Failed to stop embedding process",
     );
   }
 };
@@ -509,7 +507,7 @@ export const toggleAutoEmbeddings = async ({
   } catch (error) {
     console.error(
       `Error toggling auto embeddings for server ${serverId}:`,
-      error
+      error,
     );
     throw new Error("Failed to update auto-embedding setting");
   }
@@ -611,7 +609,7 @@ export const updateServerConnection = async ({
           },
           body: JSON.stringify({ Username: username, Pw: password }),
           signal: AbortSignal.timeout(5000),
-        }
+        },
       );
 
       if (!authResponse.ok) {
@@ -627,24 +625,24 @@ export const updateServerConnection = async ({
       const authData = await authResponse.json();
 
       // Validate authentication response structure
-      if (!authData || !authData["AccessToken"]) {
+      if (!authData || !authData.AccessToken) {
         return {
           success: false,
           message: "Invalid authentication response from server",
         };
       }
 
-      const accessToken = authData["AccessToken"];
-      const user = authData["User"];
+      const accessToken = authData.AccessToken;
+      const user = authData.User;
 
-      if (!user || !user["Id"]) {
+      if (!user || !user.Id) {
         return {
           success: false,
           message: "Invalid user data in authentication response",
         };
       }
 
-      const policy = user["Policy"];
+      const policy = user.Policy;
       if (!policy) {
         return {
           success: false,
@@ -653,7 +651,7 @@ export const updateServerConnection = async ({
         };
       }
 
-      const isAdmin = policy["IsAdministrator"] === true;
+      const isAdmin = policy.IsAdministrator === true;
 
       // Verify user is an administrator
       if (!isAdmin) {
@@ -813,7 +811,7 @@ export const testChatConnection = async ({
             messages: [{ role: "user", content: "Hi" }],
           }),
           signal: AbortSignal.timeout(10000),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -829,7 +827,7 @@ export const testChatConnection = async ({
         {
           method: "GET",
           signal: AbortSignal.timeout(5000),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -842,7 +840,7 @@ export const testChatConnection = async ({
         return {
           success: false,
           message: `Model "${config.model}" not found. Available: ${models.join(
-            ", "
+            ", ",
           )}`,
         };
       }

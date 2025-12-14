@@ -19,7 +19,10 @@ const TotalWatchTime: React.FC<Props> = async ({ server }) => {
     redirect("/not-found");
   }
 
-  const d1 = await getTotalWatchTime({ serverId: server.id, userId: sas ? undefined : me.id });
+  const d1 = await getTotalWatchTime({
+    serverId: server.id,
+    userId: sas ? undefined : me.id,
+  });
 
   return (
     <Card className="flex-1">

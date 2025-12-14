@@ -1,8 +1,8 @@
 "use server";
 
-import { NextRequest } from "next/server";
 import { Server } from "@streamystats/database";
-import { getSession, SessionUser } from "./session";
+import { NextRequest } from "next/server";
+import { SessionUser, getSession } from "./session";
 
 /**
  * Validates API key from Authorization header against the actual Jellyfin server
@@ -51,14 +51,14 @@ export async function validateApiKey({
       // If we get 401, the API key is invalid
       if (response.status === 401) {
         console.warn(
-          `Invalid API key for server ${server.name} (${server.url})`
+          `Invalid API key for server ${server.name} (${server.url})`,
         );
         return false;
       }
 
       // For other errors (500s, etc.), we consider it a server issue but invalid auth
       console.error(
-        `Jellyfin server error during API key validation: ${response.status} ${response.statusText}`
+        `Jellyfin server error during API key validation: ${response.status} ${response.statusText}`,
       );
       return false;
     } catch (fetchError) {
@@ -71,12 +71,12 @@ export async function validateApiKey({
           fetchError.message.includes("ENOTFOUND")
         ) {
           console.error(
-            `Cannot connect to Jellyfin server ${server.name} (${server.url})`
+            `Cannot connect to Jellyfin server ${server.name} (${server.url})`,
           );
         } else {
           console.error(
             `Network error validating API key for server ${server.name}:`,
-            fetchError.message
+            fetchError.message,
           );
         }
       }
@@ -113,7 +113,7 @@ export async function requireApiKey({
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 
@@ -148,7 +148,7 @@ export async function requireSession(): Promise<
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       ),
       session: null,
     };
@@ -189,7 +189,7 @@ export async function requireAdmin(): Promise<
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       ),
       session: null,
     };

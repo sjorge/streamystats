@@ -1,8 +1,8 @@
+import { requireSession } from "@/lib/api-auth";
 import { ActiveSession } from "@/lib/db/active-sessions";
 import { getServer } from "@/lib/db/server";
 import { db, items, users } from "@streamystats/database";
 import { eq } from "drizzle-orm";
-import { requireSession } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   if (session.serverId !== Number(serverId)) {
     return new Response(
       JSON.stringify({ error: "Access denied to this server's sessions" }),
-      { status: 403, headers: { "Content-Type": "application/json" } }
+      { status: 403, headers: { "Content-Type": "application/json" } },
     );
   }
 
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
             "Content-Type": "application/json",
             "x-server-connectivity-error": status >= 500 ? "true" : "false",
           },
-        }
+        },
       );
     }
 
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     if (!Array.isArray(jellyfinSessions)) {
       console.error(
         "Unexpected response format from Jellyfin:",
-        jellyfinSessions
+        jellyfinSessions,
       );
       return new Response(JSON.stringify([]), {
         status: 200,
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
     }
 
     const activeSessions = await Promise.all(
-      jellyfinSessions.map(mapJellyfinSessionToActiveSession)
+      jellyfinSessions.map(mapJellyfinSessionToActiveSession),
     );
 
     return new Response(JSON.stringify(activeSessions), {
@@ -127,7 +127,7 @@ export async function GET(request: Request) {
           "Content-Type": "application/json",
           "x-server-connectivity-error": "true",
         },
-      }
+      },
     );
   }
 }
@@ -136,7 +136,7 @@ export async function GET(request: Request) {
  * Maps a JellyfinSession to an ActiveSession
  */
 async function mapJellyfinSessionToActiveSession(
-  session: JellyfinSession
+  session: JellyfinSession,
 ): Promise<ActiveSession | null> {
   // Skip sessions without NowPlayingItem
   if (!session.NowPlayingItem) {

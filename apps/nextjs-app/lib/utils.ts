@@ -13,13 +13,15 @@ interface SyncTask {
  * when unset or set to "/" we default to "" (empty)
  */
 const normalizeBasePath = (path: string): string => {
-    // Trim trailing slashes
-    const trimmedPath = path.replace(/\/+$/, "");
+  // Trim trailing slashes
+  const trimmedPath = path.replace(/\/+$/, "");
 
-    // Ensure a single leading slash
-    return trimmedPath === "" ? "" : `/${trimmedPath.replace(/^\/+/, "")}`;
+  // Ensure a single leading slash
+  return trimmedPath === "" ? "" : `/${trimmedPath.replace(/^\/+/, "")}`;
 };
-export const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH || "");
+export const basePath = normalizeBasePath(
+  process.env.NEXT_PUBLIC_BASE_PATH || ""
+);
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -120,9 +122,13 @@ export const formatDate = (s: string): string => {
 };
 
 const globalFetch = global.fetch;
-export const fetch = async (url: string | Request, options?: RequestInit): Promise<Response> => {
-  if (typeof url === 'string' && url.startsWith('/')) {
-    url = `${basePath}${url}`;
+export const fetch = async (
+  url: string | Request,
+  options?: RequestInit
+): Promise<Response> => {
+  if (typeof url === "string" && url.startsWith("/")) {
+    const finalUrl = `${basePath}${url}`;
+    return globalFetch(finalUrl, options);
   }
 
   return globalFetch(url, options);

@@ -28,7 +28,7 @@ export function UserLeaderboardFilter({
     setHiddenUsers((current) =>
       current.includes(userId)
         ? current.filter((id) => id !== userId)
-        : [...current, userId]
+        : [...current, userId],
     );
   };
 

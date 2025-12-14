@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  CustomBarLabel,
+  CustomValueLabel,
+} from "@/components/ui/CustomBarLabel";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -16,6 +20,7 @@ import {
 } from "@/components/ui/chart";
 import { NumericStat } from "@/lib/db/transcoding-statistics";
 import { InfoIcon } from "lucide-react";
+import React from "react";
 import {
   Bar,
   BarChart,
@@ -24,11 +29,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  CustomBarLabel,
-  CustomValueLabel,
-} from "@/components/ui/CustomBarLabel";
-import React from "react";
 
 interface Props {
   width: NumericStat;
@@ -50,7 +50,7 @@ function categorizeResolution(width: number, height: number): string {
 // Helper function to process raw distribution data into ranges
 function processResolutionDistribution(
   widthDist: number[],
-  heightDist: number[]
+  heightDist: number[],
 ) {
   const ranges: { [key: string]: number } = {};
 
@@ -79,7 +79,7 @@ export const ResolutionStatisticsCard = ({ width, height }: Props) => {
     const maxHeightPerBar = 40;
     return Math.min(
       Math.max(minHeightPerBar, 200 / dataLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 
@@ -91,7 +91,7 @@ export const ResolutionStatisticsCard = ({ width, height }: Props) => {
 
     return processResolutionDistribution(
       width.distribution,
-      height.distribution
+      height.distribution,
     ).filter((d) => d.count > 0);
   }, [width.distribution, height.distribution]);
 

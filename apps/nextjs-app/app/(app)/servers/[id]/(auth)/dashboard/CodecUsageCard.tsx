@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import {
   Card,
   CardContent,
@@ -14,18 +15,17 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { CategoryStat } from "@/lib/db/transcoding-statistics";
+import { FileDigit } from "lucide-react";
+import React from "react";
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
   LabelList,
+  XAxis,
+  YAxis,
 } from "recharts";
-import { FileDigit } from "lucide-react";
-import { CategoryStat } from "@/lib/db/transcoding-statistics";
-import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
-import React from "react";
 
 export const CodecUsageCard = ({
   videoCodecs,
@@ -62,7 +62,7 @@ export const CodecUsageCard = ({
     const maxHeightPerBar = 40;
     return Math.min(
       Math.max(minHeightPerBar, 200 / dataLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 
@@ -71,11 +71,11 @@ export const CodecUsageCard = ({
   const total = codecData.reduce((sum, item) => sum + item.count, 0);
   const totalVideoCodec = videoCodecs.reduce(
     (sum, item) => sum + item.count,
-    0
+    0,
   );
   const totalAudioCodec = audioCodecs.reduce(
     (sum, item) => sum + item.count,
-    0
+    0,
   );
   const codecDataWithPercent = codecData.map((item) => ({
     ...item,

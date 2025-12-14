@@ -19,7 +19,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ serverId }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

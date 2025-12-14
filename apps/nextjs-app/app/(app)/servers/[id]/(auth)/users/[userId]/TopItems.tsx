@@ -3,12 +3,11 @@
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Item } from "@/lib/types";
+import type { Item, Server } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
-import { Play, Clock, Film, Tv } from "lucide-react";
-import Link from "next/link";
-import { Server } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Clock, Film, Play, Tv } from "lucide-react";
+import Link from "next/link";
 
 export interface ItemWithStats extends Item {
   totalPlayCount: number;
@@ -36,7 +35,7 @@ export function TopItemsList({
     <Card
       className={cn(
         "w-full bg-background/40 backdrop-blur-md border-white/10 shadow-xl overflow-hidden",
-        className
+        className,
       )}
     >
       <CardHeader className="pb-3 border-b border-white/5">
@@ -86,7 +85,7 @@ function ItemsList({
               className="block overflow-hidden rounded-md shadow-sm transition-transform group-hover:scale-105"
             >
               <Poster
-                item={item as any}
+                item={item}
                 server={server}
                 width={60}
                 height={90}

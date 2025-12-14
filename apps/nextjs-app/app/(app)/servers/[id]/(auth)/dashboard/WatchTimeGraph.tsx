@@ -34,9 +34,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQueryParams } from "@/hooks/useQueryParams";
+import { WatchTimePerType } from "@/lib/db/statistics";
 import { cn, formatDuration } from "@/lib/utils";
 import { Suspense, useTransition } from "react";
-import { WatchTimePerType } from "@/lib/db/statistics";
 
 const chartConfig = {
   Episode: {
@@ -93,10 +93,12 @@ function WatchTimeChartView({
     > = {};
 
     // Process the new data structure
-    Object.entries(data).forEach(([key, value]) => {
+    for (const [key, value] of Object.entries(data)) {
       // Parse the composite key: "2024-01-15-movie"
       const lastDashIndex = key.lastIndexOf("-");
-      if (lastDashIndex === -1) return;
+      if (lastDashIndex === -1) {
+        continue;
+      }
 
       const date = key.substring(0, lastDashIndex);
       const type = key.substring(lastDashIndex + 1);
@@ -118,7 +120,7 @@ function WatchTimeChartView({
       } else if (type === "other") {
         dataByDate[date].Other = watchTimeMinutes;
       }
-    });
+    }
 
     // Create array with all dates in range
     const result = [];
@@ -172,7 +174,7 @@ function WatchTimeChartView({
               <div
                 className="w-2 h-2 rounded-[2px] mr-2"
                 style={{ backgroundColor: item.color }}
-              ></div>
+              />
               <p className="">{name}</p>
               <p className="ml-auto">
                 {formatDuration(Number(value), "minutes")}
@@ -362,7 +364,7 @@ export function WatchTimeGraph({ data, onLoadingChange }: Props) {
       if (param) {
         try {
           const parsedDate = new Date(param);
-          if (!isNaN(parsedDate.getTime())) {
+          if (!Number.isNaN(parsedDate.getTime())) {
             setter(parsedDate);
           }
         } catch (error) {
@@ -458,7 +460,7 @@ export function WatchTimeGraph({ data, onLoadingChange }: Props) {
               <div
                 className="w-2 h-2 rounded-[2px] mr-2"
                 style={{ backgroundColor: config.color }}
-              ></div>
+              />
               <p className="text-xs">{config.label}</p>
             </div>
           ))}

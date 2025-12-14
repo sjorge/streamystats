@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,6 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -17,25 +24,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import type { Server } from "@/lib/types";
+import { fetch } from "@/lib/utils";
 import {
   AlertTriangle,
-  Loader,
   CheckCircle,
   ChevronDown,
   ChevronRight,
-  Tv,
+  Loader,
   Trash2,
+  Tv,
 } from "lucide-react";
-import { fetch } from "@/lib/utils";
-import type { Server } from "@/lib/types";
+import { useCallback, useState } from "react";
 
 interface DangerousSeriesMergeManagerProps {
   server: Server;
@@ -199,9 +199,13 @@ export function DangerousSeriesMergeManager({
     setSelectedEpisodes((prev) => {
       const next = new Set(prev);
       if (allSelected) {
-        matchedEpisodeIds.forEach((id) => next.delete(id));
+        for (const id of matchedEpisodeIds) {
+          next.delete(id);
+        }
       } else {
-        matchedEpisodeIds.forEach((id) => next.add(id));
+        for (const id of matchedEpisodeIds) {
+          next.add(id);
+        }
       }
       return next;
     });
@@ -412,7 +416,9 @@ export function DangerousSeriesMergeManager({
                       <div className="border rounded-lg">
                         <CollapsibleTrigger className="w-full">
                           <div className="flex items-center gap-3 p-3 hover:bg-muted/50">
-                            <div
+                            <button
+                              type="button"
+                              className="w-full text-left"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleAllInSeries(group);
@@ -427,7 +433,7 @@ export function DangerousSeriesMergeManager({
                                 }
                                 disabled={matchedEpisodes.length === 0}
                               />
-                            </div>
+                            </button>
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4" />
                             ) : (
@@ -469,7 +475,7 @@ export function DangerousSeriesMergeManager({
                             <table className="w-full text-sm">
                               <thead>
                                 <tr className="border-b bg-muted/30">
-                                  <th className="w-10 p-2"></th>
+                                  <th className="w-10 p-2" />
                                   <th className="text-left p-2">Episode</th>
                                   <th className="text-left p-2">
                                     Deleted Episode

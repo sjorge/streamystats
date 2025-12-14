@@ -14,9 +14,9 @@ import { usePersistantState } from "@/hooks/usePersistantState";
 import { formatDuration } from "@/lib/utils";
 import { Item, Server } from "@streamystats/database/schema";
 import { Settings } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Poster } from "./Poster";
-import Link from "next/link";
 
 interface ItemWithStats extends Item {
   totalPlayCount: number;
@@ -63,13 +63,13 @@ export const MostWatchedItems: React.FC<Props> = ({ data, server }) => {
     visibleColumnCount === 1
       ? "md:grid-cols-1"
       : visibleColumnCount === 2
-      ? "md:grid-cols-2"
-      : "md:grid-cols-3";
+        ? "md:grid-cols-2"
+        : "md:grid-cols-3";
 
   const renderItems = (
     items: ItemWithStats[],
     type: "Movie" | "Episode" | "Series",
-    title: string
+    title: string,
   ) => (
     <div>
       <h2 className="text-xl font-bold mb-4">Most Watched {title}</h2>

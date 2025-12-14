@@ -1,13 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { db } from "@streamystats/database";
 import {
-  sessions,
   type NewSession,
   items,
+  sessions,
   users,
 } from "@streamystats/database/schema";
-import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 
 // Types for import state
@@ -34,7 +34,7 @@ interface PlaybackReportingData {
 
 export async function importFromPlaybackReporting(
   prevState: ImportState,
-  formData: FormData
+  formData: FormData,
 ): Promise<ImportState> {
   console.info("Starting Playback Reporting import process");
 
@@ -44,7 +44,7 @@ export async function importFromPlaybackReporting(
     error?: string;
   } {
     console.info(
-      `Validating playback reporting data with ${data.length} records`
+      `Validating playback reporting data with ${data.length} records`,
     );
 
     if (!Array.isArray(data)) {
@@ -67,8 +67,8 @@ export async function importFromPlaybackReporting(
 
     console.info(
       `Validating sample of ${sampleSize} records for required fields: ${requiredFields.join(
-        ", "
-      )}`
+        ", ",
+      )}`,
     );
 
     for (let i = 0; i < sampleSize; i++) {
@@ -95,7 +95,7 @@ export async function importFromPlaybackReporting(
       }
 
       // Validate timestamp
-      if (session.timestamp && isNaN(Date.parse(session.timestamp))) {
+      if (session.timestamp && Number.isNaN(Date.parse(session.timestamp))) {
         const error = `Invalid timestamp format at index ${i}: ${session.timestamp}`;
         console.error(`Validation failed: ${error}`, { session });
         return {
@@ -109,7 +109,7 @@ export async function importFromPlaybackReporting(
         session.durationSeconds !== undefined &&
         session.durationSeconds !== null &&
         (typeof session.durationSeconds !== "number" ||
-          isNaN(session.durationSeconds))
+          Number.isNaN(session.durationSeconds))
       ) {
         const error = `Invalid duration format at index ${i}: ${session.durationSeconds}`;
         console.error(`Validation failed: ${error}`, { session });
@@ -148,7 +148,7 @@ export async function importFromPlaybackReporting(
     }
 
     const serverIdNum = Number(serverId);
-    if (isNaN(serverIdNum)) {
+    if (Number.isNaN(serverIdNum)) {
       const error = "Invalid server ID";
       console.error(`Import failed: ${error}`, { serverId });
       return {
@@ -209,7 +209,7 @@ export async function importFromPlaybackReporting(
 
     // Process import
     console.info(
-      `Starting import of ${data.length} sessions for server ${serverIdNum}`
+      `Starting import of ${data.length} sessions for server ${serverIdNum}`,
     );
     let importedCount = 0;
     const totalCount = data.length;
@@ -220,13 +220,13 @@ export async function importFromPlaybackReporting(
       try {
         const imported = await importPlaybackReportingSession(
           playbackData,
-          serverIdNum
+          serverIdNum,
         );
         if (imported) {
           importedCount++;
           if (importedCount % 100 === 0) {
             console.info(
-              `Import progress: ${importedCount}/${totalCount} sessions imported`
+              `Import progress: ${importedCount}/${totalCount} sessions imported`,
             );
           }
         } else {
@@ -293,7 +293,7 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
       skippedLines++;
       console.warn(
         `Skipping line ${i + 1}: insufficient columns (${columns.length}/9)`,
-        { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") }
+        { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
       );
       continue;
     }
@@ -311,12 +311,12 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
         durationSecondsStr,
       ] = columns;
 
-      const durationSeconds = parseInt(durationSecondsStr, 10);
-      if (isNaN(durationSeconds)) {
+      const durationSeconds = Number.parseInt(durationSecondsStr, 10);
+      if (Number.isNaN(durationSeconds)) {
         skippedLines++;
         console.warn(
           `Skipping line ${i + 1}: invalid duration "${durationSecondsStr}"`,
-          { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") }
+          { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
         );
         continue;
       }
@@ -330,7 +330,9 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
         playMethod: playMethod.trim() || undefined,
         clientName: clientName.trim() || undefined,
         deviceName: deviceName.trim() || undefined,
-        durationSeconds: isNaN(durationSeconds) ? undefined : durationSeconds,
+        durationSeconds: Number.isNaN(durationSeconds)
+          ? undefined
+          : durationSeconds,
       });
     } catch (error) {
       skippedLines++;
@@ -338,12 +340,11 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
         error: error instanceof Error ? error.message : "Unknown error",
         line: line.substring(0, 100) + (line.length > 100 ? "..." : ""),
       });
-      continue;
     }
   }
 
   console.info(
-    `TSV parsing completed: ${data.length} valid records, ${skippedLines} skipped lines`
+    `TSV parsing completed: ${data.length} valid records, ${skippedLines} skipped lines`,
   );
   return data;
 }
@@ -361,7 +362,7 @@ function parsePlaybackReportingJson(jsonData: any): PlaybackReportingData[] {
       try {
         const durationValue =
           item.durationSeconds || item.duration_seconds || item.Duration || "0";
-        const parsedDuration = parseInt(durationValue, 10);
+        const parsedDuration = Number.parseInt(durationValue, 10);
 
         return {
           timestamp: item.timestamp || item.date || item.time,
@@ -375,7 +376,9 @@ function parsePlaybackReportingJson(jsonData: any): PlaybackReportingData[] {
             item.clientName || item.client_name || item.Client || undefined,
           deviceName:
             item.deviceName || item.device_name || item.Device || undefined,
-          durationSeconds: isNaN(parsedDuration) ? undefined : parsedDuration,
+          durationSeconds: Number.isNaN(parsedDuration)
+            ? undefined
+            : parsedDuration,
         };
       } catch (error) {
         console.error(`Error parsing JSON item at index ${index}:`, {
@@ -401,7 +404,7 @@ function parsePlaybackReportingJson(jsonData: any): PlaybackReportingData[] {
 
 async function importPlaybackReportingSession(
   playbackData: PlaybackReportingData,
-  serverId: number
+  serverId: number,
 ): Promise<boolean> {
   // Only validate timestamp as required - allow missing users or items
   if (!playbackData.timestamp) {
@@ -413,13 +416,13 @@ async function importPlaybackReportingSession(
   let sessionTime: Date;
   try {
     sessionTime = new Date(playbackData.timestamp);
-    if (isNaN(sessionTime.getTime())) {
+    if (Number.isNaN(sessionTime.getTime())) {
       throw new Error("Invalid date");
     }
   } catch (error) {
     console.warn(
       `Skipping session: invalid timestamp "${playbackData.timestamp}"`,
-      { playbackData, error }
+      { playbackData, error },
     );
     return false;
   }
@@ -442,7 +445,7 @@ async function importPlaybackReportingSession(
 
         if (existingItem.length === 0) {
           missingReferences.push(
-            `itemId '${playbackData.itemId}' not found in items table - setting to null`
+            `itemId '${playbackData.itemId}' not found in items table - setting to null`,
           );
           finalItemId = null; // Set to null instead of failing
           console.warn("Item reference not found, setting to null:", {
@@ -459,7 +462,7 @@ async function importPlaybackReportingSession(
         missingReferences.push(
           `Failed to verify itemId '${playbackData.itemId}', setting to null: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`
+          }`,
         );
         finalItemId = null; // Set to null on error
       }
@@ -476,7 +479,7 @@ async function importPlaybackReportingSession(
 
         if (existingUser.length === 0) {
           missingReferences.push(
-            `userId '${playbackData.userId}' not found in users table - setting to null`
+            `userId '${playbackData.userId}' not found in users table - setting to null`,
           );
           finalUserId = null; // Set to null instead of failing
           console.warn("User reference not found, setting to null:", {
@@ -498,7 +501,7 @@ async function importPlaybackReportingSession(
         missingReferences.push(
           `Failed to verify userId '${playbackData.userId}', setting to null: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`
+          }`,
         );
         finalUserId = null; // Set to null on error
       }
@@ -519,7 +522,7 @@ async function importPlaybackReportingSession(
 
     // Calculate end time based on duration
     const endTime = new Date(
-      sessionTime.getTime() + (playbackData.durationSeconds || 0) * 1000
+      sessionTime.getTime() + (playbackData.durationSeconds || 0) * 1000,
     );
 
     // Determine if transcoding based on play method
@@ -533,14 +536,14 @@ async function importPlaybackReportingSession(
       if (videoCodecIdx !== -1) {
         videoCodec = playMethod.substring(
           videoCodecIdx + 2, // Skip "v:"
-          playMethod.indexOf(" ", videoCodecIdx)
+          playMethod.indexOf(" ", videoCodecIdx),
         );
       }
       const audioCodecIdx = playMethod.indexOf("a:");
       if (audioCodecIdx !== -1) {
         audioCodec = playMethod.substring(
           audioCodecIdx + 2, // Skip "a:"
-          playMethod.indexOf(")", audioCodecIdx)
+          playMethod.indexOf(")", audioCodecIdx),
         );
       }
     }

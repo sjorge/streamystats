@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,14 +7,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatDuration } from "@/lib/utils";
 import { Item, Server } from "@streamystats/database/schema";
 import {
-  Star,
-  Clock,
+  ArrowLeft,
   Calendar,
+  Clock,
   ExternalLink,
+  Star,
   Trash2,
   Tv,
-  ArrowLeft,
 } from "lucide-react";
+import Link from "next/link";
 import type { ItemDetailsResponse } from "./types";
 
 interface ItemHeaderProps {
@@ -174,7 +174,8 @@ export function ItemHeader({
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
               <span>{item.type}</span>
               <span>
-                {statistics.totalViews} view{statistics.totalViews === 1 ? "" : "s"}
+                {statistics.totalViews} view
+                {statistics.totalViews === 1 ? "" : "s"}
               </span>
               <span>{formatDuration(statistics.totalWatchTime)} watched</span>
             </div>

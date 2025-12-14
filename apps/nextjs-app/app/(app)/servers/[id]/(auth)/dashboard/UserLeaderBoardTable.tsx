@@ -31,7 +31,7 @@ export const UserLeaderboardTable = ({
 }: Props) => {
   const [hiddenUsers, setHiddenUsers, loading] = usePersistantState<string[]>(
     "hiddenUsers",
-    []
+    [],
   );
 
   const sortedUsers = useMemo(() => {

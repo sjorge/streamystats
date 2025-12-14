@@ -1,8 +1,8 @@
 "use server";
 
 import { deleteServer as deleteServerFromDb } from "@/lib/db/server";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 /**
  * Server action to delete a server
@@ -22,12 +22,11 @@ export async function deleteServerAction(serverId: number) {
         success: true,
         message: result.message,
       };
-    } else {
-      return {
-        success: false,
-        message: result.message,
-      };
     }
+    return {
+      success: false,
+      message: result.message,
+    };
   } catch (error) {
     console.error("Server action - Error deleting server:", error);
     return {

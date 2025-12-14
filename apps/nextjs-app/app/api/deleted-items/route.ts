@@ -1,8 +1,8 @@
 import { requireApiKey } from "@/lib/api-auth";
-import { NextRequest } from "next/server";
 import { getServer } from "@/lib/db/server";
-import { db, items, servers, Server } from "@streamystats/database";
-import { and, eq, gte, isNotNull, desc, ilike, count } from "drizzle-orm";
+import { Server, db, items, servers } from "@streamystats/database";
+import { and, count, desc, eq, gte, ilike, isNotNull } from "drizzle-orm";
+import { NextRequest } from "next/server";
 
 /**
  * API Route: GET /api/deleted-items?serverId=123 OR ?serverName=MyServer
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         {
           status: 404,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -101,10 +101,10 @@ export async function GET(request: NextRequest) {
 
     // Parse pagination params
     const limit = Math.min(
-      Math.max(parseInt(limitParam || "100", 10), 1),
-      1000
+      Math.max(Number.parseInt(limitParam || "100", 10), 1),
+      1000,
     );
-    const offset = Math.max(parseInt(offsetParam || "0", 10), 0);
+    const offset = Math.max(Number.parseInt(offsetParam || "0", 10), 0);
 
     // Build query conditions
     const conditions = [
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     // Add optional filters
     if (since) {
       const sinceDate = new Date(since);
-      if (isNaN(sinceDate.getTime())) {
+      if (Number.isNaN(sinceDate.getTime())) {
         return new Response(
           JSON.stringify({
             error:
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
-          }
+          },
         );
       }
       conditions.push(gte(items.deletedAt, sinceDate));
@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error fetching deleted items:", error);
@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

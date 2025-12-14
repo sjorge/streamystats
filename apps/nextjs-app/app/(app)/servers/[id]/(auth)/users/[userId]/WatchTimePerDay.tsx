@@ -21,9 +21,9 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { WatchTimePerWeekDay } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { useMemo } from "react";
-import { WatchTimePerWeekDay } from "@/lib/db/users";
 
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 

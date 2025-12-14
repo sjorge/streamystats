@@ -9,7 +9,12 @@ interface ChatDialogWrapperProps {
   serverUrl?: string;
 }
 
-export function ChatDialogWrapper({ chatConfigured, me, serverUrl }: ChatDialogWrapperProps) {
-  return <ChatDialog chatConfigured={chatConfigured} me={me} serverUrl={serverUrl} />;
+export function ChatDialogWrapper({
+  chatConfigured,
+  me,
+  serverUrl,
+}: ChatDialogWrapperProps) {
+  return (
+    <ChatDialog chatConfigured={chatConfigured} me={me} serverUrl={serverUrl} />
+  );
 }
-

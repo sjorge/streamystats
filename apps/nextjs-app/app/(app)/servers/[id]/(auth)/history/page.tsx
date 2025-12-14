@@ -1,9 +1,9 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
+import { HistoryResponse, getHistory } from "@/lib/db/history";
+import { getServer } from "@/lib/db/server";
 import { redirect } from "next/navigation";
 import { HistoryTable } from "./HistoryTable";
-import { getServer } from "@/lib/db/server";
-import { getHistory, HistoryResponse } from "@/lib/db/history";
 
 export default async function HistoryPage({
   params,
@@ -27,11 +27,11 @@ export default async function HistoryPage({
 
   const data = await getHistory(
     server.id,
-    parseInt(page || "1", 10),
+    Number.parseInt(page || "1", 10),
     50,
     search,
     sort_by,
-    sort_order
+    sort_order,
   );
 
   // Convert the data to match HistoryTable expectations

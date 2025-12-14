@@ -1,30 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
-import {
-  saveEmbeddingConfig,
-  clearEmbeddings,
-  getEmbeddingProgress,
-  EmbeddingProgress,
-  startEmbedding,
-  stopEmbedding,
-  toggleAutoEmbeddings,
-  EmbeddingProvider,
-} from "@/lib/db/server";
-import { useQuery } from "@tanstack/react-query";
-import { Separator } from "@/components/ui/separator";
-import type { Server } from "@/lib/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,8 +11,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader, Play, Square } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -44,7 +29,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import {
+  EmbeddingProgress,
+  EmbeddingProvider,
+  clearEmbeddings,
+  getEmbeddingProgress,
+  saveEmbeddingConfig,
+  startEmbedding,
+  stopEmbedding,
+  toggleAutoEmbeddings,
+} from "@/lib/db/server";
+import type { Server } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { Loader, Play, Square } from "lucide-react";
+import { useState } from "react";
 
 // Presets for common embedding providers
 const PROVIDER_PRESETS = {
@@ -130,22 +130,22 @@ function detectPreset(server: Server): PresetKey {
 export function EmbeddingsManager({ server }: { server: Server }) {
   // Preset selection
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>(
-    detectPreset(server)
+    detectPreset(server),
   );
 
   // Embedding config state
   const [baseUrl, setBaseUrl] = useState(
-    server.embeddingBaseUrl || PROVIDER_PRESETS.openai.baseUrl
+    server.embeddingBaseUrl || PROVIDER_PRESETS.openai.baseUrl,
   );
   const [apiKey, setApiKey] = useState(server.embeddingApiKey || "");
   const [model, setModel] = useState(
-    server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel
+    server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel,
   );
   const [dimensions, setDimensions] = useState(
-    server.embeddingDimensions || 1536
+    server.embeddingDimensions || 1536,
   );
   const [provider, setProvider] = useState<EmbeddingProvider>(
-    (server.embeddingProvider as EmbeddingProvider) || "openai-compatible"
+    (server.embeddingProvider as EmbeddingProvider) || "openai-compatible",
   );
 
   // UI state
@@ -155,7 +155,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   const [isClearing, setIsClearing] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [autoEmbeddings, setAutoEmbeddings] = useState(
-    server.autoGenerateEmbeddings || false
+    server.autoGenerateEmbeddings || false,
   );
   const [isUpdatingAutoEmbed, setIsUpdatingAutoEmbed] = useState(false);
   const [actionResult, setActionResult] = useState<{
@@ -504,7 +504,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
                   placeholder="1536"
                   value={dimensions}
                   onChange={(e) =>
-                    setDimensions(parseInt(e.target.value) || 1536)
+                    setDimensions(Number.parseInt(e.target.value) || 1536)
                   }
                 />
                 <p className="text-xs text-muted-foreground">

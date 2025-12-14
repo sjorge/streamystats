@@ -1,25 +1,25 @@
 import "server-only";
 import {
-  db,
-  sessions,
-  items,
-  users,
   Item,
   Session,
   User,
+  db,
+  items,
+  sessions,
+  users,
 } from "@streamystats/database";
 import {
   and,
-  eq,
-  desc,
-  count,
-  sum,
-  sql,
-  isNotNull,
-  gte,
-  lte,
   asc,
+  count,
+  desc,
+  eq,
+  gte,
   inArray,
+  isNotNull,
+  lte,
+  sql,
+  sum,
 } from "drizzle-orm";
 
 export interface ItemStats {
@@ -196,11 +196,11 @@ export const getItemTotalStats = async ({
     ? and(
         inArray(sessions.itemId, itemIdsToQuery),
         eq(sessions.userId, userId),
-        isNotNull(sessions.playDuration)
+        isNotNull(sessions.playDuration),
       )
     : and(
         inArray(sessions.itemId, itemIdsToQuery),
-        isNotNull(sessions.playDuration)
+        isNotNull(sessions.playDuration),
       );
 
   const result = await db
@@ -255,11 +255,11 @@ export const getItemWatchDates = async ({
     ? and(
         inArray(sessions.itemId, itemIdsToQuery),
         eq(sessions.userId, userId),
-        isNotNull(sessions.startTime)
+        isNotNull(sessions.startTime),
       )
     : and(
         inArray(sessions.itemId, itemIdsToQuery),
-        isNotNull(sessions.startTime)
+        isNotNull(sessions.startTime),
       );
 
   const result = await db
@@ -314,11 +314,11 @@ export const getItemCompletionRate = async ({
     ? and(
         inArray(sessions.itemId, itemIdsToQuery),
         eq(sessions.userId, userId),
-        isNotNull(sessions.percentComplete)
+        isNotNull(sessions.percentComplete),
       )
     : and(
         inArray(sessions.itemId, itemIdsToQuery),
-        isNotNull(sessions.percentComplete)
+        isNotNull(sessions.percentComplete),
       );
 
   const result = await db
@@ -369,7 +369,7 @@ export const getItemUserStats = async ({
     ? and(
         inArray(sessions.itemId, itemIdsToQuery),
         eq(sessions.userId, userId),
-        isNotNull(sessions.userId)
+        isNotNull(sessions.userId),
       )
     : and(inArray(sessions.itemId, itemIdsToQuery), isNotNull(sessions.userId));
 
@@ -394,7 +394,7 @@ export const getItemUserStats = async ({
       users.name,
       users.serverId,
       users.createdAt,
-      users.updatedAt
+      users.updatedAt,
     )
     .orderBy(desc(count(sessions.id)));
 
@@ -542,11 +542,11 @@ export const getItemWatchHistory = async ({
     ? and(
         inArray(sessions.itemId, itemIdsToQuery),
         eq(sessions.userId, userId),
-        isNotNull(sessions.startTime)
+        isNotNull(sessions.startTime),
       )
     : and(
         inArray(sessions.itemId, itemIdsToQuery),
-        isNotNull(sessions.startTime)
+        isNotNull(sessions.startTime),
       );
 
   const sessionData = await db
@@ -609,11 +609,11 @@ export const getItemWatchCountByMonth = async ({
     ? and(
         inArray(sessions.itemId, itemIdsToQuery),
         eq(sessions.userId, userId),
-        isNotNull(sessions.startTime)
+        isNotNull(sessions.startTime),
       )
     : and(
         inArray(sessions.itemId, itemIdsToQuery),
-        isNotNull(sessions.startTime)
+        isNotNull(sessions.startTime),
       );
 
   const result = await db
@@ -628,11 +628,11 @@ export const getItemWatchCountByMonth = async ({
     .where(whereCondition)
     .groupBy(
       sql`EXTRACT(MONTH FROM ${sessions.startTime})`,
-      sql`EXTRACT(YEAR FROM ${sessions.startTime})`
+      sql`EXTRACT(YEAR FROM ${sessions.startTime})`,
     )
     .orderBy(
       sql`EXTRACT(YEAR FROM ${sessions.startTime})`,
-      sql`EXTRACT(MONTH FROM ${sessions.startTime})`
+      sql`EXTRACT(MONTH FROM ${sessions.startTime})`,
     );
 
   return result.map((row) => ({
@@ -669,13 +669,13 @@ export const getSeriesEpisodeStats = async ({
         eq(items.type, "Episode"),
         eq(items.seriesId, itemId),
         isNotNull(items.parentIndexNumber),
-        isNotNull(items.indexNumber)
-      )
+        isNotNull(items.indexNumber),
+      ),
     );
 
   const totalEpisodes = allEpisodes.length;
   const seasons = new Set(
-    allEpisodes.map((ep) => ep.seasonNumber).filter(Boolean)
+    allEpisodes.map((ep) => ep.seasonNumber).filter(Boolean),
   );
   const totalSeasons = seasons.size;
 
@@ -695,11 +695,11 @@ export const getSeriesEpisodeStats = async ({
     ? and(
         inArray(sessions.itemId, episodeIds),
         eq(sessions.userId, userId),
-        isNotNull(sessions.playDuration)
+        isNotNull(sessions.playDuration),
       )
     : and(
         inArray(sessions.itemId, episodeIds),
-        isNotNull(sessions.playDuration)
+        isNotNull(sessions.playDuration),
       );
 
   const watchedEpisodeIds = await db
@@ -710,7 +710,7 @@ export const getSeriesEpisodeStats = async ({
     .where(whereCondition);
 
   const watchedEpisodeSet = new Set(
-    watchedEpisodeIds.map((w) => w.itemId).filter(Boolean)
+    watchedEpisodeIds.map((w) => w.itemId).filter(Boolean),
   );
   const watchedEpisodes = watchedEpisodeSet.size;
 
@@ -752,8 +752,8 @@ export const getSeasonsAndEpisodes = async ({
         eq(items.type, "Episode"),
         eq(items.seriesId, seriesId),
         isNotNull(items.parentIndexNumber),
-        isNotNull(items.indexNumber)
-      )
+        isNotNull(items.indexNumber),
+      ),
     )
     .orderBy(asc(items.parentIndexNumber), asc(items.indexNumber));
 

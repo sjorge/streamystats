@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import {
   Card,
   CardContent,
@@ -14,7 +15,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import { CategoryStat } from "@/lib/db/transcoding-statistics";
 import { InfoIcon } from "lucide-react";
 import { useCallback } from "react";
@@ -76,7 +76,7 @@ export const TranscodingReasonsCard = ({
     const maxHeightPerBar = 56;
     return Math.min(
       Math.max(minHeightPerBar, 200 / dataLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 
@@ -127,14 +127,14 @@ export const TranscodingReasonsCard = ({
         alwaysOutside
       />
     ),
-    []
+    [],
   );
 
   // Find the most common reason (highest count)
   const mostCommonReason =
     data.length > 0
       ? data.reduce((prev, current) =>
-          prev.count > current.count ? prev : current
+          prev.count > current.count ? prev : current,
         )
       : null;
 

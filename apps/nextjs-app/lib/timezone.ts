@@ -1,5 +1,5 @@
 import { format, fromUnixTime } from "date-fns";
-import { fromZonedTime, toZonedTime, getTimezoneOffset } from "date-fns-tz";
+import { fromZonedTime, getTimezoneOffset, toZonedTime } from "date-fns-tz";
 
 // Get the timezone from environment or default to 'Etc/UTC'
 export const TIMEZONE = process.env.TZ || "Etc/UTC";
@@ -20,8 +20,8 @@ export function utcHourToLocalHour(utcHour: number): number {
       utcHour,
       0,
       0,
-      0
-    )
+      0,
+    ),
   );
 
   // Convert to the target timezone

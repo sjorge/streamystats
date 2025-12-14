@@ -1,15 +1,15 @@
 "use server";
 
 import { db } from "@streamystats/database";
-import { sessions, type NewSession } from "@streamystats/database/schema";
+import { type NewSession, sessions } from "@streamystats/database/schema";
 import {
-  type LegacySessionData,
   type LegacyImportState,
+  type LegacySessionData,
 } from "./types/legacy-import";
 
 export async function importFromLegacy(
   prevState: LegacyImportState,
-  formData: FormData
+  formData: FormData,
 ): Promise<LegacyImportState> {
   try {
     const serverId = formData.get("serverId");
@@ -23,7 +23,7 @@ export async function importFromLegacy(
     }
 
     const serverIdNum = Number(serverId);
-    if (isNaN(serverIdNum)) {
+    if (Number.isNaN(serverIdNum)) {
       return {
         type: "error",
         message: "Invalid server ID",
@@ -72,7 +72,7 @@ export async function importFromLegacy(
       } catch (error) {
         console.error(
           `Failed to import legacy session ${legacySession.id}:`,
-          error
+          error,
         );
         errorCount++;
         // Continue with other sessions
@@ -96,7 +96,7 @@ export async function importFromLegacy(
 
 async function importLegacySession(
   legacySession: LegacySessionData,
-  serverId: number
+  serverId: number,
 ): Promise<boolean> {
   // Validate required fields
   if (
@@ -108,31 +108,31 @@ async function importLegacySession(
   }
 
   // Parse numeric and boolean values from strings
-  const playDuration = parseInt(legacySession.play_duration) || 0;
-  const positionTicks = parseInt(legacySession.position_ticks) || 0;
+  const playDuration = Number.parseInt(legacySession.play_duration) || 0;
+  const positionTicks = Number.parseInt(legacySession.position_ticks) || 0;
   const runtimeTicks = legacySession.runtime_ticks
-    ? parseInt(legacySession.runtime_ticks)
+    ? Number.parseInt(legacySession.runtime_ticks)
     : null;
   const completed = legacySession.completed === "true";
   const percentComplete = legacySession.percent_complete || 0;
 
   // Parse optional numeric fields
   const volumeLevel = legacySession.volume_level
-    ? parseInt(legacySession.volume_level)
+    ? Number.parseInt(legacySession.volume_level)
     : null;
   const audioStreamIndex = legacySession.audio_stream_index
-    ? parseInt(legacySession.audio_stream_index)
+    ? Number.parseInt(legacySession.audio_stream_index)
     : null;
   const subtitleStreamIndex = legacySession.subtitle_stream_index
-    ? parseInt(legacySession.subtitle_stream_index)
+    ? Number.parseInt(legacySession.subtitle_stream_index)
     : null;
 
   // Parse transcoding fields (only those that exist in schema)
   const transcodingWidth = legacySession.transcoding_width
-    ? parseInt(legacySession.transcoding_width)
+    ? Number.parseInt(legacySession.transcoding_width)
     : null;
   const transcodingHeight = legacySession.transcoding_height
-    ? parseInt(legacySession.transcoding_height)
+    ? Number.parseInt(legacySession.transcoding_height)
     : null;
 
   // Parse boolean fields
@@ -283,21 +283,21 @@ function validateLegacyData(data: any): {
     }
 
     // Validate date format
-    if (session.start_time && isNaN(Date.parse(session.start_time))) {
+    if (session.start_time && Number.isNaN(Date.parse(session.start_time))) {
       return {
         isValid: false,
         error: `Invalid date format for start_time at index ${i}`,
       };
     }
 
-    if (session.end_time && isNaN(Date.parse(session.end_time))) {
+    if (session.end_time && Number.isNaN(Date.parse(session.end_time))) {
       return {
         isValid: false,
         error: `Invalid date format for end_time at index ${i}`,
       };
     }
 
-    if (session.inserted_at && isNaN(Date.parse(session.inserted_at))) {
+    if (session.inserted_at && Number.isNaN(Date.parse(session.inserted_at))) {
       return {
         isValid: false,
         error: `Invalid date format for inserted_at at index ${i}`,
@@ -305,7 +305,7 @@ function validateLegacyData(data: any): {
     }
 
     // Validate duration is a valid number string
-    if (session.play_duration && isNaN(Number(session.play_duration))) {
+    if (session.play_duration && Number.isNaN(Number(session.play_duration))) {
       return {
         isValid: false,
         error: `Invalid play_duration format at index ${i}`,

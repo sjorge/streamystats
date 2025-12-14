@@ -1,11 +1,11 @@
 import { requireAdmin } from "@/lib/api-auth";
 import {
   db,
+  hiddenRecommendations,
   items,
   sessions,
-  hiddenRecommendations,
 } from "@streamystats/database";
-import { eq, and, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 interface EpisodePair {
   deletedEpisodeId: string;
@@ -20,7 +20,7 @@ interface MergeResult {
 
 async function mergeSingleEpisode(
   pair: EpisodePair,
-  serverId: number
+  serverId: number,
 ): Promise<MergeResult> {
   return await db.transaction(async (tx) => {
     // Migrate sessions
@@ -30,8 +30,8 @@ async function mergeSingleEpisode(
       .where(
         and(
           eq(sessions.serverId, serverId),
-          eq(sessions.itemId, pair.deletedEpisodeId)
-        )
+          eq(sessions.itemId, pair.deletedEpisodeId),
+        ),
       )
       .returning({ id: sessions.id });
 
@@ -42,8 +42,8 @@ async function mergeSingleEpisode(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.itemId, pair.activeEpisodeId)
-        )
+          eq(hiddenRecommendations.itemId, pair.activeEpisodeId),
+        ),
       );
     const existingUserIds = existingRecs.map((r) => r.userId);
 
@@ -55,8 +55,8 @@ async function mergeSingleEpisode(
           and(
             eq(hiddenRecommendations.serverId, serverId),
             eq(hiddenRecommendations.itemId, pair.deletedEpisodeId),
-            inArray(hiddenRecommendations.userId, existingUserIds)
-          )
+            inArray(hiddenRecommendations.userId, existingUserIds),
+          ),
         )
         .returning({ id: hiddenRecommendations.id });
       deletedDuplicateRecs = deleted.length;
@@ -69,8 +69,8 @@ async function mergeSingleEpisode(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.itemId, pair.deletedEpisodeId)
-        )
+          eq(hiddenRecommendations.itemId, pair.deletedEpisodeId),
+        ),
       )
       .returning({ id: hiddenRecommendations.id });
 
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       try {
         if (pair.deletedEpisodeId === pair.activeEpisodeId) {
           errors.push(
-            `Cannot merge episode ${pair.deletedEpisodeId} into itself`
+            `Cannot merge episode ${pair.deletedEpisodeId} into itself`,
           );
           continue;
         }
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
         const { serverId } = deletedEpisode[0];
         if (serverId !== activeEpisode[0].serverId) {
           errors.push(
-            `Episodes ${pair.deletedEpisodeId} and ${pair.activeEpisodeId} are from different servers`
+            `Episodes ${pair.deletedEpisodeId} and ${pair.activeEpisodeId} are from different servers`,
           );
           continue;
         }
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
         errors.push(
           `Error merging ${pair.deletedEpisodeId} -> ${pair.activeEpisodeId}: ${
             pairError instanceof Error ? pairError.message : "Unknown error"
-          }`
+          }`,
         );
       }
     }
@@ -214,7 +214,7 @@ export async function POST(request: Request) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error merging episodes in bulk:", error);
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

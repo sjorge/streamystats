@@ -1,8 +1,8 @@
 "use client";
 
-import { fetch } from "@/lib/utils";
-import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -10,21 +10,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { fetch } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import {
-  CheckCircle,
-  Clock,
-  Server,
-  RefreshCw,
-  XCircle,
   AlertTriangle,
   ArrowRight,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  Server,
+  XCircle,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
+import React from "react";
 
 interface ServerSyncStatus {
   success: boolean;
@@ -43,7 +43,7 @@ interface ServerSyncStatus {
 }
 
 async function fetchServerSyncStatus(
-  serverId: number
+  serverId: number,
 ): Promise<ServerSyncStatus> {
   const response = await fetch(`/api/jobs/servers/${serverId}/sync-status`);
 
@@ -194,10 +194,10 @@ export function ServerSetupMonitor({
                 server.syncStatus === "completed"
                   ? "default"
                   : server.syncStatus === "syncing"
-                  ? "secondary"
-                  : server.syncStatus === "failed"
-                  ? "destructive"
-                  : "outline"
+                    ? "secondary"
+                    : server.syncStatus === "failed"
+                      ? "destructive"
+                      : "outline"
               }
             >
               {server.syncStatus}
@@ -298,8 +298,8 @@ export function ServerSetupMonitor({
                       isCompleted
                         ? "bg-green-100 text-green-800"
                         : isCurrent
-                        ? "bg-blue-100 text-blue-800"
-                        : "bg-gray-100 text-gray-600"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-gray-100 text-gray-600"
                     }`}
                   >
                     {step === "completed"
@@ -307,7 +307,7 @@ export function ServerSetupMonitor({
                       : step.charAt(0).toUpperCase() + step.slice(1)}
                   </div>
                 );
-              }
+              },
             )}
           </div>
         </div>

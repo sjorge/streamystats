@@ -40,7 +40,7 @@ const FormSchema = z.object({
       },
       {
         message: "URL must start with http:// or https://",
-      }
+      },
     )
     .refine(
       (url) => {
@@ -48,7 +48,7 @@ const FormSchema = z.object({
       },
       {
         message: "URL should not end with a slash",
-      }
+      },
     )
     .refine(
       (url) => {
@@ -61,7 +61,7 @@ const FormSchema = z.object({
       },
       {
         message: "Please enter a valid URL",
-      }
+      },
     ),
   apikey: z.string().min(2, {
     message: "API key must be at least 2 characters.",
@@ -115,15 +115,26 @@ export function SetupForm() {
       const response = await createServer(serverData);
 
       if (!response || response.success === false) {
-        const errorMessage = (response && 'details' in response ? response.details : null) || "Unknown error occurred";
-        
+        const errorMessage =
+          (response && "details" in response ? response.details : null) ||
+          "Unknown error occurred";
+
         // Handle specific error cases
         if (errorMessage.includes("A server with this URL already exists")) {
-          toast.error("A server with this URL has already been added to Streamystats");
+          toast.error(
+            "A server with this URL has already been added to Streamystats",
+          );
         } else if (errorMessage.includes("Invalid API key")) {
-          toast.error("Invalid API key. Please check your Jellyfin API key and try again.");
-        } else if (errorMessage.includes("Server not found") || errorMessage.includes("Cannot reach server")) {
-          toast.error("Cannot connect to server. Please check the URL and ensure Jellyfin is running.");
+          toast.error(
+            "Invalid API key. Please check your Jellyfin API key and try again.",
+          );
+        } else if (
+          errorMessage.includes("Server not found") ||
+          errorMessage.includes("Cannot reach server")
+        ) {
+          toast.error(
+            "Cannot connect to server. Please check the URL and ensure Jellyfin is running.",
+          );
         } else {
           toast.error(errorMessage);
         }
@@ -142,7 +153,7 @@ export function SetupForm() {
       });
 
       toast.error(
-        "Failed to create server. Please check your connection and try again."
+        "Failed to create server. Please check your connection and try again.",
       );
     } finally {
       setLoading(false);

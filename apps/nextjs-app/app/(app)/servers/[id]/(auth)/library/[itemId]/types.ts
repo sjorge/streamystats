@@ -1,5 +1,5 @@
-import type { Item } from "@streamystats/database/schema";
 import type { ItemUserStats } from "@/lib/db/items";
+import type { Item } from "@streamystats/database/schema";
 
 export interface SeriesEpisodeStats {
   totalSeasons: number;
@@ -20,4 +20,3 @@ export interface ItemDetailsResponse {
   watchCountByMonth: unknown[];
   episodeStats?: SeriesEpisodeStats;
 }
-

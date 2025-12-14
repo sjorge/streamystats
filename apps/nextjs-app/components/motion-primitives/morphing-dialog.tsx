@@ -1,5 +1,15 @@
 "use client";
 
+import useClickOutside from "@/hooks/useClickOutside";
+import { cn } from "@/lib/utils";
+import { XIcon } from "lucide-react";
+import {
+  AnimatePresence,
+  MotionConfig,
+  Transition,
+  Variant,
+  motion,
+} from "motion/react";
 import Image from "next/image";
 import React, {
   useCallback,
@@ -10,17 +20,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  motion,
-  AnimatePresence,
-  MotionConfig,
-  Transition,
-  Variant,
-} from "motion/react";
 import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
-import { XIcon } from "lucide-react";
-import useClickOutside from "@/hooks/useClickOutside";
 
 export type MorphingDialogContextType = {
   isOpen: boolean;
@@ -36,7 +36,7 @@ function useMorphingDialog() {
   const context = useContext(MorphingDialogContext);
   if (!context) {
     throw new Error(
-      "useMorphingDialog must be used within a MorphingDialogProvider"
+      "useMorphingDialog must be used within a MorphingDialogProvider",
     );
   }
   return context;
@@ -62,7 +62,7 @@ function MorphingDialogProvider({
       uniqueId,
       triggerRef,
     }),
-    [isOpen, uniqueId]
+    [isOpen, uniqueId],
   );
 
   return (
@@ -111,7 +111,7 @@ function MorphingDialogTrigger({
         setIsOpen(!isOpen);
       }
     },
-    [isOpen, setIsOpen]
+    [isOpen, setIsOpen],
   );
 
   return (
@@ -183,12 +183,12 @@ function MorphingDialogContent({
     if (isOpen) {
       document.body.classList.add("overflow-hidden");
       const focusableElements = containerRef.current?.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       if (focusableElements && focusableElements.length > 0) {
         setFirstFocusableElement(focusableElements[0] as HTMLElement);
         setLastFocusableElement(
-          focusableElements[focusableElements.length - 1] as HTMLElement
+          focusableElements[focusableElements.length - 1] as HTMLElement,
         );
         (focusableElements[0] as HTMLElement).focus();
       }
@@ -254,7 +254,7 @@ function MorphingDialogContainer({ children }: MorphingDialogContainerProps) {
         </>
       )}
     </AnimatePresence>,
-    document.body
+    document.body,
   );
 }
 
@@ -372,7 +372,7 @@ function MorphingDialogImage({
       width={width}
       height={height}
       className={cn(className)}
-      // @ts-ignore used by motion.img 
+      // @ts-ignore used by motion.img
       layoutId={`dialog-img-${uniqueId}`}
       style={style}
     />

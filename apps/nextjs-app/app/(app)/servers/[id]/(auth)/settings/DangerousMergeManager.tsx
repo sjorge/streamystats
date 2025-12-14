@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,17 +26,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { Server } from "@/lib/types";
+import { fetch } from "@/lib/utils";
 import {
   AlertTriangle,
-  Loader,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Loader,
 } from "lucide-react";
-import { fetch } from "@/lib/utils";
-import type { Server } from "@/lib/types";
+import { useCallback, useState } from "react";
 
 const ITEMS_PER_PAGE = 25;
 
@@ -78,7 +78,7 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
   const [isMergingAll, setIsMergingAll] = useState(false);
   const [matches, setMatches] = useState<DangerousMatch[]>([]);
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [pagination, setPagination] = useState({
     page: 1,
@@ -92,11 +92,11 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
   } | null>(null);
 
   const fetchMatches = useCallback(
-    async (page: number = 1) => {
+    async (page = 1) => {
       setIsLoading(true);
       try {
         const response = await fetch(
-          `/api/items/dangerous-matches?serverId=${server.id}&page=${page}&limit=${ITEMS_PER_PAGE}`
+          `/api/items/dangerous-matches?serverId=${server.id}&page=${page}&limit=${ITEMS_PER_PAGE}`,
         );
         const data = await response.json();
 
@@ -122,7 +122,7 @@ export function DangerousMergeManager({ server }: DangerousMergeManagerProps) {
         setIsLoading(false);
       }
     },
-    [server.id]
+    [server.id],
   );
 
   const handleOpen = () => {

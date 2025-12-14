@@ -3,9 +3,9 @@
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { formatDuration } from "@/lib/utils";
-import type { RecommendationItem } from "@/lib/db/similar-statistics";
 import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
+import type { RecommendationItem } from "@/lib/db/similar-statistics";
+import { formatDuration } from "@/lib/utils";
 import { Server } from "@streamystats/database/schema";
 import { Sparkles, TrendingUp } from "lucide-react";
 import Link from "next/link";
@@ -93,7 +93,7 @@ export function SimilarItemsList({
                             <div className="absolute top-2 left-2 z-20">
                               <Badge
                                 className={`${getSimilarityColor(
-                                  similarity
+                                  similarity,
                                 )} bg-background/90 backdrop-blur-sm border-0 shadow-lg text-xs px-1.5 py-0.5`}
                               >
                                 <TrendingUp className="h-2.5 w-2.5 mr-1" />

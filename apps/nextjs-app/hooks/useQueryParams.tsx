@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 /**
  * Hook for managing query parameters in the URL with Suspense support
  */
-export function useQueryParams<T = any>() {
+export function useQueryParams<T = unknown>() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -24,13 +24,13 @@ export function useQueryParams<T = any>() {
       const newSearchParams = new URLSearchParams(searchParams.toString());
 
       // Update or remove each parameter
-      Object.entries(params).forEach(([key, value]) => {
+      for (const [key, value] of Object.entries(params)) {
         if (value === null) {
           newSearchParams.delete(key);
         } else {
           newSearchParams.set(key, value);
         }
-      });
+      }
 
       router.replace(`?${newSearchParams.toString()}`, {
         scroll: options.scroll,

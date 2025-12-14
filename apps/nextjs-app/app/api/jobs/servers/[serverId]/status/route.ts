@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/api-auth";
 
 export async function GET(
   _request: Request,
-  props: { params: Promise<{ serverId: string }> }
+  props: { params: Promise<{ serverId: string }> },
 ) {
   try {
     const { error } = await requireAdmin();
@@ -24,7 +24,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -53,11 +53,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }
-
-
-
-

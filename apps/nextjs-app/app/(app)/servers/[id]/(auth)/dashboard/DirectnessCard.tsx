@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  CustomBarLabel,
+  CustomValueLabel,
+} from "@/components/ui/CustomBarLabel";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -14,21 +18,17 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { DirectnessStat } from "@/lib/db/transcoding-statistics";
+import { InfoIcon } from "lucide-react";
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
   LabelList,
   ResponsiveContainer,
+  XAxis,
+  YAxis,
 } from "recharts";
-import { InfoIcon } from "lucide-react";
-import { DirectnessStat } from "@/lib/db/transcoding-statistics";
-import {
-  CustomBarLabel,
-  CustomValueLabel,
-} from "@/components/ui/CustomBarLabel";
 
 interface DirectnessCardProps {
   data: DirectnessStat[];
@@ -69,7 +69,7 @@ export const DirectnessCard = ({ data }: DirectnessCardProps) => {
     const maxHeightPerBar = 40;
     return Math.min(
       Math.max(minHeightPerBar, 200 / dataLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 

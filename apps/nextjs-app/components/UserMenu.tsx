@@ -1,11 +1,13 @@
 "use client";
 
+import { logout } from "@/lib/db/users";
+import { User } from "@streamystats/database";
 import { ChevronsUpDown, Loader2, LogOut } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Spinner } from "./Spinner";
 import JellyfinAvatar from "./JellyfinAvatar";
+import { Spinner } from "./Spinner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,8 +17,6 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { SidebarMenuButton } from "./ui/sidebar";
-import { User } from "@streamystats/database";
-import { logout } from "@/lib/db/users";
 
 interface Props {
   me?: User;

@@ -32,12 +32,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { usePersistantState } from "@/hooks/usePersistantState";
 import type { UserWithStats } from "@/lib/db/users";
 import type { Server } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
-import { useRouter } from "nextjs-toploader/app";
-import { usePersistantState } from "@/hooks/usePersistantState";
 import Link from "next/link";
+import { useRouter } from "nextjs-toploader/app";
 import User from "./[userId]/page";
 
 export interface UserTableProps {
@@ -190,10 +190,13 @@ export const UserTable: React.FC<UserTableProps> = ({
     ]);
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
   const [columnVisibility, setColumnVisibility, isLoadingVisibility] =
-    usePersistantState<VisibilityState>(`users-column-visibility-${server.id}`, {});
+    usePersistantState<VisibilityState>(
+      `users-column-visibility-${server.id}`,
+      {},
+    );
   const [rowSelection, setRowSelection] = React.useState({});
 
   const table = useReactTable({
@@ -265,7 +268,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   );
@@ -284,7 +287,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}

@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { requireAdmin } from "@/lib/api-auth";
+import { db } from "@streamystats/database";
+import { type NewSession, sessions } from "@streamystats/database/schema";
+import { NextRequest, NextResponse } from "next/server";
 // @ts-ignore - stream-json doesn't have types
 import { parser } from "stream-json";
 // @ts-ignore - stream-json doesn't have types
 import { streamArray } from "stream-json/streamers/StreamArray";
-import { db } from "@streamystats/database";
-import { sessions, type NewSession } from "@streamystats/database/schema";
-import { requireAdmin } from "@/lib/api-auth";
 
 export const runtime = "nodejs"; // IMPORTANT: disables edge runtime
 export const dynamic = "force-dynamic"; // optional – no cache
 
 /** ISO-8601 timestamp */
-type ISODate = string & { __iso: void };
+type ISODate = string & { __iso: undefined };
 
 /** Emby/Jellyfin playback methods */
 type PlaybackMethod = "DirectPlay" | "DirectStream" | "Transcode";
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
     }
 
     const serverIdNum = Number(serverId);
-    if (isNaN(serverIdNum)) {
+    if (Number.isNaN(serverIdNum)) {
       return NextResponse.json({ error: "Invalid server ID" }, { status: 400 });
     }
 
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
       input,
       parser(),
       streamArray(),
-      async function* (records: AsyncIterable<{ value: any }>) {
+      async (records: AsyncIterable<{ value: unknown }>) => {
         for await (const { value } of records) {
           // Handle the Jellystats structure: [{ "jf_playback_activity": [...] }]
           if (
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
                   }
                   processedCount++;
                 } catch (error) {
-                  console.error(`Failed to import session:`, error);
+                  console.error("Failed to import session:", error);
                   errorCount++;
                   processedCount++;
                 }
@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
               }
               processedCount++;
             } catch (error) {
-              console.error(`Failed to import session:`, error);
+              console.error("Failed to import session:", error);
               errorCount++;
               processedCount++;
             }

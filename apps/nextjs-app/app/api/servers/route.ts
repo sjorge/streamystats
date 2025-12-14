@@ -1,4 +1,4 @@
-import { getServers, createServer } from "@/lib/server";
+import { createServer, getServers } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export async function GET() {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }
@@ -32,7 +32,7 @@ export async function GET() {
  */
 async function validateJellyfinAdmin(
   url: string,
-  apiKey: string
+  apiKey: string,
 ): Promise<{ valid: boolean; error?: string }> {
   try {
     const response = await fetch(`${url}/Users/Me`, {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

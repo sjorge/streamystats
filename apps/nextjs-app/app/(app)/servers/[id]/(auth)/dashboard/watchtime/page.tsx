@@ -1,12 +1,15 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getDefaultStartDate, setEndDateToEndOfDay } from "@/dates";
+import { getDefaultEndDate } from "@/dates";
 import { getServer } from "@/lib/db/server";
 import {
   getMe,
   getWatchTimePerHour,
   getWatchTimePerWeekDay,
 } from "@/lib/db/users";
+import { showAdminStatistics } from "@/utils/adminTools";
 import { Server } from "@streamystats/database/schema";
 import { addDays } from "date-fns";
 import { redirect } from "next/navigation";
@@ -15,9 +18,6 @@ import Graph from "../Graph";
 import TotalWatchTime from "../TotalWatchTime";
 import { WatchTimePerHour } from "../WatchTimePerHour";
 import { WatchTimePerWeekDay } from "../WatchTimePerWeekDay";
-import { getDefaultStartDate, setEndDateToEndOfDay } from "@/dates";
-import { getDefaultEndDate } from "@/dates";
-import { showAdminStatistics } from "@/utils/adminTools";
 
 export default async function WatchtimePage({
   params,
@@ -71,8 +71,14 @@ async function WatchtimeStats({
   }
 
   const [d1, d2] = await Promise.all([
-    getWatchTimePerWeekDay({ serverId: server.id, userId: sas ? undefined : me.id }),
-    getWatchTimePerHour({ serverId: server.id, userId: sas ? undefined : me.id }),
+    getWatchTimePerWeekDay({
+      serverId: server.id,
+      userId: sas ? undefined : me.id,
+    }),
+    getWatchTimePerHour({
+      serverId: server.id,
+      userId: sas ? undefined : me.id,
+    }),
   ]);
 
   return (

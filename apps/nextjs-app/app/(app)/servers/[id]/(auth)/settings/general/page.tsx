@@ -3,15 +3,15 @@ import { ServerJobStatusCard } from "@/components/ServerJobStatusCard";
 import { getServer } from "@/lib/db/server";
 import { isUserAdmin } from "@/lib/db/users";
 import { redirect } from "next/navigation";
-import { DeleteServer } from "../DeleteServer";
-import { VersionSection } from "../VersionSection";
-import { SyncManager } from "../SyncManager";
-import { LibrarySyncManager } from "../LibrarySyncManager";
 import { CleanupManager } from "../CleanupManager";
-import { MergeItemsManager } from "../MergeItemsManager";
 import { DangerousMergeManager } from "../DangerousMergeManager";
 import { DangerousSeriesMergeManager } from "../DangerousSeriesMergeManager";
+import { DeleteServer } from "../DeleteServer";
+import { LibrarySyncManager } from "../LibrarySyncManager";
+import { MergeItemsManager } from "../MergeItemsManager";
+import { SyncManager } from "../SyncManager";
 import { UpdateConnection } from "../UpdateConnection";
+import { VersionSection } from "../VersionSection";
 
 export default async function GeneralSettings(props: {
   params: Promise<{ id: string }>;

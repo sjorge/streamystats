@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { requireAdmin } from "@/lib/api-auth";
+import { type LegacySessionData } from "@/lib/types/legacy-import";
+import { db } from "@streamystats/database";
+import { type NewSession, sessions } from "@streamystats/database/schema";
+import { NextRequest, NextResponse } from "next/server";
 // @ts-ignore - stream-json doesn't have types
 import { parser } from "stream-json";
 // @ts-ignore - stream-json doesn't have types
 import { streamArray } from "stream-json/streamers/StreamArray";
-import { db } from "@streamystats/database";
-import { sessions, type NewSession } from "@streamystats/database/schema";
-import { type LegacySessionData } from "@/lib/types/legacy-import";
-import { requireAdmin } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 import { v4 as uuidv4 } from "uuid";
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const serverIdNum = Number(serverId);
-    if (isNaN(serverIdNum)) {
+    if (Number.isNaN(serverIdNum)) {
       return NextResponse.json({ error: "Invalid server ID" }, { status: 400 });
     }
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       input,
       parser(),
       streamArray(),
-      async function* (records: AsyncIterable<{ value: any }>) {
+      async (records: AsyncIterable<{ value: unknown }>) => {
         for await (const { value } of records) {
           try {
             const imported = await importLegacySession(
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
             }
             processedCount++;
           } catch (error) {
-            console.error(`Failed to import legacy session:`, error);
+            console.error("Failed to import legacy session:", error);
             errorCount++;
             processedCount++;
           }
@@ -115,31 +115,31 @@ async function importLegacySession(
   }
 
   // Parse numeric and boolean values from strings
-  const playDuration = parseInt(legacySession.play_duration) || 0;
-  const positionTicks = parseInt(legacySession.position_ticks) || 0;
+  const playDuration = Number.parseInt(legacySession.play_duration) || 0;
+  const positionTicks = Number.parseInt(legacySession.position_ticks) || 0;
   const runtimeTicks = legacySession.runtime_ticks
-    ? parseInt(legacySession.runtime_ticks)
+    ? Number.parseInt(legacySession.runtime_ticks)
     : null;
   const completed = legacySession.completed === "true";
   const percentComplete = legacySession.percent_complete || 0;
 
   // Parse optional numeric fields
   const volumeLevel = legacySession.volume_level
-    ? parseInt(legacySession.volume_level)
+    ? Number.parseInt(legacySession.volume_level)
     : null;
   const audioStreamIndex = legacySession.audio_stream_index
-    ? parseInt(legacySession.audio_stream_index)
+    ? Number.parseInt(legacySession.audio_stream_index)
     : null;
   const subtitleStreamIndex = legacySession.subtitle_stream_index
-    ? parseInt(legacySession.subtitle_stream_index)
+    ? Number.parseInt(legacySession.subtitle_stream_index)
     : null;
 
   // Parse transcoding fields (only those that exist in schema)
   const transcodingWidth = legacySession.transcoding_width
-    ? parseInt(legacySession.transcoding_width)
+    ? Number.parseInt(legacySession.transcoding_width)
     : null;
   const transcodingHeight = legacySession.transcoding_height
-    ? parseInt(legacySession.transcoding_height)
+    ? Number.parseInt(legacySession.transcoding_height)
     : null;
 
   // Parse boolean fields

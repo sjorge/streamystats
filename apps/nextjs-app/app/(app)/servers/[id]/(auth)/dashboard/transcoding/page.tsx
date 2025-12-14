@@ -39,7 +39,7 @@ async function TranscodingStats({ server }: { server: Server }) {
     server.id,
     undefined,
     undefined,
-    sas ? undefined : me?.id
+    sas ? undefined : me?.id,
   );
 
   return (

@@ -1,9 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { RecommendationItem } from "@/lib/db/similar-statistics";
 import type { Server } from "@streamystats/database";
-import { Skeleton } from "@/components/ui/skeleton";
+import dynamic from "next/dynamic";
 
 const SimilarStatistics = dynamic(
   () => import("./SimilarStatistics").then((mod) => mod.SimilarMovieStatistics),
@@ -15,7 +15,7 @@ const SimilarStatistics = dynamic(
         <Skeleton className="h-[300px] w-full" />
       </div>
     ),
-  }
+  },
 );
 
 interface Props {

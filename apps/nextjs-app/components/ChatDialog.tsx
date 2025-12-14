@@ -1,46 +1,46 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { useParams } from "next/navigation";
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import { Loader } from "@/components/ai-elements/loader";
+import { Message, MessageContent } from "@/components/ai-elements/message";
+import {
+  PromptInput,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from "@/components/ai-elements/prompt-input";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Sparkles,
-  Bot,
-  AlertCircle,
-  Film,
-  Tv,
-  ExternalLink,
-} from "lucide-react";
 import type { User } from "@/lib/types";
-import JellyfinAvatar from "./JellyfinAvatar";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import {
+  AlertCircle,
+  Bot,
+  ExternalLink,
+  Film,
+  Sparkles,
+  Tv,
+} from "lucide-react";
 import Link from "next/link";
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import {
-  Reasoning,
-  ReasoningTrigger,
-  ReasoningContent,
-} from "@/components/ai-elements/reasoning";
-import {
-  PromptInput,
-  PromptInputTextarea,
-  PromptInputFooter,
-  PromptInputSubmit,
-} from "@/components/ai-elements/prompt-input";
-import { Loader } from "@/components/ai-elements/loader";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
+import JellyfinAvatar from "./JellyfinAvatar";
 
 interface ChatDialogProps {
   chatConfigured: boolean;
@@ -144,7 +144,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
         api: "/api/chat",
         body: { serverId },
       }),
-    [serverId]
+    [serverId],
   );
 
   const { messages, sendMessage, status, error } = useChat({
@@ -238,7 +238,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
       if (!message.text.trim() || isLoading) return;
       await sendMessage({ text: message.text });
     },
-    [isLoading, sendMessage]
+    [isLoading, sendMessage],
   );
 
   const markdownComponents = useMemo(
@@ -290,7 +290,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
         );
       },
     }),
-    [itemsCache, serverUrl, serverId]
+    [itemsCache, serverUrl, serverId],
   );
 
   const renderMessageText = useCallback(
@@ -302,7 +302,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
         {text}
       </Streamdown>
     ),
-    [markdownComponents]
+    [markdownComponents],
   );
 
   return (
@@ -461,13 +461,13 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
                                 isLastMessage &&
                                 message.role === "assistant" &&
                                 !message.parts.some(
-                                  (p) => p.type === "text" && p.text.trim()
+                                  (p) => p.type === "text" && p.text.trim(),
                                 ) &&
                                 !message.parts.some((p) =>
-                                  p.type.startsWith("tool-")
+                                  p.type.startsWith("tool-"),
                                 ) &&
                                 !message.parts.some(
-                                  (p) => p.type === "reasoning"
+                                  (p) => p.type === "reasoning",
                                 ) && (
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
                                     <Loader size={12} />

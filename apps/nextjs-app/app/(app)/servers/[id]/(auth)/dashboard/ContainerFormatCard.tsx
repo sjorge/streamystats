@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  CustomBarLabel,
+  CustomValueLabel,
+} from "@/components/ui/CustomBarLabel";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -15,23 +19,19 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LabelList,
-} from "recharts";
-import { Layers } from "lucide-react";
-import {
   CategoryStat,
   TranscodingStatisticsResponse,
 } from "@/lib/db/transcoding-statistics";
-import {
-  CustomBarLabel,
-  CustomValueLabel,
-} from "@/components/ui/CustomBarLabel";
+import { Layers } from "lucide-react";
 import React from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 interface ContainerFormatCardProps {
   data: CategoryStat[];
@@ -62,7 +62,7 @@ export const ContainerFormatCard = ({ data }: ContainerFormatCardProps) => {
     const maxHeightPerBar = 40;
     return Math.min(
       Math.max(minHeightPerBar, 200 / dataLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 
@@ -79,7 +79,7 @@ export const ContainerFormatCard = ({ data }: ContainerFormatCardProps) => {
   const mostCommonContainer =
     data.length > 0
       ? data.reduce((prev, current) =>
-          prev.count > current.count ? prev : current
+          prev.count > current.count ? prev : current,
         )
       : null;
 

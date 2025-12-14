@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/api-auth";
 import { db, items } from "@streamystats/database";
-import { eq, and, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 
 export async function GET(request: Request) {
   try {
@@ -19,12 +19,12 @@ export async function GET(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
-    const serverIdNum = parseInt(serverId);
-    if (isNaN(serverIdNum)) {
+    const serverIdNum = Number.parseInt(serverId);
+    if (Number.isNaN(serverIdNum)) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -54,8 +54,8 @@ export async function GET(request: Request) {
           sql`NOT EXISTS (
             SELECT 1 FROM items e 
             WHERE e.season_id = ${items.id}
-          )`
-        )
+          )`,
+        ),
       );
 
     // Find orphaned series: deleted series with no seasons or episodes
@@ -74,8 +74,8 @@ export async function GET(request: Request) {
           sql`NOT EXISTS (
             SELECT 1 FROM items e 
             WHERE e.series_id = ${items.id}
-          )`
-        )
+          )`,
+        ),
       );
 
     return new Response(
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error finding orphaned series:", error);
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -152,8 +152,8 @@ export async function POST(request: Request) {
           sql`NOT EXISTS (
             SELECT 1 FROM items e 
             WHERE e.season_id = ${items.id}
-          )`
-        )
+          )`,
+        ),
       )
       .returning({ id: items.id, name: items.name });
 
@@ -168,8 +168,8 @@ export async function POST(request: Request) {
           sql`NOT EXISTS (
             SELECT 1 FROM items e 
             WHERE e.series_id = ${items.id}
-          )`
-        )
+          )`,
+        ),
       )
       .returning({ id: items.id, name: items.name });
 
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error cleaning up orphaned series:", error);
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { fetch } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -17,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { fetch } from "@/lib/utils";
 import {
   AlertCircle,
   CheckCircle2,
@@ -84,7 +84,7 @@ export default function JellystatsImport({ serverId }: { serverId: number }) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const data: ImportResult = await response.json();

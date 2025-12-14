@@ -1,19 +1,19 @@
 import { Container } from "@/components/Container";
-import { getServer } from "@/lib/db/server";
 import { getItemDetails, getSeasonsAndEpisodes } from "@/lib/db/items";
-import {
-  getSimilarItemsForItem,
-  RecommendationItem,
-} from "@/lib/db/similar-statistics";
+import { getServer } from "@/lib/db/server";
 import { getSimilarSeriesForItem } from "@/lib/db/similar-series-statistics";
 import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
+import {
+  RecommendationItem,
+  getSimilarItemsForItem,
+} from "@/lib/db/similar-statistics";
+import { getMe } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
 import { redirect } from "next/navigation";
 import { ItemHeader } from "./ItemHeader";
 import { ItemMetadata } from "./ItemMetadata";
-import { SimilarItemsList } from "./SimilarItemsList";
 import { SeasonsAndEpisodes } from "./SeasonsAndEpisodes";
-import { getMe } from "@/lib/db/users";
+import { SimilarItemsList } from "./SimilarItemsList";
 
 export default async function ItemDetailsPage({
   params,
