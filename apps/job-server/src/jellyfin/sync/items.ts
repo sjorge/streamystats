@@ -1,4 +1,4 @@
-import { eq, and, inArray, isNotNull, or } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, or, sql } from "drizzle-orm";
 import {
   db,
   items,
@@ -1273,12 +1273,12 @@ async function checkAndMigrateDeletedItem(newItem: NewItem): Promise<{
 }
 
 /**
- * Find a deleted item that matches the new item by provider IDs or episode details
+ * Find a deleted item that matches the new item by provider IDs or stable attributes
  */
 async function findDeletedItemMatch(
   newItem: NewItem
 ): Promise<{ id: string; matchReason: string } | null> {
-  // 1. Try to match by provider IDs (IMDB, TMDB, etc.)
+  // 1. Try to match by provider IDs first (IMDB, TMDB, etc.) - most reliable
   if (newItem.providerIds && typeof newItem.providerIds === "object") {
     const providerIds = newItem.providerIds as Record<string, string>;
 
@@ -1316,12 +1316,15 @@ async function findDeletedItemMatch(
     }
   }
 
-  // 2. For episodes, try to match by series ID + season + episode number
+  // 2. Fallback: Match by stable attributes (not IDs that change on re-add)
+
+  // Episodes: type + production_year + series_name + index_number + parent_index_number
   const indexNum = newItem.indexNumber;
   const parentIndexNum = newItem.parentIndexNumber;
   if (
     newItem.type === "Episode" &&
-    newItem.seriesId &&
+    newItem.seriesName &&
+    newItem.productionYear &&
     indexNum != null &&
     parentIndexNum != null
   ) {
@@ -1333,7 +1336,8 @@ async function findDeletedItemMatch(
           eq(items.serverId, newItem.serverId),
           isNotNull(items.deletedAt),
           eq(items.type, "Episode"),
-          eq(items.seriesId, newItem.seriesId),
+          sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
+          eq(items.productionYear, newItem.productionYear),
           eq(items.indexNumber, indexNum),
           eq(items.parentIndexNumber, parentIndexNum)
         )
@@ -1343,7 +1347,61 @@ async function findDeletedItemMatch(
     if (deletedEpisode.length > 0) {
       return {
         id: deletedEpisode[0].id,
-        matchReason: `episode:${newItem.seriesId}:S${parentIndexNum}E${indexNum}`,
+        matchReason: `episode:${newItem.seriesName}:${newItem.productionYear}:S${parentIndexNum}E${indexNum}`,
+      };
+    }
+  }
+
+  // Season: type + production_year + index_number + series_name
+  if (
+    newItem.type === "Season" &&
+    newItem.seriesName &&
+    newItem.productionYear &&
+    indexNum != null
+  ) {
+    const deletedSeason = await db
+      .select({ id: items.id })
+      .from(items)
+      .where(
+        and(
+          eq(items.serverId, newItem.serverId),
+          isNotNull(items.deletedAt),
+          eq(items.type, "Season"),
+          sql`lower(${items.seriesName}) = lower(${newItem.seriesName})`,
+          eq(items.productionYear, newItem.productionYear),
+          eq(items.indexNumber, indexNum)
+        )
+      )
+      .limit(1);
+
+    if (deletedSeason.length > 0) {
+      return {
+        id: deletedSeason[0].id,
+        matchReason: `season:${newItem.seriesName}:${newItem.productionYear}:${indexNum}`,
+      };
+    }
+  }
+
+  // Series: name + type + production_year
+  if (newItem.type === "Series" && newItem.name && newItem.productionYear) {
+    const deletedSeries = await db
+      .select({ id: items.id })
+      .from(items)
+      .where(
+        and(
+          eq(items.serverId, newItem.serverId),
+          isNotNull(items.deletedAt),
+          eq(items.type, "Series"),
+          sql`lower(${items.name}) = lower(${newItem.name})`,
+          eq(items.productionYear, newItem.productionYear)
+        )
+      )
+      .limit(1);
+
+    if (deletedSeries.length > 0) {
+      return {
+        id: deletedSeries[0].id,
+        matchReason: `series:${newItem.name}:${newItem.productionYear}`,
       };
     }
   }

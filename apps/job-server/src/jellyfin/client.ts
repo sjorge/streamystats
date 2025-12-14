@@ -295,8 +295,10 @@ export interface MinimalJellyfinItem {
   Type: string;
   ProviderIds?: Record<string, string>;
   SeriesId?: string;
+  SeriesName?: string;
   IndexNumber?: number;
   ParentIndexNumber?: number;
+  ProductionYear?: number;
 }
 
 const DEFAULT_ITEM_FIELDS = [
@@ -636,8 +638,10 @@ export class JellyfinClient {
     const minimalFields = [
       "ProviderIds",
       "SeriesId",
+      "SeriesName",
       "IndexNumber",
       "ParentIndexNumber",
+      "ProductionYear",
     ];
 
     const allItems: MinimalJellyfinItem[] = [];
@@ -665,8 +669,10 @@ export class JellyfinClient {
           Type: item.Type,
           ProviderIds: item.ProviderIds,
           SeriesId: item.SeriesId,
+          SeriesName: item.SeriesName,
           IndexNumber: item.IndexNumber,
           ParentIndexNumber: item.ParentIndexNumber,
+          ProductionYear: item.ProductionYear,
         });
       }
 
