@@ -28,6 +28,7 @@ import {
   getUsers,
   getUserStatsSummaryForServer,
 } from "@/lib/db/users";
+import { getHistoryByFilters } from "@/lib/db/history";
 
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
@@ -505,6 +506,75 @@ export function createChatTools(serverId: number, userId: string) {
                   results.length === 1 ? "" : "s"
                 } with watchtime data`
               : "No watchtime data found for the specified criteria",
+        };
+      },
+    }),
+
+    getHistoryByFilters: tool({
+      description:
+        "Get playback history with filters for user, item type, and time interval. Use this to see what specific items were watched during a time period. Can be combined with getUserWatchStatistics to get detailed viewing information.",
+      inputSchema: z.object({
+        userId: z
+          .string()
+          .optional()
+          .describe(
+            "Optional user ID to filter by specific user. If not provided, returns history for all users."
+          ),
+        itemType: z
+          .enum(["Movie", "Series", "Episode", "all"])
+          .optional()
+          .default("all")
+          .describe("Filter by item type. Defaults to 'all'."),
+        startDate: z
+          .string()
+          .optional()
+          .describe("Start date in ISO format (YYYY-MM-DD). Optional."),
+        endDate: z
+          .string()
+          .optional()
+          .describe("End date in ISO format (YYYY-MM-DD). Optional."),
+        limit: z
+          .number()
+          .optional()
+          .default(50)
+          .describe(
+            "Maximum number of history items to return. Defaults to 50."
+          ),
+      }),
+      execute: async ({ userId, itemType, startDate, endDate, limit }) => {
+        const history = await getHistoryByFilters({
+          serverId,
+          userId,
+          itemType: itemType || "all",
+          startDate,
+          endDate,
+          limit: limit || 50,
+        });
+
+        return {
+          history: history.map((item) => ({
+            itemName: item.item?.name || item.session.itemName || "Unknown",
+            itemId: item.item?.id || item.session.itemId,
+            itemType: item.item?.type || "Unknown",
+            userName: item.user?.name || item.session.userName || "Unknown",
+            userId: item.user?.id || item.session.userId,
+            watchDate: item.session.startTime
+              ? item.session.startTime.toISOString()
+              : null,
+            watchDuration: item.session.playDuration || 0,
+            watchDurationFormatted: formatDuration(
+              item.session.playDuration || 0
+            ),
+            completionPercentage: item.session.percentComplete || 0,
+            deviceName: item.session.deviceName,
+            clientName: item.session.clientName,
+          })),
+          message:
+            history.length > 0
+              ? `Found ${history.length} history item${
+                  history.length === 1 ? "" : "s"
+                }`
+              : "No history found for the specified criteria",
         };
       },
     }),

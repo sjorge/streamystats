@@ -7,7 +7,19 @@ import {
   Item,
   User,
 } from "@streamystats/database";
-import { and, eq, desc, sql, isNotNull, ilike, asc, or } from "drizzle-orm";
+import {
+  and,
+  eq,
+  desc,
+  sql,
+  isNotNull,
+  ilike,
+  asc,
+  or,
+  gte,
+  lte,
+  inArray,
+} from "drizzle-orm";
 
 export interface HistoryItem {
   session: Session;
@@ -139,7 +151,13 @@ export const getUserHistory = async (
   userId: string,
   options: UserHistoryOptions = {}
 ): Promise<HistoryResponse> => {
-  const { page = 1, perPage = 50, search, sortBy, sortOrder = "desc" } = options;
+  const {
+    page = 1,
+    perPage = 50,
+    search,
+    sortBy,
+    sortOrder = "desc",
+  } = options;
   const offset = (page - 1) * perPage;
 
   // Build query conditions for specific user
@@ -281,4 +299,74 @@ export const getItemHistory = async (
     perPage,
     totalPages,
   };
+};
+
+/**
+ * Get playback history with filters for user, item type, and time interval
+ */
+export const getHistoryByFilters = async ({
+  serverId,
+  userId,
+  itemType,
+  startDate,
+  endDate,
+  limit = 50,
+}: {
+  serverId: number;
+  userId?: string;
+  itemType?: "Movie" | "Series" | "Episode" | "all";
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+}): Promise<HistoryItem[]> => {
+  const conditions = [
+    eq(sessions.serverId, serverId),
+    isNotNull(sessions.itemId),
+    isNotNull(sessions.userId),
+    isNotNull(sessions.startTime),
+  ];
+
+  if (userId) {
+    conditions.push(eq(sessions.userId, userId));
+  }
+
+  if (startDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    conditions.push(gte(sessions.startTime, start));
+  }
+
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    conditions.push(lte(sessions.startTime, end));
+  }
+
+  const needsItemJoin =
+    itemType && itemType !== "all" && itemType !== undefined;
+
+  let query = db
+    .select()
+    .from(sessions)
+    .leftJoin(items, eq(sessions.itemId, items.id))
+    .leftJoin(users, eq(sessions.userId, users.id));
+
+  if (needsItemJoin) {
+    if (itemType === "Series") {
+      conditions.push(eq(items.type, "Episode"));
+    } else {
+      conditions.push(eq(items.type, itemType));
+    }
+  }
+
+  const data = await query
+    .where(and(...conditions))
+    .orderBy(desc(sessions.startTime))
+    .limit(limit);
+
+  return data.map((row) => ({
+    session: row.sessions,
+    item: row.items,
+    user: row.users,
+  }));
 };
