@@ -8,6 +8,7 @@ import { VersionSection } from "../VersionSection";
 import { SyncManager } from "../SyncManager";
 import { CleanupManager } from "../CleanupManager";
 import { MergeItemsManager } from "../MergeItemsManager";
+import { DangerousMergeManager } from "../DangerousMergeManager";
 import { UpdateConnection } from "../UpdateConnection";
 
 export default async function GeneralSettings(props: {
@@ -31,6 +32,7 @@ export default async function GeneralSettings(props: {
         <SyncManager serverId={server.id} serverName={server.name} />
         {isAdmin ? <CleanupManager serverId={server.id} /> : null}
         {isAdmin ? <MergeItemsManager server={server} /> : null}
+        {isAdmin ? <DangerousMergeManager server={server} /> : null}
         <DeleteServer server={server} />
       </div>
     </Container>

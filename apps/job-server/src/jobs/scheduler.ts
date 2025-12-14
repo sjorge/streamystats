@@ -4,6 +4,7 @@ import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
 import { cleanupDeletedItems } from "../jellyfin/sync/deleted-items";
+import { cancelJobsByName } from "../routes/jobs/utils";
 
 class SyncScheduler {
   private scheduledTasks: Map<string, cron.ScheduledTask> = new Map();
@@ -24,7 +25,7 @@ class SyncScheduler {
    */
   private async performStartupCleanup(): Promise<void> {
     try {
-      console.log("Performing startup cleanup...");
+      console.log("[scheduler] phase=startup-cleanup status=start");
 
       // Reset all servers stuck in "syncing" status
       const result = await db
@@ -39,17 +40,15 @@ class SyncScheduler {
 
       if (result.length > 0) {
         console.log(
-          `Startup cleanup: Reset ${
+          `[scheduler] phase=startup-cleanup status=reset resetCount=${
             result.length
-          } server(s) from "syncing" to "pending": ${result
-            .map((s) => s.name)
-            .join(", ")}`
+          } servers=${result.map((s) => s.name).join(",")}`
         );
       } else {
-        console.log("Startup cleanup: No stuck servers found");
+        console.log("[scheduler] phase=startup-cleanup status=clean");
       }
     } catch (error) {
-      console.error("Error during startup cleanup:", error);
+      console.error("[scheduler] phase=startup-cleanup status=error", error);
     }
   }
 
@@ -58,7 +57,7 @@ class SyncScheduler {
    */
   async start(): Promise<void> {
     if (this.enabled) {
-      console.log("Scheduler is already running");
+      console.log("[scheduler] status=already-running");
       return;
     }
 
@@ -168,18 +167,11 @@ class SyncScheduler {
       fullSyncTask.start();
       deletedItemsCleanupTask.start();
 
-      console.log("Scheduler started successfully");
-      console.log(`Activity sync: ${this.activitySyncInterval}`);
-      console.log(`Recent items sync: ${this.recentItemsSyncInterval}`);
-      console.log(`User sync: ${this.userSyncInterval}`);
-      console.log(`People sync: ${this.peopleSyncInterval}`);
-      console.log(`Embeddings sync: ${this.embeddingsSyncInterval}`);
-      console.log(`Job cleanup: ${this.jobCleanupInterval}`);
-      console.log(`Old job cleanup: ${this.oldJobCleanupInterval}`);
-      console.log(`Full sync: ${this.fullSyncInterval}`);
-      console.log(`Deleted items cleanup: ${this.deletedItemsCleanupInterval}`);
+      console.log(
+        `[scheduler] status=started activity=${this.activitySyncInterval} recentItems=${this.recentItemsSyncInterval} users=${this.userSyncInterval} people=${this.peopleSyncInterval} embeddings=${this.embeddingsSyncInterval} jobCleanup=${this.jobCleanupInterval} oldJobCleanup=${this.oldJobCleanupInterval} fullSync=${this.fullSyncInterval} deletedItems=${this.deletedItemsCleanupInterval}`
+      );
     } catch (error) {
-      console.error("Failed to start scheduler:", error);
+      console.error("[scheduler] status=start-failed", error);
       this.enabled = false;
       throw error;
     }
@@ -190,7 +182,7 @@ class SyncScheduler {
    */
   stop(): void {
     if (!this.enabled) {
-      console.log("Scheduler is not running");
+      console.log("[scheduler] status=not-running");
       return;
     }
 
@@ -199,15 +191,15 @@ class SyncScheduler {
       try {
         task.stop();
         task.destroy();
-        console.log(`Stopped scheduled task: ${name}`);
+        console.log(`[scheduler] task=${name} status=stopped`);
       } catch (error) {
-        console.error(`Error stopping task ${name}:`, error);
+        console.error(`[scheduler] task=${name} status=stop-error`, error);
       }
     }
 
     this.scheduledTasks.clear();
     this.enabled = false;
-    console.log("Scheduler stopped");
+    console.log("[scheduler] status=stopped");
   }
 
   /**
@@ -310,7 +302,7 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("No active servers found for activity sync");
+        console.log("[scheduler] trigger=activity-sync status=no-servers");
         return;
       }
 
@@ -341,7 +333,7 @@ class SyncScheduler {
           );
         } catch (error) {
           console.error(
-            `Failed to queue activity sync for server ${server.name}:`,
+            `[scheduler] queued=activity-sync server=${server.name} status=error`,
             error
           );
         }
@@ -351,7 +343,7 @@ class SyncScheduler {
         `[scheduler] completed=activity-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
-      console.error("Error during periodic activity sync trigger:", error);
+      console.error("[scheduler] trigger=activity-sync status=error", error);
     }
   }
 
@@ -366,7 +358,7 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("No active servers found for recently added items sync");
+        console.log("[scheduler] trigger=recent-items-sync status=no-servers");
         return;
       }
 
@@ -397,7 +389,7 @@ class SyncScheduler {
           );
         } catch (error) {
           console.error(
-            `Failed to queue recently added items sync for server ${server.name}:`,
+            `[scheduler] queued=recent-items-sync server=${server.name} status=error`,
             error
           );
         }
@@ -408,7 +400,7 @@ class SyncScheduler {
       );
     } catch (error) {
       console.error(
-        "Error during periodic recently added items sync trigger:",
+        "[scheduler] trigger=recent-items-sync status=error",
         error
       );
     }
@@ -425,7 +417,7 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("No active servers found for user sync");
+        console.log("[scheduler] trigger=user-sync status=no-servers");
         return;
       }
 
@@ -456,7 +448,7 @@ class SyncScheduler {
           );
         } catch (error) {
           console.error(
-            `Failed to queue user sync for server ${server.name}:`,
+            `[scheduler] queued=user-sync server=${server.name} status=error`,
             error
           );
         }
@@ -466,7 +458,7 @@ class SyncScheduler {
         `[scheduler] completed=user-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
-      console.error("Error during periodic user sync trigger:", error);
+      console.error("[scheduler] trigger=user-sync status=error", error);
     }
   }
 
@@ -498,13 +490,13 @@ class SyncScheduler {
           );
         } catch (error) {
           console.error(
-            `Failed to queue people sync for server ${server.name}:`,
+            `[scheduler] queued=people-sync server=${server.name} status=error`,
             error
           );
         }
       }
     } catch (error) {
-      console.error("Error during periodic people sync trigger:", error);
+      console.error("[scheduler] trigger=people-sync status=error", error);
     }
   }
 
@@ -600,13 +592,13 @@ class SyncScheduler {
           );
         } catch (error) {
           console.error(
-            `Failed to queue embeddings sync for server ${server.name}:`,
+            `[scheduler] queued=embeddings-sync server=${server.name} status=error`,
             error
           );
         }
       }
     } catch (error) {
-      console.error("Error during periodic embeddings sync trigger:", error);
+      console.error("[scheduler] trigger=embeddings-sync status=error", error);
     }
   }
 
@@ -615,13 +607,13 @@ class SyncScheduler {
    */
   private async triggerFullSync(): Promise<void> {
     try {
-      console.log("Triggering scheduled daily full sync...");
+      console.log("[scheduler] trigger=full-sync");
 
       // Get all servers that are not currently syncing (or stale syncing)
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("No active servers found for full sync");
+        console.log("[scheduler] trigger=full-sync status=no-servers");
         return;
       }
 
@@ -657,21 +649,21 @@ class SyncScheduler {
           );
 
           console.log(
-            `Queued scheduled full sync for server: ${server.name} (ID: ${server.id})`
+            `[scheduler] queued=full-sync server=${server.name} serverId=${server.id}`
           );
         } catch (error) {
           console.error(
-            `Failed to queue full sync for server ${server.name}:`,
+            `[scheduler] queued=full-sync server=${server.name} status=error`,
             error
           );
         }
       }
 
       console.log(
-        `Scheduled daily full sync queued for ${activeServers.length} servers`
+        `[scheduler] completed=full-sync serverCount=${activeServers.length}`
       );
     } catch (error) {
-      console.error("Error during scheduled full sync trigger:", error);
+      console.error("[scheduler] trigger=full-sync status=error", error);
     }
   }
 
@@ -701,13 +693,13 @@ class SyncScheduler {
 
       if (result.length > 0) {
         console.log(
-          `Reset stale sync status for ${result.length} server(s): ${result
-            .map((s) => s.name)
-            .join(", ")}`
+          `[scheduler] phase=reset-stale resetCount=${
+            result.length
+          } servers=${result.map((s) => s.name).join(",")}`
         );
       }
     } catch (error) {
-      console.error("Error resetting stale sync status:", error);
+      console.error("[scheduler] phase=reset-stale status=error", error);
     }
   }
 
@@ -785,7 +777,7 @@ class SyncScheduler {
         );
       }
     } catch (error) {
-      console.error("Error during job cleanup:", error);
+      console.error("[scheduler] trigger=job-cleanup status=error", error);
     }
   }
 
@@ -794,7 +786,7 @@ class SyncScheduler {
    */
   private async triggerOldJobCleanup(): Promise<void> {
     try {
-      console.log("Cleaning up job results older than 10 days...");
+      console.log("[scheduler] trigger=old-job-cleanup");
 
       const result = await db
         .delete(jobResults)
@@ -803,15 +795,11 @@ class SyncScheduler {
 
       const deletedCount = result.length;
 
-      if (deletedCount > 0) {
-        console.log(
-          `Old job cleanup completed: deleted ${deletedCount} job results older than 10 days`
-        );
-      } else {
-        console.log("No old job results found to clean up");
-      }
+      console.log(
+        `[scheduler] completed=old-job-cleanup deletedCount=${deletedCount}`
+      );
     } catch (error) {
-      console.error("Error during old job cleanup:", error);
+      console.error("[scheduler] trigger=old-job-cleanup status=error", error);
     }
   }
 
@@ -827,26 +815,22 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log("No active servers found for deleted items cleanup");
+        console.log(
+          "[scheduler] trigger=deleted-items-cleanup status=no-servers"
+        );
         return;
       }
 
       for (const server of activeServers) {
         try {
-          console.log(
-            `[scheduler] starting=deleted-items-cleanup server=${server.name} serverId=${server.id}`
-          );
-
           const result = await cleanupDeletedItems(server);
 
           console.log(
-            `[scheduler] completed=deleted-items-cleanup server=${server.name} ` +
-              `status=${result.status} deleted=${result.metrics.itemsSoftDeleted} ` +
-              `migrated=${result.metrics.itemsMigrated} duration=${result.metrics.duration}ms`
+            `[scheduler] completed=deleted-items-cleanup server=${server.name} status=${result.status} deleted=${result.metrics.itemsSoftDeleted} migrated=${result.metrics.itemsMigrated} durationMs=${result.metrics.duration}`
           );
         } catch (error) {
           console.error(
-            `Failed to run deleted items cleanup for server ${server.name}:`,
+            `[scheduler] completed=deleted-items-cleanup server=${server.name} status=error`,
             error
           );
         }
@@ -856,7 +840,10 @@ class SyncScheduler {
         `[scheduler] completed=deleted-items-cleanup serverCount=${activeServers.length}`
       );
     } catch (error) {
-      console.error("Error during deleted items cleanup:", error);
+      console.error(
+        "[scheduler] trigger=deleted-items-cleanup status=error",
+        error
+      );
     }
   }
 
@@ -888,11 +875,11 @@ class SyncScheduler {
       );
 
       console.log(
-        `Manual activity sync queued for server ID: ${serverId} (limit: ${limit})`
+        `[scheduler] queued=manual-activity-sync serverId=${serverId} limit=${limit}`
       );
     } catch (error) {
       console.error(
-        `Failed to queue manual activity sync for server ${serverId}:`,
+        `[scheduler] queued=manual-activity-sync serverId=${serverId} status=error`,
         error
       );
       throw error;
@@ -927,11 +914,11 @@ class SyncScheduler {
       );
 
       console.log(
-        `Manual recently added items sync queued for server ID: ${serverId} (limit: ${limit})`
+        `[scheduler] queued=manual-recent-items-sync serverId=${serverId} limit=${limit}`
       );
     } catch (error) {
       console.error(
-        `Failed to queue manual recently added items sync for server ${serverId}:`,
+        `[scheduler] queued=manual-recent-items-sync serverId=${serverId} status=error`,
         error
       );
       throw error;
@@ -939,10 +926,21 @@ class SyncScheduler {
   }
 
   /**
-   * Manually trigger full sync for a specific server
+   * Manually trigger full sync for a specific server.
+   * Cancels any existing full sync jobs for this server before starting.
    */
   async triggerServerFullSync(serverId: number): Promise<void> {
     try {
+      const cancelledCount = await cancelJobsByName(
+        JELLYFIN_JOB_NAMES.FULL_SYNC,
+        serverId
+      );
+      if (cancelledCount > 0) {
+        console.log(
+          `[scheduler] cancelled=full-sync serverId=${serverId} cancelledCount=${cancelledCount}`
+        );
+      }
+
       const boss = await getJobQueue();
 
       await boss.send(
@@ -971,10 +969,10 @@ class SyncScheduler {
         }
       );
 
-      console.log(`Manual full sync queued for server ID: ${serverId}`);
+      console.log(`[scheduler] queued=manual-full-sync serverId=${serverId}`);
     } catch (error) {
       console.error(
-        `Failed to queue manual full sync for server ${serverId}:`,
+        `[scheduler] queued=manual-full-sync serverId=${serverId} status=error`,
         error
       );
       throw error;
@@ -1005,10 +1003,10 @@ class SyncScheduler {
         }
       );
 
-      console.log(`Manual user sync queued for server ID: ${serverId}`);
+      console.log(`[scheduler] queued=manual-user-sync serverId=${serverId}`);
     } catch (error) {
       console.error(
-        `Failed to queue manual user sync for server ${serverId}:`,
+        `[scheduler] queued=manual-user-sync serverId=${serverId} status=error`,
         error
       );
       throw error;
