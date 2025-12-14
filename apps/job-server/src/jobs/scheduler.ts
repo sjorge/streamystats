@@ -302,9 +302,7 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log(
-          "[scheduler] trigger=activity-sync status=skipped-servers-busy"
-        );
+        console.log("[scheduler] skipped=activity-sync reason=servers-busy");
         return;
       }
 
@@ -361,7 +359,7 @@ class SyncScheduler {
 
       if (activeServers.length === 0) {
         console.log(
-          "[scheduler] trigger=recent-items-sync status=skipped-servers-busy"
+          "[scheduler] skipped=recent-items-sync reason=servers-busy"
         );
         return;
       }
@@ -421,9 +419,7 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log(
-          "[scheduler] trigger=user-sync status=skipped-servers-busy"
-        );
+        console.log("[scheduler] skipped=user-sync reason=servers-busy");
         return;
       }
 
@@ -619,9 +615,7 @@ class SyncScheduler {
       const activeServers = await this.getServersForPeriodicSync();
 
       if (activeServers.length === 0) {
-        console.log(
-          "[scheduler] trigger=full-sync status=skipped-servers-busy"
-        );
+        console.log("[scheduler] skipped=full-sync reason=servers-busy");
         return;
       }
 
@@ -824,7 +818,7 @@ class SyncScheduler {
 
       if (activeServers.length === 0) {
         console.log(
-          "[scheduler] trigger=deleted-items-cleanup status=skipped-servers-busy"
+          "[scheduler] skipped=deleted-items-cleanup reason=servers-busy"
         );
         return;
       }
@@ -1015,6 +1009,46 @@ class SyncScheduler {
     } catch (error) {
       console.error(
         `[scheduler] queued=manual-user-sync serverId=${serverId} status=error`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Manually trigger items sync for a specific library
+   */
+  async triggerLibraryItemsSync(
+    serverId: number,
+    libraryId: string
+  ): Promise<void> {
+    try {
+      const boss = await getJobQueue();
+
+      await boss.send(
+        JELLYFIN_JOB_NAMES.ITEMS_SYNC,
+        {
+          serverId,
+          syncType: "items",
+          options: {
+            itemOptions: {
+              libraryId,
+            },
+          },
+        },
+        {
+          expireInMinutes: 120, // Job expires after 2 hours
+          retryLimit: 1, // Retry once if it fails
+          retryDelay: 60, // Wait 60 seconds before retrying
+        }
+      );
+
+      console.log(
+        `[scheduler] queued=manual-library-items-sync serverId=${serverId} libraryId=${libraryId}`
+      );
+    } catch (error) {
+      console.error(
+        `[scheduler] queued=manual-library-items-sync serverId=${serverId} libraryId=${libraryId} status=error`,
         error
       );
       throw error;

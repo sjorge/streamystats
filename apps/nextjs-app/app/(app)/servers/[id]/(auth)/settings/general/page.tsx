@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { DeleteServer } from "../DeleteServer";
 import { VersionSection } from "../VersionSection";
 import { SyncManager } from "../SyncManager";
+import { LibrarySyncManager } from "../LibrarySyncManager";
 import { CleanupManager } from "../CleanupManager";
 import { MergeItemsManager } from "../MergeItemsManager";
 import { DangerousMergeManager } from "../DangerousMergeManager";
@@ -30,6 +31,7 @@ export default async function GeneralSettings(props: {
         {isAdmin ? <ServerJobStatusCard serverId={server.id} /> : null}
         <UpdateConnection serverId={server.id} />
         <SyncManager serverId={server.id} serverName={server.name} />
+        {isAdmin ? <LibrarySyncManager serverId={server.id} /> : null}
         {isAdmin ? <CleanupManager serverId={server.id} /> : null}
         {isAdmin ? <MergeItemsManager server={server} /> : null}
         {isAdmin ? <DangerousMergeManager server={server} /> : null}

@@ -27,6 +27,7 @@ export interface ItemSyncOptions {
   itemConcurrency?: number;
   apiRequestDelayMs?: number;
   recentItemsLimit?: number;
+  libraryId?: string;
 }
 
 export interface ItemSyncData {
@@ -55,11 +56,37 @@ export async function syncItems(
   const errors: string[] = [];
 
   try {
-    // Get all libraries for this server
+    // Get libraries for this server, optionally filtered by libraryId
+    const libraryCondition = options.libraryId
+      ? and(
+          eq(libraries.serverId, server.id),
+          eq(libraries.id, options.libraryId)
+        )
+      : eq(libraries.serverId, server.id);
+
     const serverLibraries = await db
       .select()
       .from(libraries)
-      .where(eq(libraries.serverId, server.id));
+      .where(libraryCondition);
+
+    if (serverLibraries.length === 0) {
+      const errorMsg = options.libraryId
+        ? `Library ${options.libraryId} not found for server ${server.id}`
+        : `No libraries found for server ${server.id}`;
+      const finalMetrics = metrics.finish();
+      return createSyncResult<ItemSyncData>(
+        "error",
+        {
+          librariesProcessed: 0,
+          itemsProcessed: 0,
+          itemsInserted: 0,
+          itemsUpdated: 0,
+          itemsUnchanged: 0,
+        },
+        finalMetrics,
+        errorMsg
+      );
+    }
 
     console.info(
       formatSyncLogLine("items-sync", {
@@ -72,6 +99,7 @@ export async function syncItems(
         processMs: 0,
         totalProcessed: 0,
         libraries: serverLibraries.length,
+        libraryId: options.libraryId,
       })
     );
 
@@ -1263,11 +1291,12 @@ async function checkAndMigrateDeletedItem(newItem: NewItem): Promise<{
   result.hiddenRecsMigrated = migratedRecs.length;
   result.migrated = true;
 
-  if (result.sessionsMigrated > 0 || result.hiddenRecsMigrated > 0) {
-    console.info(
-      `[items-sync] Migrated ${result.sessionsMigrated} sessions and ${result.hiddenRecsMigrated} hidden recommendations from ${deletedMatch.id} to ${newItem.id}`
-    );
-  }
+  // Hard-delete the old item since all related data has been migrated
+  await db.delete(items).where(eq(items.id, deletedMatch.id));
+
+  console.info(
+    `[items-sync] Migrated ${result.sessionsMigrated} sessions and ${result.hiddenRecsMigrated} hidden recommendations from ${deletedMatch.id} to ${newItem.id}, deleted old item`
+  );
 
   return result;
 }
