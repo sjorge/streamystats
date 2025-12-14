@@ -1,4 +1,4 @@
-import { ItemUserStats } from "@/lib/db/items";
+import type { ItemUserStats } from "@/lib/db/items";
 import { getServer } from "@/lib/db/server";
 import { isUserAdmin } from "@/lib/db/users";
 import { db, items, sessions, users } from "@streamystats/database";
@@ -12,8 +12,9 @@ import {
   like,
   sql,
   sum,
+  type SQL,
 } from "drizzle-orm";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export async function GET(
     params,
   }: {
     params: Promise<{ serverId: string; itemId: string }>;
-  },
+  }
 ) {
   const { serverId, itemId } = await params;
 
@@ -38,7 +39,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      },
+      }
     );
   }
 
@@ -53,15 +54,15 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      },
+      }
     );
   }
 
-  const searchParams = request.nextUrl.searchParams;
+  const { searchParams } = request.nextUrl;
   const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1"));
   const pageSize = Math.max(
     1,
-    Math.min(100, Number.parseInt(searchParams.get("pageSize") || "5")),
+    Math.min(100, Number.parseInt(searchParams.get("pageSize") || "5"))
   );
   const search = searchParams.get("search")?.trim() || "";
   const completion = searchParams.get("completion") || "all";
@@ -82,7 +83,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      },
+      }
     );
   }
 
@@ -96,7 +97,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      },
+      }
     );
   }
 
@@ -123,7 +124,7 @@ export async function GET(
             "Content-Type": "application/json",
             "Cache-Control": "private, max-age=60",
           },
-        },
+        }
       );
     }
   }
@@ -136,7 +137,7 @@ export async function GET(
   }
 
   // Build HAVING conditions for completion filter
-  let havingCondition = null;
+  let havingCondition: SQL | undefined;
   if (completion === "completed") {
     havingCondition = sql`AVG(${sessions.percentComplete}) >= 90`;
   } else if (completion === "partial") {
@@ -168,14 +169,14 @@ export async function GET(
 
   const offset = (page - 1) * pageSize;
 
-  let countQuery = db
+  const countQueryBase = db
     .select({ count: count() })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(and(...whereConditions))
     .groupBy(sessions.userId);
 
-  let dataQuery = db
+  const dataQueryBase = db
     .select({
       userId: sessions.userId,
       userName: users.name,
@@ -190,10 +191,13 @@ export async function GET(
     .where(and(...whereConditions))
     .groupBy(sessions.userId, users.name);
 
-  if (havingCondition) {
-    countQuery = countQuery.having(havingCondition) as any;
-    dataQuery = dataQuery.having(havingCondition) as any;
-  }
+  const countQuery = havingCondition
+    ? countQueryBase.having(havingCondition)
+    : countQueryBase;
+
+  const dataQuery = havingCondition
+    ? dataQueryBase.having(havingCondition)
+    : dataQueryBase;
 
   const [countResult, viewersRaw] = await Promise.all([
     countQuery,
@@ -203,19 +207,29 @@ export async function GET(
   const total = countResult.length;
   const totalPages = Math.ceil(total / pageSize);
 
-  const data: ItemUserStats[] = viewersRaw.map((r) => ({
-    user: {
-      id: r.userId!,
+  const data: ItemUserStats[] = viewersRaw.flatMap((r) => {
+    if (!r.userId) return [];
+
+    const user: ItemUserStats["user"] = {
+      id: r.userId,
       name: r.userName || "Unknown User",
-    } as ItemUserStats,
-    watchCount: Number(r.watchCount) || 0,
-    totalWatchTime: Number(r.totalWatchTime || 0),
-    completionRate: Math.round((Number(r.completionRate) || 0) * 10) / 10,
-    firstWatched: r.firstWatched
-      ? new Date(r.firstWatched).toISOString()
-      : null,
-    lastWatched: r.lastWatched ? new Date(r.lastWatched).toISOString() : null,
-  }));
+    } as ItemUserStats["user"];
+
+    return [
+      {
+        user,
+        watchCount: Number(r.watchCount) || 0,
+        totalWatchTime: Number(r.totalWatchTime || 0),
+        completionRate: Math.round((Number(r.completionRate) || 0) * 10) / 10,
+        firstWatched: r.firstWatched
+          ? new Date(r.firstWatched).toISOString()
+          : null,
+        lastWatched: r.lastWatched
+          ? new Date(r.lastWatched).toISOString()
+          : null,
+      },
+    ];
+  });
 
   return new Response(
     JSON.stringify({
@@ -233,6 +247,6 @@ export async function GET(
         "Content-Type": "application/json",
         "Cache-Control": "private, max-age=60",
       },
-    },
+    }
   );
 }

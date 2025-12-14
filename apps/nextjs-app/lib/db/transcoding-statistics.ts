@@ -1,12 +1,33 @@
 // Transcoding statistics types and functions
-import { Session, db, sessions } from "@streamystats/database";
+import { db, sessions } from "@streamystats/database";
+import type { Session } from "@streamystats/database";
 import { and, eq, gte, isNotNull, lte } from "drizzle-orm";
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function getNestedTranscodingInfo(value: unknown): unknown {
+  if (!isRecord(value)) return null;
+  return value.TranscodingInfo ?? value.transcodingInfo ?? value.transcodeInfo;
+}
 
 export interface NumericStat {
   label: string;
   value: number;
   count: number;
-  distribution?: unknown[];
+  distribution?: number[];
   avg?: number;
   min?: number;
   max?: number;
@@ -63,7 +84,7 @@ export async function getTranscodingStatistics(
   serverId: number,
   startDate?: string,
   endDate?: string,
-  userId?: string,
+  userId?: string
 ): Promise<TranscodingStatisticsResponse> {
   // Get all sessions with transcoding data for the specified date range
   const whereConditions = [eq(sessions.serverId, serverId)];
@@ -140,12 +161,7 @@ export async function getTranscodingStatistics(
 
     // Try to extract additional info from rawData
     let transcodingInfo: unknown = null;
-    if (session.rawData && typeof session.rawData === "object") {
-      // Look for transcoding info in various possible locations
-      const raw = session.rawData as Record<string, any>;
-      transcodingInfo =
-        raw.TranscodingInfo || raw.transcodingInfo || raw.transcodeInfo;
-    }
+    transcodingInfo = getNestedTranscodingInfo(session.rawData);
 
     if (isDirectPlay) {
       directPlayCount++;
@@ -156,35 +172,36 @@ export async function getTranscodingStatistics(
       if (session.transcodingVideoCodec) {
         videoCodecMap.set(
           session.transcodingVideoCodec,
-          (videoCodecMap.get(session.transcodingVideoCodec) || 0) + 1,
+          (videoCodecMap.get(session.transcodingVideoCodec) || 0) + 1
         );
       }
 
       if (session.transcodingAudioCodec) {
         audioCodecMap.set(
           session.transcodingAudioCodec,
-          (audioCodecMap.get(session.transcodingAudioCodec) || 0) + 1,
+          (audioCodecMap.get(session.transcodingAudioCodec) || 0) + 1
         );
       }
 
       if (session.transcodingContainer) {
         containerMap.set(
           session.transcodingContainer,
-          (containerMap.get(session.transcodingContainer) || 0) + 1,
+          (containerMap.get(session.transcodingContainer) || 0) + 1
         );
       }
 
       // Try to get hardware acceleration type from rawData
-      if (
-        session.hardwareAccelType ||
-        (transcodingInfo as any)?.HardwareAccelerationType ||
-        (transcodingInfo as any)?.hardwareAccelerationType
-      ) {
-        const hwType =
-          session.hardwareAccelType ||
-          (transcodingInfo as any).HardwareAccelerationType ||
-          (transcodingInfo as any).hardwareAccelerationType;
-        hardwareAccelMap.set(hwType, (hardwareAccelMap.get(hwType) || 0) + 1);
+      const hwTypeRaw =
+        session.hardwareAccelType ??
+        (isRecord(transcodingInfo)
+          ? transcodingInfo.HardwareAccelerationType ??
+            transcodingInfo.hardwareAccelerationType
+          : null);
+      if (typeof hwTypeRaw === "string" && hwTypeRaw.length > 0) {
+        hardwareAccelMap.set(
+          hwTypeRaw,
+          (hardwareAccelMap.get(hwTypeRaw) || 0) + 1
+        );
       }
 
       // Collect transcoding reasons
@@ -192,19 +209,20 @@ export async function getTranscodingStatistics(
         for (const reason of session.transcodingReasons) {
           transcodingReasonsMap.set(
             reason,
-            (transcodingReasonsMap.get(reason) || 0) + 1,
+            (transcodingReasonsMap.get(reason) || 0) + 1
           );
         }
       }
 
       // Collect bitrate data (try rawData first, then fallback to video bitrate)
-      const bitrateInfo = transcodingInfo as any;
-      const bitrate =
-        bitrateInfo?.Bitrate ||
-        bitrateInfo?.bitrate ||
-        session.transcodingBitrate ||
+      const bitrateRaw =
+        (isRecord(transcodingInfo)
+          ? transcodingInfo.Bitrate ?? transcodingInfo.bitrate
+          : null) ??
+        session.transcodingBitrate ??
         session.videoBitRate;
-      if (bitrate) {
+      const bitrate = toFiniteNumber(bitrateRaw);
+      if (bitrate !== null) {
         bitrates.push(bitrate);
       }
 
@@ -217,12 +235,12 @@ export async function getTranscodingStatistics(
       }
 
       // Try to get audio channels from transcoding info or session data
-      const audioInfo = transcodingInfo as any;
-      const channels =
-        audioInfo?.AudioChannels ||
-        audioInfo?.audioChannels ||
-        session.audioChannels;
-      if (channels) {
+      const channelsRaw =
+        (isRecord(transcodingInfo)
+          ? transcodingInfo.AudioChannels ?? transcodingInfo.audioChannels
+          : null) ?? session.audioChannels;
+      const channels = toFiniteNumber(channelsRaw);
+      if (channels !== null) {
         audioChannels.push(channels);
       }
     }
@@ -234,7 +252,7 @@ export async function getTranscodingStatistics(
   const heightStats = calculateNumericStats("Height", heights);
   const audioChannelStats = calculateNumericStats(
     "Audio Channels",
-    audioChannels,
+    audioChannels
   );
 
   // Convert codec maps to CategoryStat arrays
@@ -243,11 +261,11 @@ export async function getTranscodingStatistics(
   const containerStats = mapToCategoryStats(containerMap, transcodeCount);
   const hardwareAccelStats = mapToCategoryStats(
     hardwareAccelMap,
-    transcodeCount,
+    transcodeCount
   );
   const transcodingReasonsStats = mapToCategoryStats(
     transcodingReasonsMap,
-    transcodeCount,
+    transcodeCount
   );
 
   // Calculate percentages for directness
@@ -334,7 +352,7 @@ function calculateNumericStats(label: string, values: number[]): NumericStat {
 // Helper function to convert Map to CategoryStat array
 function mapToCategoryStats(
   map: Map<string, number>,
-  total: number,
+  total: number
 ): CategoryStat[] {
   return Array.from(map.entries()).map(([label, count]) => ({
     label,
@@ -347,7 +365,7 @@ function mapToCategoryStats(
 export async function getBitrateDistribution(
   serverId: number,
   startDate?: string,
-  endDate?: string,
+  endDate?: string
 ): Promise<NumericStat[]> {
   const whereConditions = [
     eq(sessions.serverId, serverId),
@@ -373,15 +391,14 @@ export async function getBitrateDistribution(
   const bitrates = sessionData
     .map((s) => {
       // Try to get transcoding bitrate from rawData first, then fall back to video bitrate
-      if (s.rawData && typeof s.rawData === "object") {
-        const transcodingInfo = session.rawData as Record<string, any>;
-        const info =
-          transcodingInfo.TranscodingInfo || transcodingInfo.transcodingInfo;
-        if (info?.Bitrate || info?.bitrate) {
-          return info.Bitrate || info.bitrate;
-        }
+      const transcodingInfo = getNestedTranscodingInfo(s.rawData);
+      if (isRecord(transcodingInfo)) {
+        const bitrate = toFiniteNumber(
+          transcodingInfo.Bitrate ?? transcodingInfo.bitrate
+        );
+        if (bitrate !== null) return bitrate;
       }
-      return s.videoBitRate;
+      return s.videoBitRate ?? null;
     })
     .filter((bitrate): bitrate is number => bitrate !== null);
 
@@ -401,7 +418,7 @@ export async function getBitrateDistribution(
   return ranges
     .map((range) => {
       const valuesInRange = bitrates.filter(
-        (b) => b >= range.min && b < range.max,
+        (b) => b >= range.min && b < range.max
       );
       const avg =
         valuesInRange.length > 0
@@ -424,7 +441,7 @@ export async function getBitrateDistribution(
 export async function getCodecDistribution(
   serverId: number,
   startDate?: string,
-  endDate?: string,
+  endDate?: string
 ): Promise<{ [codec: string]: number }> {
   const whereConditions = [eq(sessions.serverId, serverId)];
 
@@ -479,7 +496,7 @@ export async function getCodecDistribution(
 export async function getResolutionDistribution(
   serverId: number,
   startDate?: string,
-  endDate?: string,
+  endDate?: string
 ): Promise<{ [resolution: string]: number }> {
   const whereConditions = [
     eq(sessions.serverId, serverId),
