@@ -116,7 +116,11 @@ export const TranscodingReasonsCard = ({
         y={Number(y)}
         width={Number(width)}
         height={Number(height)}
-        value={value}
+        value={
+          typeof value === "string" || typeof value === "number"
+            ? value
+            : undefined
+        }
         fill="#d6e3ff"
         fontSize={12}
         containerWidth={400}
