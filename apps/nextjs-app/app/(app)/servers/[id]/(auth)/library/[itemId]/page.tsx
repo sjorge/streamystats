@@ -3,9 +3,9 @@ import { getItemDetails, getSeasonsAndEpisodes } from "@/lib/db/items";
 import { getServer } from "@/lib/db/server";
 import { getSimilarSeriesForItem } from "@/lib/db/similar-series-statistics";
 import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
-import type {
-  RecommendationItem,
+import {
   getSimilarItemsForItem,
+  type RecommendationItem,
 } from "@/lib/db/similar-statistics";
 import { getMe } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
