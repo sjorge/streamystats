@@ -1,5 +1,5 @@
 # Dependencies stage - Full Bun
-FROM oven/bun:1-alpine AS deps
+FROM oven/bun:1.3.4-alpine AS deps
 
 # Install system dependencies for native modules
 RUN apk add --no-cache libc6-compat wget python3 make g++ vips-dev
@@ -45,7 +45,7 @@ WORKDIR /app/apps/nextjs-app
 RUN bun --bun next build
 
 # Production runtime stage
-FROM oven/bun:1-alpine AS runner
+FROM oven/bun:1.3.4-alpine AS runner
 
 RUN apk add --no-cache libc6-compat wget vips
 

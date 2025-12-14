@@ -1,5 +1,5 @@
 # Build stage
-FROM oven/bun:1 AS builder
+FROM oven/bun:1.3.4 AS builder
 WORKDIR /app
 
 # Copy configuration files
@@ -9,8 +9,8 @@ COPY packages/database/package.json ./packages/database/
 COPY apps/job-server/package.json ./apps/job-server/
 RUN mkdir -p apps/nextjs-app && echo '{"name":"@streamystats/nextjs-app","version":"0.0.0","dependencies":{}}' > apps/nextjs-app/package.json
 
-# Install dependencies (we need full install to build)
-RUN bun install --frozen-lockfile
+# Install dependencies
+RUN bun install
 
 # Copy database package source
 COPY packages/database ./packages/database
