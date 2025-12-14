@@ -38,46 +38,23 @@ echo 'CREATE EXTENSION IF NOT EXISTS "vector";' | sudo -u postgres psql -d ${DB_
 
 ## Streamystats
 
-Everything except the database and systemd unit will be contained within `/opt/streamystats`. We will also use a nodeenv to keep everything separate from the system's default node.
+Everything except the database, systemd unit and bun will be contained within `/opt/streamystats`.
 
-+### Preparing the nodeenv
-Creating the nodeenv:
+### Installing bun
+
+For more information see https://bun.sh/
+
 ```bash
-[ -d /opt/streamystats/nodeenv ] || nodeenv --prebuilt -n 23.11.1 /opt/streamystats/nodeenv
-source /opt/streamystats/nodeenv/bin/activate
-npm install -g pnpm
+curl -fsSL https://bun.sh/install | bash
 ```
 
 ### Installing from source
 Cloning the source:
 ```bash
 git clone https://github.com/fredrikburmester/streamystats.git /opt/streamystats/src
-```
 
-Installing the database package:
-```bash
-cd /opt/streamystats/src/packages/database
-pnpm install --frozen-lockfile
-pnpm build
-npx drizzle-kit migrate
-pnpm db:status
-```
-
-Installing the job-server package:
-```bash
-cd /opt/streamystats/src/apps/job-server
-pnpm install --frozen-lockfile
-pnpm build
-```
-
-**If you want a different base URI e.g. /streamystats, you need to export NEXT_PUBLIC_BASE_PATH before building the next-app!**
-
-Installing the next-app package:
-```bash
-cd /opt/streamystats/src/apps/nextjs-app
-#export NEXT_PUBLIC_BASE_PATH=/streamstats
-pnpm install --frozen-lockfile
-pnpm build
+cd /opt/streamystats
+bun install --frozen-lockfile
 ```
 
 ### Configuration
@@ -85,6 +62,8 @@ pnpm build
 **You should still have the DB_NAME and DB_PASS variables set from earlier, if not replace them with the correct values!**
 
 This configuration listens on localhost so needs to be placed behind a reverse proxy. Change this as needed for your setup.
+
+!! The openssl command is not escaped so when copying these commands to create the .env files a random secret will be generated.
 
 ```bash
 mkdir -p /opt/streamystats/etc
@@ -103,6 +82,7 @@ HOST=localhost
 PORT=3000
 #NEXT_PUBLIC_BASE_PATH=/streamystats
 JOB_SERVER_URL=http://localhost:3005
+SESSION_SECRET="$(openssl rand -hex 64)"
 EOF
 ```
 
@@ -122,11 +102,11 @@ After=postgresql@15-main.service
 
 [Service]
 EnvironmentFile=/opt/streamystats/etc/db.env
-Environment=PATH=/opt/streamystats/nodeenv/bin:/usr/bin:/bin
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
 Environment=NODE_ENV=production
 Type=oneshot
 WorkingDirectory=/opt/streamystats/src/packages/database
-ExecStart=/opt/streamystats/nodeenv/bin/npx drizzle-kit migrate
+ExecStart=bun run db:migrate
 User=streamystats
 Group=streamystats
 PrivateTmp=true
@@ -152,11 +132,11 @@ After=postgresql@15-main.service
 [Service]
 EnvironmentFile=/opt/streamystats/etc/db.env
 EnvironmentFile=/opt/streamystats/etc/job-server.env
-Environment=PATH=/opt/streamystats/nodeenv/bin:/usr/bin:/bin
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
 Environment=NODE_ENV=production
 Type=simple
 WorkingDirectory=/opt/streamystats/src/apps/job-server
-ExecStart=/opt/streamystats/nodeenv/bin/pnpm start
+ExecStart=bun start
 User=streamystats
 Group=streamystats
 PrivateTmp=true
@@ -180,12 +160,12 @@ Requires=streamystats-job-server.service
 [Service]
 EnvironmentFile=/opt/streamystats/etc/db.env
 EnvironmentFile=/opt/streamystats/etc/nextjs-app.env
-Environment=PATH=/opt/streamystats/nodeenv/bin:/usr/bin:/bin
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
 Type=simple
 WorkingDirectory=/opt/streamystats/src/apps/nextjs-app
-ExecStart=/opt/streamystats/nodeenv/bin/pnpm start
+ExecStart=/bin/bash -c 'bun run build && bun start'
 User=streamystats
 Group=streamystats
 PrivateTmp=true
