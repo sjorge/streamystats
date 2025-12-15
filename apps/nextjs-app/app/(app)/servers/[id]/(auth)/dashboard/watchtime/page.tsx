@@ -1,8 +1,7 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getDefaultStartDate, setEndDateToEndOfDay } from "@/dates";
-import { getDefaultEndDate } from "@/dates";
+import { setEndDateToEndOfDay } from "@/dates";
 import { getServer } from "@/lib/db/server";
 import {
   getMe,
@@ -18,6 +17,7 @@ import Graph from "../Graph";
 import TotalWatchTime from "../TotalWatchTime";
 import { WatchTimePerHour } from "../WatchTimePerHour";
 import { WatchTimePerWeekDay } from "../WatchTimePerWeekDay";
+import { WatchtimeDateRangeFilter } from "./WatchtimeDateRangeFilter";
 
 export default async function WatchtimePage({
   params,
@@ -25,8 +25,8 @@ export default async function WatchtimePage({
 }: {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
-    startDate: string;
-    endDate: string;
+    startDate?: string;
+    endDate?: string;
   }>;
 }) {
   const { id } = await params;
@@ -37,16 +37,28 @@ export default async function WatchtimePage({
     redirect("/not-found");
   }
 
-  const _startDate = startDate || getDefaultStartDate();
-  const _endDate = setEndDateToEndOfDay(endDate);
+  const defaultStartDate = addDays(new Date(), -7).toISOString().split("T")[0];
+  const defaultEndDate = new Date().toISOString().split("T")[0];
+
+  const startDateParam = startDate || defaultStartDate;
+  const endDateParam = endDate || defaultEndDate;
+
+  if (!startDate || !endDate) {
+    redirect(
+      `/servers/${server.id}/dashboard/watchtime?startDate=${startDateParam}&endDate=${endDateParam}`,
+    );
+  }
+
+  const _endDate = setEndDateToEndOfDay(endDateParam);
 
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
       <PageTitle title="Watchtime Statistics" />
+      <WatchtimeDateRangeFilter className="mb-6" />
       <Suspense fallback={<Skeleton className="h-48 w-full" />}>
         <WatchtimeStats
           server={server}
-          startDate={_startDate}
+          startDate={startDateParam}
           endDate={_endDate}
         />
       </Suspense>
@@ -74,17 +86,25 @@ async function WatchtimeStats({
     getWatchTimePerWeekDay({
       serverId: server.id,
       userId: sas ? undefined : me.id,
+      startDate,
+      endDate,
     }),
     getWatchTimePerHour({
       serverId: server.id,
       userId: sas ? undefined : me.id,
+      startDate,
+      endDate,
     }),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex md:flex-row flex-col gap-2">
-        <TotalWatchTime server={server} />
+        <TotalWatchTime
+          server={server}
+          startDate={startDate}
+          endDate={endDate}
+        />
       </div>
       <Suspense fallback={<Skeleton className="h-48 w-full" />}>
         <Graph server={server} startDate={startDate} endDate={endDate} />
