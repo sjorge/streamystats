@@ -28,7 +28,7 @@ const vector = customType<{
     return value
       .slice(1, -1)
       .split(",")
-      .map((v) => parseFloat(v));
+      .map((v) => Number.parseFloat(v.trim()));
   },
   toDriver(value: number[]): string {
     return `[${value.join(",")}]`;
