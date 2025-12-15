@@ -26,14 +26,16 @@ app.post("/scheduler/trigger", async (c) => {
     const server = await db
       .select({ id: servers.id, name: servers.name })
       .from(servers)
-      .where(eq(servers.id, parseInt(serverId)))
+      .where(eq(servers.id, Number.parseInt(serverId)))
       .limit(1);
 
     if (!server.length) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerServerActivitySync(parseInt(serverId));
+    await activityScheduler.triggerServerActivitySync(
+      Number.parseInt(serverId)
+    );
 
     return c.json({
       success: true,
@@ -56,14 +58,14 @@ app.post("/scheduler/trigger-user-sync", async (c) => {
     const server = await db
       .select({ id: servers.id, name: servers.name })
       .from(servers)
-      .where(eq(servers.id, parseInt(serverId)))
+      .where(eq(servers.id, Number.parseInt(serverId)))
       .limit(1);
 
     if (!server.length) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerServerUserSync(parseInt(serverId));
+    await activityScheduler.triggerServerUserSync(Number.parseInt(serverId));
 
     return c.json({
       success: true,
@@ -86,14 +88,14 @@ app.post("/scheduler/trigger-full-sync", async (c) => {
     const server = await db
       .select({ id: servers.id, name: servers.name })
       .from(servers)
-      .where(eq(servers.id, parseInt(serverId)))
+      .where(eq(servers.id, Number.parseInt(serverId)))
       .limit(1);
 
     if (!server.length) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerServerFullSync(parseInt(serverId));
+    await activityScheduler.triggerServerFullSync(Number.parseInt(serverId));
 
     return c.json({
       success: true,
@@ -120,7 +122,7 @@ app.post("/scheduler/trigger-library-sync", async (c) => {
     const server = await db
       .select({ id: servers.id, name: servers.name })
       .from(servers)
-      .where(eq(servers.id, parseInt(serverId)))
+      .where(eq(servers.id, Number.parseInt(serverId)))
       .limit(1);
 
     if (!server.length) {
@@ -128,7 +130,7 @@ app.post("/scheduler/trigger-library-sync", async (c) => {
     }
 
     await activityScheduler.triggerLibraryItemsSync(
-      parseInt(serverId),
+      Number.parseInt(serverId),
       libraryId
     );
 
