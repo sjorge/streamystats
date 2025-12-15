@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,9 +9,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { RefreshCw, Database, CheckCircle, AlertTriangle } from "lucide-react";
 import { fetch } from "@/lib/utils";
+import { AlertTriangle, CheckCircle, Database, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 interface SyncManagerProps {
   serverId: number;

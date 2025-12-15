@@ -1,19 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { requireAdmin } from "@/lib/api-auth";
+import { db } from "@streamystats/database";
+import { sessions } from "@streamystats/database/schema";
+import type { NewSession } from "@streamystats/database/schema";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 // @ts-ignore - stream-json doesn't have types
 import { parser } from "stream-json";
 // @ts-ignore - stream-json doesn't have types
 import { streamArray } from "stream-json/streamers/StreamArray";
-import { db } from "@streamystats/database";
-import { sessions, type NewSession } from "@streamystats/database/schema";
-import { requireAdmin } from "@/lib/api-auth";
 
 export const runtime = "nodejs"; // IMPORTANT: disables edge runtime
 export const dynamic = "force-dynamic"; // optional – no cache
 
 /** ISO-8601 timestamp */
-type ISODate = string & { __iso: void };
+type ISODate = string & { __iso: undefined };
 
 /** Emby/Jellyfin playback methods */
 type PlaybackMethod = "DirectPlay" | "DirectStream" | "Transcode";
@@ -141,12 +143,12 @@ export async function POST(req: NextRequest) {
     if (!serverId) {
       return NextResponse.json(
         { error: "Server ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const serverIdNum = Number(serverId);
-    if (isNaN(serverIdNum)) {
+    if (Number.isNaN(serverIdNum)) {
       return NextResponse.json({ error: "Invalid server ID" }, { status: 400 });
     }
 
@@ -155,7 +157,7 @@ export async function POST(req: NextRequest) {
     }
 
     const input = Readable.fromWeb(
-      req.body as import("stream/web").ReadableStream
+      req.body as import("stream/web").ReadableStream,
     );
     let processedCount = 0;
     let importedCount = 0;
@@ -166,7 +168,7 @@ export async function POST(req: NextRequest) {
       input,
       parser(),
       streamArray(),
-      async function* (records: AsyncIterable<{ value: any }>) {
+      async (records: AsyncIterable<{ value: unknown }>) => {
         for await (const { value } of records) {
           // Handle the Jellystats structure: [{ "jf_playback_activity": [...] }]
           if (
@@ -182,14 +184,14 @@ export async function POST(req: NextRequest) {
                 try {
                   const imported = await importSession(
                     session as JellystatsSession,
-                    serverIdNum
+                    serverIdNum,
                   );
                   if (imported) {
                     importedCount++;
                   }
                   processedCount++;
                 } catch (error) {
-                  console.error(`Failed to import session:`, error);
+                  console.error("Failed to import session:", error);
                   errorCount++;
                   processedCount++;
                 }
@@ -200,20 +202,20 @@ export async function POST(req: NextRequest) {
             try {
               const imported = await importSession(
                 value as JellystatsSession,
-                serverIdNum
+                serverIdNum,
               );
               if (imported) {
                 importedCount++;
               }
               processedCount++;
             } catch (error) {
-              console.error(`Failed to import session:`, error);
+              console.error("Failed to import session:", error);
               errorCount++;
               processedCount++;
             }
           }
         }
-      }
+      },
     );
 
     if (processedCount === 0) {
@@ -223,7 +225,7 @@ export async function POST(req: NextRequest) {
           error: "No valid sessions found. Please check the file format.",
           message: "Import failed - no sessions found",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -241,14 +243,14 @@ export async function POST(req: NextRequest) {
         error: error instanceof Error ? error.message : "Import failed",
         success: false,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 async function importSession(
   session: JellystatsSession,
-  serverId: number
+  serverId: number,
 ): Promise<boolean> {
   // Skip if already imported
   if (session.imported) {

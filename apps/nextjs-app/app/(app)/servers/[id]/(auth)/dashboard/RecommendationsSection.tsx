@@ -4,17 +4,17 @@ import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Server } from "@streamystats/database";
-import { EyeOffIcon, TrendingUp, Link2, LucideIcon } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
-import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Server } from "@streamystats/database";
+import { EyeOffIcon, Link2, LucideIcon, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import { toast } from "sonner";
 import type {
   RecommendationCardItem,
   RecommendationListItem,
@@ -28,7 +28,7 @@ interface RecommendationsSectionProps {
   server: Server;
   onHideRecommendation: (
     serverId: string | number,
-    itemId: string
+    itemId: string,
   ) => Promise<{
     success: boolean;
     error?: string | boolean;
@@ -54,7 +54,7 @@ export function RecommendationsSection({
   const [hidingItems, setHidingItems] = useState<Set<string>>(new Set());
 
   const handleHideRecommendation = async (
-    recommendation: RecommendationListItem
+    recommendation: RecommendationListItem,
   ) => {
     const { item } = recommendation;
     if (!item.id || hidingItems.has(item.id)) {
@@ -171,7 +171,7 @@ export function RecommendationsSection({
                               <div className="absolute top-2 left-2 z-20">
                                 <Badge
                                   className={`${getSimilarityColor(
-                                    similarity
+                                    similarity,
                                   )} bg-background/90 backdrop-blur-sm border-0 shadow-lg text-xs px-1.5 py-0.5`}
                                 >
                                   <TrendingUp className="h-2.5 w-2.5 mr-1" />
@@ -210,12 +210,12 @@ export function RecommendationsSection({
                                   {item.runtimeTicks &&
                                     formatRuntime &&
                                     formatRuntime(
-                                      Number(item.runtimeTicks)
+                                      Number(item.runtimeTicks),
                                     ) && (
                                       <>
                                         <span>•</span>
                                         {formatRuntime(
-                                          Number(item.runtimeTicks)
+                                          Number(item.runtimeTicks),
                                         )}
                                       </>
                                     )}
@@ -243,7 +243,7 @@ export function RecommendationsSection({
                                       .map(
                                         (
                                           basedItem: RecommendationCardItem,
-                                          idx: number
+                                          idx: number,
                                         ) => (
                                           <TooltipProvider
                                             key={basedItem.id || idx}
@@ -282,7 +282,7 @@ export function RecommendationsSection({
                                               </TooltipContent>
                                             </Tooltip>
                                           </TooltipProvider>
-                                        )
+                                        ),
                                       )}
                                     {basedOn.length > 3 && (
                                       <div className="flex-shrink-0 w-12 h-18 rounded border border-border/50 bg-muted flex items-center justify-center">

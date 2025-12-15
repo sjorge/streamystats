@@ -1,28 +1,30 @@
 import {
-  db,
-  sessions,
-  items,
-  libraries,
-  users,
   Item,
   Library,
   User,
+  db,
+  items,
+  libraries,
+  sessions,
+  users,
 } from "@streamystats/database";
 import {
+  AnyColumn,
+  SQL,
   and,
+  asc,
+  count,
+  desc,
   eq,
   gte,
-  lte,
-  sql,
-  count,
-  sum,
-  desc,
+  ilike,
+  inArray,
   isNotNull,
   isNull,
-  inArray,
-  ilike,
-  asc,
+  lte,
   or,
+  sql,
+  sum,
 } from "drizzle-orm";
 
 // Type definitions for library statistics
@@ -103,7 +105,7 @@ export const getAggregatedLibraryStatistics = async ({
           totalWatchTime: Number(row?.totalWatchTime || 0),
           totalPlayCount: row?.totalPlayCount || 0,
         };
-      }
+      },
     );
 
   // Process item counts
@@ -160,12 +162,12 @@ export const getLibraryItemsWithStats = async ({
   }
 
   // Add search filter
-  if (search && search.trim()) {
+  if (search?.trim()) {
     conditions.push(ilike(items.name, `%${search.trim()}%`));
   }
 
   // Add library filter
-  if (libraryIds && libraryIds.trim()) {
+  if (libraryIds?.trim()) {
     const libraryIdArray = libraryIds.split(",").filter((id) => id.trim());
     if (libraryIdArray.length > 0) {
       conditions.push(inArray(items.libraryId, libraryIdArray));
@@ -178,11 +180,11 @@ export const getLibraryItemsWithStats = async ({
       item: items,
       totalWatchTime:
         sql<number>`COALESCE(SUM(${sessions.playDuration}), 0)`.as(
-          "total_watch_time"
+          "total_watch_time",
         ),
       watchCount: sql<number>`COUNT(${sessions.id})`.as("watch_count"),
       uniqueViewers: sql<number>`COUNT(DISTINCT ${sessions.userId})`.as(
-        "unique_viewers"
+        "unique_viewers",
       ),
       firstWatched: sql<string>`MIN(${sessions.startTime})`.as("first_watched"),
       lastWatched: sql<string>`MAX(${sessions.startTime})`.as("last_watched"),
@@ -193,7 +195,7 @@ export const getLibraryItemsWithStats = async ({
     .groupBy(items.id);
 
   // Apply sorting
-  let orderClause;
+  let orderClause: SQL | undefined;
   const order = sortOrder === "desc" ? desc : asc;
 
   switch (sortBy) {
@@ -236,7 +238,7 @@ export const getLibraryItemsWithStats = async ({
     .where(and(...conditions));
 
   const totalCount = await totalCountQuery.then(
-    (result) => result[0]?.count || 0
+    (result) => result[0]?.count || 0,
   );
 
   const totalPages = Math.ceil(totalCount / perPage);
@@ -258,7 +260,7 @@ export const getLibraryItemsWithStats = async ({
       unique_viewers: Number(row.uniqueViewers),
       first_watched: row.firstWatched,
       last_watched: row.lastWatched,
-    })
+    }),
   );
 
   return {

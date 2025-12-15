@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  hideRecommendation,
   RecommendationItem,
+  hideRecommendation,
 } from "@/lib/db/similar-statistics";
 import { Server } from "@streamystats/database";
 import { Film } from "lucide-react";

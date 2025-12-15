@@ -1,8 +1,8 @@
-import { streamText, convertToModelMessages, stepCountIs } from "ai";
-import { createChatModel, type ChatConfig } from "@/lib/ai/providers";
+import { type ChatConfig, createChatModel } from "@/lib/ai/providers";
 import { createChatTools } from "@/lib/ai/tools";
 import { getServer } from "@/lib/db/server";
 import { getMe } from "@/lib/db/users";
+import { convertToModelMessages, stepCountIs, streamText } from "ai";
 
 export const maxDuration = 60;
 
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
           error:
             "AI Chat not configured. Please configure it in Settings > AI Chat.",
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -134,7 +134,7 @@ Current user context:
       JSON.stringify({
         error: error instanceof Error ? error.message : "An error occurred",
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 }

@@ -5,7 +5,7 @@
 // The new streaming implementation can handle large files (200MB+) efficiently.
 
 import { db } from "@streamystats/database";
-import { sessions, type NewSession } from "@streamystats/database/schema";
+import { type NewSession, sessions } from "@streamystats/database/schema";
 
 interface ImportState {
   type: "success" | "error" | "info" | null;
@@ -15,7 +15,7 @@ interface ImportState {
 }
 
 /** ISO-8601 timestamp */
-type ISODate = string & { __iso: void };
+type ISODate = string & { __iso: undefined };
 
 /** Emby/Jellyfin playback methods */
 type PlaybackMethod = "DirectPlay" | "DirectStream" | "Transcode";
@@ -133,7 +133,7 @@ interface JellystatsSession {
 
 export async function importFromJellystats(
   prevState: ImportState,
-  formData: FormData
+  formData: FormData,
 ): Promise<ImportState> {
   try {
     const serverId = formData.get("serverId");
@@ -147,7 +147,7 @@ export async function importFromJellystats(
     }
 
     const serverIdNum = Number(serverId);
-    if (isNaN(serverIdNum)) {
+    if (Number.isNaN(serverIdNum)) {
       return {
         type: "error",
         message: "Invalid server ID",
@@ -227,10 +227,10 @@ export async function importFromJellystats(
 
         // Extract media info
         const videoStream = session.MediaStreams?.find(
-          (s) => s.Type === "Video"
+          (s) => s.Type === "Video",
         );
         const audioStream = session.MediaStreams?.find(
-          (s) => s.Type === "Audio"
+          (s) => s.Type === "Audio",
         );
 
         // Determine if transcoding occurred
@@ -373,7 +373,7 @@ function validateJellystatsData(data: any): {
     // Validate date format
     if (
       session.ActivityDateInserted &&
-      isNaN(Date.parse(session.ActivityDateInserted))
+      Number.isNaN(Date.parse(session.ActivityDateInserted))
     ) {
       return {
         isValid: false,
@@ -382,7 +382,10 @@ function validateJellystatsData(data: any): {
     }
 
     // Validate duration is a number
-    if (session.PlaybackDuration && isNaN(Number(session.PlaybackDuration))) {
+    if (
+      session.PlaybackDuration &&
+      Number.isNaN(Number(session.PlaybackDuration))
+    ) {
       return {
         isValid: false,
         error: `Invalid PlaybackDuration format at index ${i}`,

@@ -1,11 +1,11 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { SignJWT, jwtVerify, JWTPayload } from "jose";
 import { shouldUseSecureCookies } from "@/lib/secure-cookies";
+import { JWTPayload, SignJWT, jwtVerify } from "jose";
+import { cookies } from "next/headers";
 
 const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production"
+  process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production",
 );
 
 const SESSION_COOKIE = "streamystats-session";
@@ -96,7 +96,7 @@ export async function destroySession(): Promise<void> {
  * Useful for refreshing admin status after it changes on Jellyfin.
  */
 export async function updateSession(
-  updates: Partial<SessionUser>
+  updates: Partial<SessionUser>,
 ): Promise<void> {
   const current = await getSession();
   if (!current) {

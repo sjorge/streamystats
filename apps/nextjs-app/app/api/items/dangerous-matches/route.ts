@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/api-auth";
 import { db, items, sessions } from "@streamystats/database";
-import { eq, and, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
 export interface DangerousMatch {
   deletedItem: {
@@ -26,10 +26,10 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
     const serverId = url.searchParams.get("serverId");
-    const page = parseInt(url.searchParams.get("page") || "1");
+    const page = Number.parseInt(url.searchParams.get("page") || "1");
     const limit = Math.min(
-      parseInt(url.searchParams.get("limit") || "100"),
-      100
+      Number.parseInt(url.searchParams.get("limit") || "100"),
+      100,
     );
     const offset = (page - 1) * limit;
 
@@ -42,12 +42,12 @@ export async function GET(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
-    const serverIdNum = parseInt(serverId);
-    if (isNaN(serverIdNum)) {
+    const serverIdNum = Number.parseInt(serverId);
+    if (Number.isNaN(serverIdNum)) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -74,8 +74,8 @@ export async function GET(request: Request) {
           eq(items.serverId, serverIdNum),
           eq(items.type, "Movie"),
           isNotNull(items.deletedAt),
-          isNotNull(items.productionYear)
-        )
+          isNotNull(items.productionYear),
+        ),
       )
       .as("deleted_items");
 
@@ -92,15 +92,15 @@ export async function GET(request: Request) {
           eq(items.serverId, serverIdNum),
           eq(items.type, "Movie"),
           isNull(items.deletedAt),
-          isNotNull(items.productionYear)
-        )
+          isNotNull(items.productionYear),
+        ),
       )
       .as("active_items");
 
     const joinCondition = and(
       sql`lower(${deletedItems.name}) = lower(${activeItems.name})`,
       eq(deletedItems.productionYear, activeItems.productionYear),
-      eq(deletedItems.type, activeItems.type)
+      eq(deletedItems.type, activeItems.type),
     );
 
     const [matches, totalResult] = await Promise.all([
@@ -149,7 +149,7 @@ export async function GET(request: Request) {
           },
           sessionsCount: sessionCount[0]?.count ?? 0,
         } as DangerousMatch;
-      })
+      }),
     );
 
     const total = totalResult[0]?.count || 0;
@@ -168,7 +168,7 @@ export async function GET(request: Request) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error finding dangerous matches:", error);
@@ -181,7 +181,7 @@ export async function GET(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

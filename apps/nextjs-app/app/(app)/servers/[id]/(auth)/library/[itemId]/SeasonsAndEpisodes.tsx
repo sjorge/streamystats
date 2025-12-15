@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   Accordion,
   AccordionContent,
@@ -8,14 +7,15 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDuration } from "@/lib/utils";
 import { SeasonEpisode } from "@/lib/db/items";
-import { Play, Clock, Calendar, Tv } from "lucide-react";
+import { formatDuration } from "@/lib/utils";
 import { Server } from "@streamystats/database/schema";
-import Image from "next/image";
-import { useState, useMemo } from "react";
-import { Blurhash } from "react-blurhash";
 import { Item } from "@streamystats/database/schema";
+import { Calendar, Clock, Play, Tv } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { Blurhash } from "react-blurhash";
 
 interface SeasonsAndEpisodesProps {
   seasons: SeasonEpisode[];
@@ -187,7 +187,7 @@ export function SeasonsAndEpisodes({
                               <Clock className="w-3 h-3" />
                               <span>
                                 {formatDuration(
-                                  Math.floor(episode.runtimeTicks / 10_000_000)
+                                  Math.floor(episode.runtimeTicks / 10_000_000),
                                 )}
                               </span>
                             </div>
@@ -197,7 +197,7 @@ export function SeasonsAndEpisodes({
                               <Calendar className="w-3 h-3" />
                               <span>
                                 {new Date(
-                                  episode.premiereDate
+                                  episode.premiereDate,
                                 ).toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric",

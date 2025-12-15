@@ -23,11 +23,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { login } from "@/lib/auth";
 import type { Server } from "@/lib/types";
 import { useRouter } from "nextjs-toploader/app";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { login } from "@/lib/auth";
 
 const FormSchema = z.object({
   username: z.string(),
@@ -133,11 +133,11 @@ export const SignInForm: React.FC<Props> = ({ server, servers }) => {
           {servers.filter((s) => s.id !== server.id).length > 0 && (
             <div className="mt-6 space-y-4">
               <div className="flex items-center">
-                <div className="h-px flex-1 bg-border"></div>
+                <div className="h-px flex-1 bg-border" />
                 <span className="px-2 text-xs text-muted-foreground">
                   Or select another server
                 </span>
-                <div className="h-px flex-1 bg-border"></div>
+                <div className="h-px flex-1 bg-border" />
               </div>
 
               <div className="space-y-2">

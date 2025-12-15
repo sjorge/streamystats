@@ -1,11 +1,11 @@
 import { requireAdmin } from "@/lib/api-auth";
 import {
   db,
+  hiddenRecommendations,
   items,
   sessions,
-  hiddenRecommendations,
 } from "@streamystats/database";
-import { eq, and, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 interface MergePair {
   deletedItemId: string;
@@ -20,7 +20,7 @@ interface MergeResult {
 
 async function mergeSinglePair(
   pair: MergePair,
-  serverId: number
+  serverId: number,
 ): Promise<MergeResult> {
   return await db.transaction(async (tx) => {
     const migratedSessions = await tx
@@ -29,8 +29,8 @@ async function mergeSinglePair(
       .where(
         and(
           eq(sessions.serverId, serverId),
-          eq(sessions.itemId, pair.deletedItemId)
-        )
+          eq(sessions.itemId, pair.deletedItemId),
+        ),
       )
       .returning({ id: sessions.id });
 
@@ -40,8 +40,8 @@ async function mergeSinglePair(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.itemId, pair.activeItemId)
-        )
+          eq(hiddenRecommendations.itemId, pair.activeItemId),
+        ),
       );
     const existingUserIds = existingRightRecs.map((r) => r.userId);
 
@@ -53,8 +53,8 @@ async function mergeSinglePair(
           and(
             eq(hiddenRecommendations.serverId, serverId),
             eq(hiddenRecommendations.itemId, pair.deletedItemId),
-            inArray(hiddenRecommendations.userId, existingUserIds)
-          )
+            inArray(hiddenRecommendations.userId, existingUserIds),
+          ),
         )
         .returning({ id: hiddenRecommendations.id });
       deletedDuplicateRecs = deleted.length;
@@ -66,8 +66,8 @@ async function mergeSinglePair(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.itemId, pair.deletedItemId)
-        )
+          eq(hiddenRecommendations.itemId, pair.deletedItemId),
+        ),
       )
       .returning({ id: hiddenRecommendations.id });
 
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
         const serverId = deletedItem[0].serverId;
         if (serverId !== activeItem[0].serverId) {
           errors.push(
-            `Items ${pair.deletedItemId} and ${pair.activeItemId} are from different servers`
+            `Items ${pair.deletedItemId} and ${pair.activeItemId} are from different servers`,
           );
           continue;
         }
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
         errors.push(
           `Error merging ${pair.deletedItemId} -> ${pair.activeItemId}: ${
             pairError instanceof Error ? pairError.message : "Unknown error"
-          }`
+          }`,
         );
       }
     }
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error merging items in bulk:", error);
@@ -208,7 +208,7 @@ export async function POST(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

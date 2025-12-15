@@ -52,7 +52,7 @@ export function UpdateNotifier() {
               // Go to latest release
               window.open(
                 "https://github.com/fredrikburmester/streamystats/releases/latest",
-                "_blank"
+                "_blank",
               );
               toast.dismiss();
             }}
@@ -78,12 +78,10 @@ export function UpdateNotifier() {
         ),
       });
     },
-    [toasts]
+    [toasts],
   );
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-
     const checkForUpdates = async () => {
       try {
         const response = await fetch("/api/version");
@@ -97,7 +95,7 @@ export function UpdateNotifier() {
       }
     };
 
-    intervalId = setInterval(checkForUpdates, 15 * 60 * 1000);
+    const intervalId = setInterval(checkForUpdates, 15 * 60 * 1000);
 
     setTimeout(checkForUpdates, 1000);
 

@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSimilarUsers, SimilarUser } from "@/lib/db/user-similarity";
-import { Calendar, Trophy, ArrowRightLeft } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SimilarUser, getSimilarUsers } from "@/lib/db/user-similarity";
+import { ArrowRightLeft, Calendar, Trophy } from "lucide-react";
 
 function UserList({
   users,

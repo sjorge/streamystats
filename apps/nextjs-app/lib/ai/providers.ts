@@ -1,5 +1,5 @@
-import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
 export type ChatProvider = "openai-compatible" | "ollama" | "anthropic";
@@ -96,8 +96,6 @@ export function createChatModel(config: ChatConfig): LanguageModel | null {
       });
       return ollama(config.model);
     }
-
-    case "openai-compatible":
     default: {
       const openai = createOpenAI({
         baseURL: config.baseUrl || "https://api.openai.com/v1",

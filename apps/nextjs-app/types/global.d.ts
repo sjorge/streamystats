@@ -1,7 +1,7 @@
 import type {
-  Server as DatabaseServer,
-  Library as DatabaseLibrary,
   Item as DatabaseItem,
+  Library as DatabaseLibrary,
+  Server as DatabaseServer,
 } from "@streamystats/database";
 
 declare global {
@@ -41,5 +41,3 @@ declare global {
     total_items: number;
   }
 }
-
-export {};

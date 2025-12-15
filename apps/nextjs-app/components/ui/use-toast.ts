@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 
 type ToastType = "default" | "destructive";
 
@@ -22,7 +22,7 @@ export function useToast() {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, 5000);
     },
-    []
+    [],
   );
 
   const success = useCallback(
@@ -33,7 +33,7 @@ export function useToast() {
         type: "default",
       });
     },
-    [addToast]
+    [addToast],
   );
 
   const error = useCallback(
@@ -44,7 +44,7 @@ export function useToast() {
         type: "destructive",
       });
     },
-    [addToast]
+    [addToast],
   );
 
   const dismiss = useCallback((id: string) => {

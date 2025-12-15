@@ -1,5 +1,7 @@
 "use client";
 
+import { usePersistantState } from "@/hooks/usePersistantState";
+import { useQueryParams } from "@/hooks/useQueryParams";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -13,13 +15,12 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useQueryParams } from "@/hooks/useQueryParams";
-import { usePersistantState } from "@/hooks/usePersistantState";
-import { useDebounce } from "use-debounce";
-import * as React from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import * as React from "react";
+import { useDebounce } from "use-debounce";
 
+import JellyfinAvatar from "@/components/JellyfinAvatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -36,7 +37,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import JellyfinAvatar from "@/components/JellyfinAvatar";
 import { Activity, Server } from "@streamystats/database/schema";
 
 interface PaginatedActivities {
@@ -70,10 +70,13 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
   const [debouncedSearch] = useDebounce(searchInput, 500);
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
   const [columnVisibility, setColumnVisibility, isLoadingVisibility] =
-    usePersistantState<VisibilityState>(`activities-column-visibility-${server.id}`, {});
+    usePersistantState<VisibilityState>(
+      `activities-column-visibility-${server.id}`,
+      {},
+    );
 
   // Update URL when debounced search changes
   React.useEffect(() => {
@@ -110,10 +113,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
       accessorKey: "name",
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
-            onClick={() => handleSortChange("name")}
-          >
+          <Button variant="ghost" onClick={() => handleSortChange("name")}>
             Name
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -145,10 +145,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
       accessorKey: "type",
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
-            onClick={() => handleSortChange("type")}
-          >
+          <Button variant="ghost" onClick={() => handleSortChange("type")}>
             Type
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -160,10 +157,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
       accessorKey: "date",
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
-            onClick={() => handleSortChange("date")}
-          >
+          <Button variant="ghost" onClick={() => handleSortChange("date")}>
             Date
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -269,7 +263,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   );
@@ -288,7 +282,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}

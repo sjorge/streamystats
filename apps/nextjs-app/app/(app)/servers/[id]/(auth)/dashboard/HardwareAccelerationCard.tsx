@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import {
   Card,
   CardContent,
@@ -14,7 +15,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import { CategoryStat } from "@/lib/db/transcoding-statistics";
 import { ZapIcon } from "lucide-react";
 import React from "react";
@@ -39,7 +39,7 @@ export const HardwareAccelerationCard = ({ data }: Props) => {
     const maxHeightPerBar = 40;
     return Math.min(
       Math.max(minHeightPerBar, 200 / dataLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 
@@ -97,7 +97,7 @@ export const HardwareAccelerationCard = ({ data }: Props) => {
   const mostCommonAcceleration =
     data.length > 0
       ? data.reduce((prev, current) =>
-          prev.count > current.count ? prev : current
+          prev.count > current.count ? prev : current,
         )
       : null;
 

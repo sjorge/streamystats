@@ -1,24 +1,26 @@
 import {
-  db,
-  sessions,
-  items,
-  users,
-  Session,
   Item,
+  Session,
   User,
+  db,
+  items,
+  sessions,
+  users,
 } from "@streamystats/database";
 import {
+  AnyColumn,
+  SQL,
   and,
-  eq,
-  desc,
-  sql,
-  isNotNull,
-  ilike,
   asc,
-  or,
+  desc,
+  eq,
   gte,
-  lte,
+  ilike,
   inArray,
+  isNotNull,
+  lte,
+  or,
+  sql,
 } from "drizzle-orm";
 
 export interface HistoryItem {
@@ -48,11 +50,11 @@ interface UserHistoryOptions {
  */
 export const getHistory = async (
   serverId: number,
-  page: number = 1,
-  perPage: number = 50,
+  page = 1,
+  perPage = 50,
   search?: string,
   sortBy?: string,
-  sortOrder?: string
+  sortOrder?: string,
 ): Promise<HistoryResponse> => {
   const offset = (page - 1) * perPage;
 
@@ -64,11 +66,11 @@ export const getHistory = async (
   ];
 
   // Add search filter if provided
-  if (search && search.trim()) {
+  if (search?.trim()) {
     conditions.push(
       sql`(${sessions.itemName} ILIKE ${`%${search.trim()}%`} OR ${
         sessions.userName
-      } ILIKE ${`%${search.trim()}%`})`
+      } ILIKE ${`%${search.trim()}%`})`,
     );
   }
 
@@ -81,7 +83,7 @@ export const getHistory = async (
     .where(and(...conditions));
 
   // Apply sorting
-  let orderClause;
+  let orderClause: SQL | undefined;
   const order = sortOrder === "asc" ? asc : desc;
 
   switch (sortBy) {
@@ -125,7 +127,7 @@ export const getHistory = async (
     .where(and(...conditions));
 
   const totalCount = await totalCountQuery.then(
-    (result) => result[0]?.count || 0
+    (result) => result[0]?.count || 0,
   );
 
   const totalPages = Math.ceil(totalCount / perPage);
@@ -149,7 +151,7 @@ export const getHistory = async (
 export const getUserHistory = async (
   serverId: number,
   userId: string,
-  options: UserHistoryOptions = {}
+  options: UserHistoryOptions = {},
 ): Promise<HistoryResponse> => {
   const {
     page = 1,
@@ -173,8 +175,8 @@ export const getUserHistory = async (
       or(
         ilike(items.name, `%${search}%`),
         ilike(sessions.clientName, `%${search}%`),
-        ilike(sessions.deviceName, `%${search}%`)
-      )!
+        ilike(sessions.deviceName, `%${search}%`),
+      )!,
     );
   }
 
@@ -187,9 +189,9 @@ export const getUserHistory = async (
     .where(and(...conditions));
 
   // Determine sort order
-  let orderByClause;
+  let orderByClause: SQL | undefined;
   if (sortBy) {
-    let sortColumn;
+    let sortColumn: AnyColumn | undefined;
     switch (sortBy) {
       case "item_name":
         sortColumn = items.name;
@@ -253,8 +255,8 @@ export const getUserHistory = async (
 export const getItemHistory = async (
   serverId: number,
   itemId: string,
-  page: number = 1,
-  perPage: number = 50
+  page = 1,
+  perPage = 50,
 ): Promise<HistoryResponse> => {
   const offset = (page - 1) * perPage;
 
@@ -267,8 +269,8 @@ export const getItemHistory = async (
       and(
         eq(sessions.serverId, serverId),
         eq(sessions.itemId, itemId),
-        isNotNull(sessions.userId)
-      )
+        isNotNull(sessions.userId),
+      ),
     )
     .orderBy(desc(sessions.createdAt))
     .limit(perPage)
@@ -281,8 +283,8 @@ export const getItemHistory = async (
       and(
         eq(sessions.serverId, serverId),
         eq(sessions.itemId, itemId),
-        isNotNull(sessions.userId)
-      )
+        isNotNull(sessions.userId),
+      ),
     )
     .then((result) => result[0]?.count || 0);
 
@@ -345,7 +347,7 @@ export const getHistoryByFilters = async ({
   const needsItemJoin =
     itemType && itemType !== "all" && itemType !== undefined;
 
-  let query = db
+  const query = db
     .select()
     .from(sessions)
     .leftJoin(items, eq(sessions.itemId, items.id))

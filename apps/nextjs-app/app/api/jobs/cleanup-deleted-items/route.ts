@@ -18,7 +18,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -35,13 +35,13 @@ export async function POST(request: Request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ serverId }),
-      }
+      },
     );
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        errorData.error || `HTTP ${response.status}: ${response.statusText}`,
       );
     }
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

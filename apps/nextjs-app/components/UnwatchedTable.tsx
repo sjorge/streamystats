@@ -109,7 +109,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
         >
           1
         </PaginationLink>
-      </PaginationItem>
+      </PaginationItem>,
     );
 
     // If there are too many pages, use ellipsis
@@ -121,7 +121,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
         items.push(
           <PaginationItem key="ellipsis-start">
             <PaginationEllipsis />
-          </PaginationItem>
+          </PaginationItem>,
         );
       }
 
@@ -138,7 +138,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
             >
               {i}
             </PaginationLink>
-          </PaginationItem>
+          </PaginationItem>,
         );
       }
 
@@ -146,7 +146,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
         items.push(
           <PaginationItem key="ellipsis-end">
             <PaginationEllipsis />
-          </PaginationItem>
+          </PaginationItem>,
         );
       }
     } else {
@@ -164,7 +164,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
             >
               {i}
             </PaginationLink>
-          </PaginationItem>
+          </PaginationItem>,
         );
       }
     }
@@ -183,7 +183,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
           >
             {totalPages}
           </PaginationLink>
-        </PaginationItem>
+        </PaginationItem>,
       );
     }
 
@@ -304,7 +304,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
 }
 
 function formatMinutes(minutes: number): string {
-  if (isNaN(minutes)) return "Unknown";
+  if (Number.isNaN(minutes)) return "Unknown";
 
   const hours = Math.floor(minutes / 60);
   const mins = Math.round(minutes % 60);

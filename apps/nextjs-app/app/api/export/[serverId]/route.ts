@@ -1,14 +1,14 @@
-import { NextRequest } from "next/server";
+import { requireAdmin } from "@/lib/api-auth";
 import { getServer } from "@/lib/db/server";
 import { db, sessions } from "@streamystats/database";
 import { eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/api-auth";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ serverId: string }> }
+  { params }: { params: Promise<{ serverId: string }> },
 ) {
   try {
     // Require admin for data export
@@ -54,14 +54,14 @@ export async function GET(
     const sessionCount = exportData.sessions.length;
 
     console.log(
-      `Export completed for server ${server.name}: ${sessionCount} sessions`
+      `Export completed for server ${server.name}: ${sessionCount} sessions`,
     );
 
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().split("T")[0];
     const filename = `streamystats-backup-${server.name.replace(
       /[^a-zA-Z0-9]/g,
-      "-"
+      "-",
     )}-${timestamp}.json`;
 
     // Return JSON response with proper headers for download
@@ -84,7 +84,7 @@ export async function GET(
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

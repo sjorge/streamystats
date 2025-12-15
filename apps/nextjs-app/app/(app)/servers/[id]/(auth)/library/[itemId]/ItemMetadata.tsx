@@ -1,19 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateUS, formatDuration } from "@/lib/utils";
 import { Item } from "@streamystats/database/schema";
 import {
+  BarChart3,
+  Percent,
+  Tag,
   TrendingUp,
   Users,
-  Percent,
   Video,
-  Tag,
-  BarChart3,
 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { ViewerDetailsDialog } from "./ViewerDetailsDialog";
 import type { ItemDetailsResponse } from "./types";
 
@@ -68,7 +68,9 @@ function KeyValueRow({
   return (
     <div className="flex items-start justify-between gap-6">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className={valueClassName ?? "text-sm text-foreground"}>{value}</span>
+      <span className={valueClassName ?? "text-sm text-foreground"}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -97,7 +99,8 @@ export function ItemMetadata({
 
   const genres = useMemo(() => item.genres ?? [], [item.genres]);
   const tags = useMemo(() => item.tags ?? [], [item.tags]);
-  const hasAbout = Boolean(item.overview) || genres.length > 0 || tags.length > 0;
+  const hasAbout =
+    Boolean(item.overview) || genres.length > 0 || tags.length > 0;
 
   return (
     <>
@@ -174,7 +177,10 @@ export function ItemMetadata({
             <CardContent className="pt-0 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <StatTile label="Views" value={totalViews} />
-                <StatTile label="Watch time" value={formatDuration(totalWatchTime)} />
+                <StatTile
+                  label="Watch time"
+                  value={formatDuration(totalWatchTime)}
+                />
                 <StatTile
                   label="Avg completion"
                   value={`${completionRate.toFixed(1)}%`}
@@ -217,8 +223,14 @@ export function ItemMetadata({
               )}
 
               <div className="space-y-2">
-                <KeyValueRow label="First watched" value={formatDateUS(firstWatched)} />
-                <KeyValueRow label="Last watched" value={formatDateUS(lastWatched)} />
+                <KeyValueRow
+                  label="First watched"
+                  value={formatDateUS(firstWatched)}
+                />
+                <KeyValueRow
+                  label="Last watched"
+                  value={formatDateUS(lastWatched)}
+                />
               </div>
             </CardContent>
           </Card>
@@ -233,11 +245,17 @@ export function ItemMetadata({
             <CardContent className="pt-0 space-y-3">
               <KeyValueRow
                 label="Premiere"
-                value={item.premiereDate ? formatDateOnlyUS(item.premiereDate) : undefined}
+                value={
+                  item.premiereDate
+                    ? formatDateOnlyUS(item.premiereDate)
+                    : undefined
+                }
               />
               <KeyValueRow
                 label="Container"
-                value={item.container ? item.container.toUpperCase() : undefined}
+                value={
+                  item.container ? item.container.toUpperCase() : undefined
+                }
               />
               <KeyValueRow
                 label="Resolution"
@@ -253,7 +271,9 @@ export function ItemMetadata({
                 label="Subtitles"
                 value={
                   item.hasSubtitles === null ? undefined : (
-                    <Badge variant={item.hasSubtitles ? "default" : "secondary"}>
+                    <Badge
+                      variant={item.hasSubtitles ? "default" : "secondary"}
+                    >
                       {item.hasSubtitles ? "Available" : "None"}
                     </Badge>
                   )
@@ -261,7 +281,11 @@ export function ItemMetadata({
               />
               <KeyValueRow
                 label="Video type"
-                value={item.videoType ? <Badge variant="outline">{item.videoType}</Badge> : undefined}
+                value={
+                  item.videoType ? (
+                    <Badge variant="outline">{item.videoType}</Badge>
+                  ) : undefined
+                }
               />
               <KeyValueRow
                 label="Path"

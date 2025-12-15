@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -52,11 +52,7 @@ export async function GET(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }
-
-
-
-

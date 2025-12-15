@@ -18,7 +18,11 @@ export const UserActivityWrapper: React.FC<Props> = async ({
   const _startDate = startDate || getDefaultStartDate();
   const _endDate = setEndDateToEndOfDay(endDate);
 
-  const data = await getUserActivityPerDay({ serverId: server.id, startDate: _startDate, endDate: _endDate });
+  const data = await getUserActivityPerDay({
+    serverId: server.id,
+    startDate: _startDate,
+    endDate: _endDate,
+  });
 
   return <UserActivityChart data={data} />;
 };

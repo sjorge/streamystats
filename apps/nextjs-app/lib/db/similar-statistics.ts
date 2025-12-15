@@ -1,26 +1,26 @@
 "use server";
 
-import {
-  Item,
-  sessions,
-  items,
-  hiddenRecommendations,
-} from "@streamystats/database/schema";
 import { db } from "@streamystats/database";
 import {
+  Item,
+  hiddenRecommendations,
+  items,
+  sessions,
+} from "@streamystats/database/schema";
+import {
   and,
-  eq,
-  sql,
+  count,
   desc,
-  notInArray,
+  eq,
+  gt,
   isNotNull,
   isNull,
-  gt,
-  count,
+  notInArray,
+  sql,
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { getMe } from "./users";
-import { unstable_cache, revalidateTag } from "next/cache";
 
 const enableDebug = false;
 
@@ -117,7 +117,7 @@ const itemCardWithEmbeddingColumns = {
 } as const;
 
 const stripEmbedding = (
-  item: RecommendationCardItemWithEmbedding
+  item: RecommendationCardItemWithEmbedding,
 ): RecommendationCardItem => {
   const { embedding: _embedding, ...card } = item;
   return card;
@@ -128,27 +128,27 @@ const CACHE_TTL = 60 * 60 * 1; // 1 hour
 const getSimilarStatisticsUncached = async (
   serverId: number,
   userId: string | undefined,
-  limit: number
+  limit: number,
 ): Promise<RecommendationItem[]> => {
   try {
     debugLog(
       `\n🚀 Starting recommendation process for server ${serverId}, user ${
         userId || "anonymous"
-      }, limit ${limit}`
+      }, limit ${limit}`,
     );
 
     let recommendations: RecommendationItem[] = [];
 
     if (userId) {
       // Get user-specific recommendations
-      debugLog(`\n📊 Getting user-specific recommendations...`);
+      debugLog("\n📊 Getting user-specific recommendations...");
       recommendations = await getUserSpecificRecommendations(
         serverId,
         userId,
-        limit
+        limit,
       );
       debugLog(
-        `✅ Got ${recommendations.length} user-specific recommendations`
+        `✅ Got ${recommendations.length} user-specific recommendations`,
       );
     }
 
@@ -156,21 +156,21 @@ const getSimilarStatisticsUncached = async (
     if (recommendations.length < limit) {
       const remainingLimit = limit - recommendations.length;
       debugLog(
-        `\n🔥 Need ${remainingLimit} more recommendations, getting popular items...`
+        `\n🔥 Need ${remainingLimit} more recommendations, getting popular items...`,
       );
       const popularRecommendations = await getPopularRecommendations(
         serverId,
         remainingLimit,
-        userId
+        userId,
       );
       debugLog(
-        `✅ Got ${popularRecommendations.length} popular recommendations`
+        `✅ Got ${popularRecommendations.length} popular recommendations`,
       );
       recommendations = [...recommendations, ...popularRecommendations];
     }
 
     debugLog(
-      `\n🎉 Final result: ${recommendations.length} total recommendations`
+      `\n🎉 Final result: ${recommendations.length} total recommendations`,
     );
     return recommendations;
   } catch (error) {
@@ -182,24 +182,24 @@ const getSimilarStatisticsUncached = async (
 const getCachedSimilarStatistics = (
   serverId: number,
   userId: string,
-  limit: number
+  limit: number,
 ) =>
   unstable_cache(
     () => getSimilarStatisticsUncached(serverId, userId, limit),
-    [`similar-statistics`, String(serverId), userId, String(limit)],
+    ["similar-statistics", String(serverId), userId, String(limit)],
     {
       revalidate: CACHE_TTL,
       tags: [
         `recommendations-${serverId}`,
         `recommendations-${serverId}-${userId}`,
       ],
-    }
+    },
   )();
 
 export const getSimilarStatistics = async (
   serverId: string | number,
   userId?: string,
-  limit: number = 20
+  limit = 20,
 ): Promise<RecommendationItem[]> => {
   const serverIdNum = Number(serverId);
 
@@ -210,7 +210,7 @@ export const getSimilarStatistics = async (
       targetUserId = currentUser.id;
       debugLog(`🔍 Using current user: ${targetUserId}`);
     } else {
-      debugLog(`❌ No valid user found for recommendations`);
+      debugLog("❌ No valid user found for recommendations");
       return [];
     }
   }
@@ -220,7 +220,7 @@ export const getSimilarStatistics = async (
 
 export const revalidateRecommendations = async (
   serverId: number,
-  userId?: string
+  userId?: string,
 ) => {
   revalidateTag(`recommendations-${serverId}`, "hours");
   if (userId) {
@@ -231,10 +231,10 @@ export const revalidateRecommendations = async (
 async function getUserSpecificRecommendations(
   serverId: number,
   userId: string,
-  limit: number
+  limit: number,
 ): Promise<RecommendationItem[]> {
   debugLog(
-    `\n🎯 Starting user-specific recommendations for user ${userId}, server ${serverId}, limit ${limit}`
+    `\n🎯 Starting user-specific recommendations for user ${userId}, server ${serverId}, limit ${limit}`,
   );
 
   // Get user's watch history with total play duration and recent activity
@@ -243,7 +243,7 @@ async function getUserSpecificRecommendations(
       itemId: sessions.itemId,
       item: itemCardWithEmbeddingSelect,
       totalPlayDuration: sql<number>`SUM(${sessions.playDuration})`.as(
-        "totalPlayDuration"
+        "totalPlayDuration",
       ),
       lastWatched: sql<Date>`MAX(${sessions.endTime})`.as("lastWatched"),
     })
@@ -254,8 +254,8 @@ async function getUserSpecificRecommendations(
         eq(sessions.serverId, serverId),
         eq(sessions.userId, userId),
         isNotNull(items.embedding),
-        isNotNull(sessions.playDuration)
-      )
+        isNotNull(sessions.playDuration),
+      ),
     )
     .groupBy(sessions.itemId, items.id)
     .orderBy(sql`MAX(${sessions.endTime}) DESC`);
@@ -264,8 +264,8 @@ async function getUserSpecificRecommendations(
   userWatchHistory.forEach((item, index) => {
     debugLog(
       `  ${index + 1}. "${item.item.name}" - ${Math.round(
-        item.totalPlayDuration / 60
-      )}min total, last watched: ${item.lastWatched}`
+        item.totalPlayDuration / 60,
+      )}min total, last watched: ${item.lastWatched}`,
     );
   });
 
@@ -287,8 +287,8 @@ async function getUserSpecificRecommendations(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.userId, userId)
-        )
+          eq(hiddenRecommendations.userId, userId),
+        ),
       );
   } catch (error) {
     debugLog("Error fetching hidden recommendations:", error);
@@ -316,7 +316,7 @@ async function getUserSpecificRecommendations(
       itemId: sessions.itemId,
       item: itemCardWithEmbeddingSelect,
       totalPlayDuration: sql<number>`SUM(${sessions.playDuration})`.as(
-        "totalPlayDuration"
+        "totalPlayDuration",
       ),
     })
     .from(sessions)
@@ -326,8 +326,8 @@ async function getUserSpecificRecommendations(
         eq(sessions.serverId, serverId),
         eq(sessions.userId, userId),
         isNotNull(items.embedding),
-        isNotNull(sessions.playDuration)
-      )
+        isNotNull(sessions.playDuration),
+      ),
     )
     .groupBy(sessions.itemId, items.id)
     .orderBy(desc(sql<number>`SUM(${sessions.playDuration})`))
@@ -338,15 +338,15 @@ async function getUserSpecificRecommendations(
   topWatchedHistory.forEach((item, index) => {
     debugLog(
       `  ${index + 1}. "${item.item.name}" - ${Math.round(
-        item.totalPlayDuration / 60
-      )}min total`
+        item.totalPlayDuration / 60,
+      )}min total`,
     );
   });
 
   // Combine recent and top watched, remove duplicates, limit to 15
   const recentIds = new Set(recentWatches.map((item) => item.id));
   const additionalTopWatched = topWatchedItems.filter(
-    (item) => !recentIds.has(item.id)
+    (item) => !recentIds.has(item.id),
   );
 
   const baseMovies = [...recentWatches, ...additionalTopWatched].slice(0, 15);
@@ -354,7 +354,7 @@ async function getUserSpecificRecommendations(
   baseMovies.forEach((item, index) => {
     const isRecent = recentIds.has(item.id);
     debugLog(
-      `  ${index + 1}. "${item.name}" (${isRecent ? "recent" : "top watched"})`
+      `  ${index + 1}. "${item.name}" (${isRecent ? "recent" : "top watched"})`,
     );
   });
 
@@ -384,7 +384,7 @@ async function getUserSpecificRecommendations(
     // Calculate cosine similarity with other items
     const similarity = sql<number>`1 - (${cosineDistance(
       items.embedding,
-      watchedItem.embedding
+      watchedItem.embedding,
     )})`;
 
     // First, let's see the distribution of similarity scores
@@ -402,34 +402,34 @@ async function getUserSpecificRecommendations(
           notInArray(items.id, watchedItemIds), // Exclude already watched items
           hiddenItemIds.length > 0
             ? notInArray(items.id, hiddenItemIds)
-            : sql`true` // Exclude hidden items
-        )
+            : sql`true`, // Exclude hidden items
+        ),
       )
       .orderBy(desc(similarity))
       .limit(50); // Get more for analysis
 
-    debugLog(`  📊 Similarity score distribution (top 10):`);
+    debugLog("  📊 Similarity score distribution (top 10):");
     allSimilarItems.slice(0, 10).forEach((result, index) => {
       debugLog(
         `    ${index + 1}. "${result.item.name}" - similarity: ${Number(
-          result.similarity
-        ).toFixed(3)}`
+          result.similarity,
+        ).toFixed(3)}`,
       );
     });
 
     // Now filter for actual recommendations with lower threshold
     const similarItems = allSimilarItems.filter(
-      (result) => Number(result.similarity) > 0.35
+      (result) => Number(result.similarity) > 0.35,
     );
 
     debugLog(
-      `  Found ${similarItems.length} similar items (similarity > 0.35):`
+      `  Found ${similarItems.length} similar items (similarity > 0.35):`,
     );
     similarItems.slice(0, 5).forEach((result, index) => {
       debugLog(
         `    ${index + 1}. "${result.item.name}" - similarity: ${Number(
-          result.similarity
-        ).toFixed(3)}`
+          result.similarity,
+        ).toFixed(3)}`,
       );
     });
     if (similarItems.length > 5) {
@@ -480,15 +480,15 @@ async function getUserSpecificRecommendations(
 
   // Get the best recommendation for each base movie
   const guaranteedRecommendations: RecommendationItem[] = [];
-  debugLog(`\n🎯 Guaranteed recommendations (one per base movie):`);
+  debugLog("\n🎯 Guaranteed recommendations (one per base movie):");
   for (const [baseMovieId, recs] of recommendationsPerBaseMovie) {
     if (recs.length > 0) {
       const bestRec = recs.sort((a, b) => b.similarity - a.similarity)[0];
       const baseMovie = baseMovies.find((m) => m.id === baseMovieId);
       debugLog(
         `  "${bestRec.item.name}" (similarity: ${bestRec.similarity.toFixed(
-          3
-        )}) <- based on "${baseMovie?.name}"`
+          3,
+        )}) <- based on "${baseMovie?.name}"`,
       );
       guaranteedRecommendations.push(bestRec);
     }
@@ -510,7 +510,7 @@ async function getUserSpecificRecommendations(
     .sort((a, b) => b.similarity - a.similarity);
 
   debugLog(
-    `\n🎭 Multi-movie matches (${multiMovieMatches.length} items similar to 2+ base movies):`
+    `\n🎭 Multi-movie matches (${multiMovieMatches.length} items similar to 2+ base movies):`,
   );
   multiMovieMatches.slice(0, 5).forEach((match, index) => {
     const baseMovieNames = match.basedOn.map((m) => `"${m.name}"`).join(", ");
@@ -518,15 +518,15 @@ async function getUserSpecificRecommendations(
       `  ${index + 1}. "${
         match.item.name
       }" (avg similarity: ${match.similarity.toFixed(
-        3
-      )}) <- based on ${baseMovieNames}`
+        3,
+      )}) <- based on ${baseMovieNames}`,
     );
   });
 
   // Combine guaranteed + multi-movie + fill remaining with best single matches
   const usedItemIds = new Set(guaranteedRecommendations.map((r) => r.item.id));
   const additionalMultiMovieMatches = multiMovieMatches.filter(
-    (m) => !usedItemIds.has(m.item.id)
+    (m) => !usedItemIds.has(m.item.id),
   );
 
   const qualifiedCandidates = [
@@ -544,8 +544,8 @@ async function getUserSpecificRecommendations(
     const type = rec.basedOn.length >= 2 ? "multi-movie" : "single-movie";
     debugLog(
       `  ${index + 1}. "${rec.item.name}" (similarity: ${rec.similarity.toFixed(
-        3
-      )}, ${type}) <- ${baseMovieNames}`
+        3,
+      )}, ${type}) <- ${baseMovieNames}`,
     );
   });
 
@@ -555,12 +555,12 @@ async function getUserSpecificRecommendations(
 async function getPopularRecommendations(
   serverId: number,
   limit: number,
-  excludeUserId?: string
+  excludeUserId?: string,
 ): Promise<RecommendationItem[]> {
   debugLog(
     `\n🔥 Getting popular recommendations for server ${serverId}, limit ${limit}, excluding user ${
       excludeUserId || "none"
-    }`
+    }`,
   );
 
   // Get items that are popular (most watched) but exclude items already watched by the current user
@@ -575,8 +575,8 @@ async function getPopularRecommendations(
         and(
           eq(sessions.serverId, serverId),
           eq(sessions.userId, excludeUserId),
-          isNotNull(sessions.itemId)
-        )
+          isNotNull(sessions.itemId),
+        ),
       )
       .groupBy(sessions.itemId);
 
@@ -595,8 +595,8 @@ async function getPopularRecommendations(
         .where(
           and(
             eq(hiddenRecommendations.serverId, serverId),
-            eq(hiddenRecommendations.userId, excludeUserId)
-          )
+            eq(hiddenRecommendations.userId, excludeUserId),
+          ),
         );
     } catch (error) {
       debugLog("Error fetching hidden recommendations:", error);
@@ -627,8 +627,8 @@ async function getPopularRecommendations(
         // Exclude user's hidden items if we have a user
         hiddenItemIds.length > 0
           ? notInArray(items.id, hiddenItemIds)
-          : sql`true`
-      )
+          : sql`true`,
+      ),
     )
     .groupBy(items.id)
     .orderBy(desc(count(sessions.id)))
@@ -639,7 +639,7 @@ async function getPopularRecommendations(
   debugLog(`📈 Found ${popularItems.length} popular items:`);
   popularItems.slice(0, 5).forEach((item, index) => {
     debugLog(
-      `  ${index + 1}. "${item.item.name}" - ${item.watchCount} watches`
+      `  ${index + 1}. "${item.item.name}" - ${item.watchCount} watches`,
     );
   });
   if (popularItems.length > 5) {
@@ -660,11 +660,11 @@ async function getPopularRecommendations(
 export const getSimilarItemsForItem = async (
   serverId: string | number,
   itemId: string,
-  limit: number = 10
+  limit = 10,
 ): Promise<RecommendationItem[]> => {
   try {
     debugLog(
-      `\n🎯 Getting items similar to specific item ${itemId} in server ${serverId}, limit ${limit}`
+      `\n🎯 Getting items similar to specific item ${itemId} in server ${serverId}, limit ${limit}`,
     );
 
     const serverIdNum = Number(serverId);
@@ -674,7 +674,7 @@ export const getSimilarItemsForItem = async (
       where: and(
         eq(items.id, itemId),
         eq(items.serverId, serverIdNum),
-        isNotNull(items.embedding)
+        isNotNull(items.embedding),
       ),
       columns: itemCardWithEmbeddingColumns,
     });
@@ -689,7 +689,7 @@ export const getSimilarItemsForItem = async (
     // Calculate cosine similarity with other items of the same type
     const similarity = sql<number>`1 - (${cosineDistance(
       items.embedding,
-      targetItem.embedding
+      targetItem.embedding,
     )})`;
 
     const similarItems = await db
@@ -704,8 +704,8 @@ export const getSimilarItemsForItem = async (
           isNull(items.deletedAt),
           eq(items.type, targetItem.type), // Same type (Movie, Series, etc.)
           isNotNull(items.embedding),
-          sql`${items.id} != ${itemId}` // Exclude the target item itself
-        )
+          sql`${items.id} != ${itemId}`, // Exclude the target item itself
+        ),
       )
       .orderBy(desc(similarity))
       .limit(limit * 2); // Get more to filter for quality
@@ -714,7 +714,7 @@ export const getSimilarItemsForItem = async (
 
     // Filter for good similarity scores (threshold can be adjusted)
     const qualifiedSimilarItems = similarItems.filter(
-      (result) => Number(result.similarity) > 0.4
+      (result) => Number(result.similarity) > 0.4,
     );
 
     debugLog(`✅ ${qualifiedSimilarItems.length} items with similarity > 0.4:`);
@@ -723,8 +723,8 @@ export const getSimilarItemsForItem = async (
       .forEach((result, index) => {
         debugLog(
           `  ${index + 1}. "${result.item.name}" - similarity: ${Number(
-            result.similarity
-          ).toFixed(3)}`
+            result.similarity,
+          ).toFixed(3)}`,
         );
       });
 
@@ -749,7 +749,7 @@ export const getSimilarItemsForItem = async (
 
 export const hideRecommendation = async (
   serverId: string | number,
-  itemId: string
+  itemId: string,
 ) => {
   try {
     // Get the current user
@@ -771,8 +771,8 @@ export const hideRecommendation = async (
         and(
           eq(hiddenRecommendations.serverId, serverIdNum),
           eq(hiddenRecommendations.userId, currentUser.id),
-          eq(hiddenRecommendations.itemId, itemId)
-        )
+          eq(hiddenRecommendations.itemId, itemId),
+        ),
       )
       .limit(1);
 

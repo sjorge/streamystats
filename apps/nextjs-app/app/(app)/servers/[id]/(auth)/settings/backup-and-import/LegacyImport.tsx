@@ -1,6 +1,5 @@
 "use client";
 
-import { fetch } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -17,14 +16,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { fetch } from "@/lib/utils";
 import {
   AlertCircle,
   CheckCircle2,
+  Database,
   HelpCircle,
   Info,
   Loader2,
   Upload,
-  Database,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";

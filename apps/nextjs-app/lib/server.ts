@@ -1,6 +1,6 @@
 "use server";
 
-import { db, servers, type Server } from "@streamystats/database";
+import { type Server, db, servers } from "@streamystats/database";
 
 interface CreateServerRequest {
   name: string;
@@ -33,7 +33,7 @@ interface CreateServerErrorResponse {
  * This will validate the connection, create the server record, and start the sync process
  */
 export async function createServer(
-  serverData: CreateServerRequest
+  serverData: CreateServerRequest,
 ): Promise<CreateServerSuccessResponse | CreateServerErrorResponse> {
   const jobServerUrl =
     process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
@@ -89,7 +89,7 @@ export async function getServerSyncStatus(serverId: number) {
 
   try {
     const response = await fetch(
-      `${jobServerUrl}/api/jobs/servers/${serverId}/sync-status`
+      `${jobServerUrl}/api/jobs/servers/${serverId}/sync-status`,
     );
 
     if (!response.ok) {
@@ -102,7 +102,7 @@ export async function getServerSyncStatus(serverId: number) {
     throw new Error(
       error instanceof Error
         ? error.message
-        : "Failed to get server sync status"
+        : "Failed to get server sync status",
     );
   }
 }
@@ -125,8 +125,8 @@ export async function getServers(): Promise<Server[]> {
  */
 export async function pollServerSetupStatus(
   serverId: number,
-  maxAttempts: number = 30,
-  intervalMs: number = 2000
+  maxAttempts = 30,
+  intervalMs = 2000,
 ): Promise<{ success: boolean; status: string }> {
   const status = await getServerSyncStatus(serverId);
   return status;

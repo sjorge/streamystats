@@ -1,6 +1,16 @@
 import { db } from "@streamystats/database";
 import { activities } from "@streamystats/database/schema";
-import { eq, count, asc, desc, ilike, and, or } from "drizzle-orm";
+import {
+  AnyColumn,
+  SQL,
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  or,
+} from "drizzle-orm";
 
 interface PaginationOptions {
   page?: number;
@@ -22,9 +32,15 @@ interface PaginatedResult<T> {
 
 export const getActivities = async (
   serverId: number | string,
-  options: PaginationOptions = {}
+  options: PaginationOptions = {},
 ): Promise<PaginatedResult<typeof activities.$inferSelect>> => {
-  const { page = 1, pageSize = 10, sortBy, sortOrder = "desc", search } = options;
+  const {
+    page = 1,
+    pageSize = 10,
+    sortBy,
+    sortOrder = "desc",
+    search,
+  } = options;
   const offset = (page - 1) * pageSize;
 
   // Build where condition
@@ -34,8 +50,8 @@ export const getActivities = async (
         baseWhere,
         or(
           ilike(activities.name, `%${search}%`),
-          ilike(activities.type, `%${search}%`)
-        )
+          ilike(activities.type, `%${search}%`),
+        ),
       )
     : baseWhere;
 
@@ -49,10 +65,10 @@ export const getActivities = async (
   const totalPages = Math.ceil(total / pageSize);
 
   // Determine sort order
-  let orderByClause;
+  let orderByClause: SQL | undefined;
   if (sortBy) {
     // Map sortBy to actual column names
-    let sortColumn;
+    let sortColumn: AnyColumn | undefined;
     switch (sortBy) {
       case "name":
         sortColumn = activities.name;
@@ -77,7 +93,7 @@ export const getActivities = async (
     .select()
     .from(activities)
     .where(whereCondition)
-    .orderBy(orderByClause)
+    .orderBy(orderByClause!)
     .limit(pageSize)
     .offset(offset);
 

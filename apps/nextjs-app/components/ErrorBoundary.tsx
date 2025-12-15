@@ -1,8 +1,8 @@
 "use client";
 
-import React, { ErrorInfo, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import React, { ErrorInfo, ReactNode } from "react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -55,10 +55,10 @@ class ErrorBoundary extends React.Component<
 
       // Create GitHub issue URL with pre-filled information
       const issueTitle = encodeURIComponent(
-        `Error: ${errorMessage.substring(0, 100)}`
+        `Error: ${errorMessage.substring(0, 100)}`,
       );
       const issueBody = encodeURIComponent(
-        `## Error Details\n\`\`\`\n${errorMessage}\n\n${stackTrace}\n\`\`\`\n\n## Steps to Reproduce\n1. \n2. \n3. \n\n## Additional Information\n`
+        `## Error Details\n\`\`\`\n${errorMessage}\n\n${stackTrace}\n\`\`\`\n\n## Steps to Reproduce\n1. \n2. \n3. \n\n## Additional Information\n`,
       );
       const newIssueUrl = `https://github.com/fredrikburmester/streamystats/issues/new?title=${issueTitle}&body=${issueBody}`;
 

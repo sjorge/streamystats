@@ -71,10 +71,12 @@ jobs:
           context: ${{ matrix.folder }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             VERSION=${{ inputs.tag }}
             COMMIT_SHA=${{ github.sha }}
-            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
           push: ${{ inputs.push_to_registry }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

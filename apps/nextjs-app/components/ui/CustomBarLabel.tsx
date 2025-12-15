@@ -39,7 +39,8 @@ export const CustomBarLabel: React.FC<CustomBarLabelProps> = ({
   // Mobile: only show percent
   const [isMobile, setIsMobile] = React.useState(false);
   React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.matchMedia("(max-width: 600px)").matches);
+    const checkMobile = () =>
+      setIsMobile(window.matchMedia("(max-width: 600px)").matches);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);

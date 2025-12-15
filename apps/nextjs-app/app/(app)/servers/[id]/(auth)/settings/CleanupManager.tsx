@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,9 +9,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, CheckCircle, AlertTriangle, Loader } from "lucide-react";
 import { fetch } from "@/lib/utils";
+import { AlertTriangle, CheckCircle, Loader, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 interface CleanupMetrics {
   librariesScanned: number;
@@ -103,9 +103,7 @@ export function CleanupManager({ serverId }: CleanupManagerProps) {
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">This cleanup will:</p>
           <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-            <li>
-              - Compare your database with items currently on Jellyfin
-            </li>
+            <li>- Compare your database with items currently on Jellyfin</li>
             <li>- Soft-delete items no longer present on the server</li>
             <li>
               - Migrate watch history if items were re-added with different IDs
@@ -147,20 +145,28 @@ export function CleanupManager({ serverId }: CleanupManagerProps) {
                 <div className="text-xs space-y-1 mt-2 opacity-80">
                   <div className="grid grid-cols-2 gap-x-4">
                     <span>Items scanned:</span>
-                    <span>{lastResult.metrics.itemsScanned.toLocaleString()}</span>
+                    <span>
+                      {lastResult.metrics.itemsScanned.toLocaleString()}
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4">
                     <span>Items deleted:</span>
-                    <span>{lastResult.metrics.itemsSoftDeleted.toLocaleString()}</span>
+                    <span>
+                      {lastResult.metrics.itemsSoftDeleted.toLocaleString()}
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4">
                     <span>Items migrated:</span>
-                    <span>{lastResult.metrics.itemsMigrated.toLocaleString()}</span>
+                    <span>
+                      {lastResult.metrics.itemsMigrated.toLocaleString()}
+                    </span>
                   </div>
                   {lastResult.metrics.sessionsMigrated > 0 && (
                     <div className="grid grid-cols-2 gap-x-4">
                       <span>Sessions migrated:</span>
-                      <span>{lastResult.metrics.sessionsMigrated.toLocaleString()}</span>
+                      <span>
+                        {lastResult.metrics.sessionsMigrated.toLocaleString()}
+                      </span>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-x-4">
@@ -188,5 +194,3 @@ export function CleanupManager({ serverId }: CleanupManagerProps) {
     </Card>
   );
 }
-
-

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   console.log("[DEBUG] Home page: Starting server check");
 
-  let servers;
+  let servers: Server[] | undefined;
 
   try {
     servers = await getServers();
@@ -26,7 +26,7 @@ export default async function Home() {
     const redirectPath = `/servers/${servers[0].id}/dashboard`;
     console.log(
       "[DEBUG] Home page: Redirecting to server dashboard:",
-      redirectPath
+      redirectPath,
     );
     redirect(redirectPath);
   } else {

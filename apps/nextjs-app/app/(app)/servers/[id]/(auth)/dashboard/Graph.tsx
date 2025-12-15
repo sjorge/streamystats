@@ -1,9 +1,9 @@
-import { Suspense, type JSX } from "react";
-import { WatchTimeGraph } from "./WatchTimeGraph";
 import { getWatchTimePerType } from "@/lib/db/statistics";
-import { Server } from "@streamystats/database";
-import { showAdminStatistics } from "@/utils/adminTools";
 import { getMe } from "@/lib/db/users";
+import { showAdminStatistics } from "@/utils/adminTools";
+import { Server } from "@streamystats/database";
+import { type JSX, Suspense } from "react";
+import { WatchTimeGraph } from "./WatchTimeGraph";
 
 interface Props {
   server: Server;
@@ -22,7 +22,7 @@ export async function Graph({
     serverId: server.id,
     startDate,
     endDate,
-    userId: showAdminStats ? undefined : me?.id
+    userId: showAdminStats ? undefined : me?.id,
   });
 
   if (!data) {

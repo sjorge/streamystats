@@ -1,12 +1,33 @@
 // Transcoding statistics types and functions
-import { db, Session, sessions } from "@streamystats/database";
-import { and, eq, gte, lte, isNotNull } from "drizzle-orm";
+import { db, sessions } from "@streamystats/database";
+import type { Session } from "@streamystats/database";
+import { and, eq, gte, isNotNull, lte } from "drizzle-orm";
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function getNestedTranscodingInfo(value: unknown): unknown {
+  if (!isRecord(value)) return null;
+  return value.TranscodingInfo ?? value.transcodingInfo ?? value.transcodeInfo;
+}
 
 export interface NumericStat {
   label: string;
   value: number;
   count: number;
-  distribution?: any[];
+  distribution?: number[];
   avg?: number;
   min?: number;
   max?: number;
@@ -139,14 +160,8 @@ export async function getTranscodingStatistics(
     }
 
     // Try to extract additional info from rawData
-    let transcodingInfo: any = null;
-    if (session.rawData && typeof session.rawData === "object") {
-      // Look for transcoding info in various possible locations
-      transcodingInfo =
-        (session.rawData as any).TranscodingInfo ||
-        (session.rawData as any).transcodingInfo ||
-        (session.rawData as any).transcodeInfo;
-    }
+    let transcodingInfo: unknown = null;
+    transcodingInfo = getNestedTranscodingInfo(session.rawData);
 
     if (isDirectPlay) {
       directPlayCount++;
@@ -176,35 +191,38 @@ export async function getTranscodingStatistics(
       }
 
       // Try to get hardware acceleration type from rawData
-      if (
-        session.hardwareAccelType ||
-        transcodingInfo?.HardwareAccelerationType ||
-        transcodingInfo?.hardwareAccelerationType
-      ) {
-        const hwType =
-          session.hardwareAccelType ||
-          transcodingInfo.HardwareAccelerationType ||
-          transcodingInfo.hardwareAccelerationType;
-        hardwareAccelMap.set(hwType, (hardwareAccelMap.get(hwType) || 0) + 1);
+      const hwTypeRaw =
+        session.hardwareAccelType ??
+        (isRecord(transcodingInfo)
+          ? transcodingInfo.HardwareAccelerationType ??
+            transcodingInfo.hardwareAccelerationType
+          : null);
+      if (typeof hwTypeRaw === "string" && hwTypeRaw.length > 0) {
+        hardwareAccelMap.set(
+          hwTypeRaw,
+          (hardwareAccelMap.get(hwTypeRaw) || 0) + 1
+        );
       }
 
       // Collect transcoding reasons
       if (session.transcodingReasons && session.transcodingReasons.length > 0) {
-        session.transcodingReasons.forEach((reason) => {
+        for (const reason of session.transcodingReasons) {
           transcodingReasonsMap.set(
             reason,
             (transcodingReasonsMap.get(reason) || 0) + 1
           );
-        });
+        }
       }
 
       // Collect bitrate data (try rawData first, then fallback to video bitrate)
-      let bitrate =
-        transcodingInfo?.Bitrate ||
-        transcodingInfo?.bitrate ||
-        session.transcodingBitrate ||
+      const bitrateRaw =
+        (isRecord(transcodingInfo)
+          ? transcodingInfo.Bitrate ?? transcodingInfo.bitrate
+          : null) ??
+        session.transcodingBitrate ??
         session.videoBitRate;
-      if (bitrate) {
+      const bitrate = toFiniteNumber(bitrateRaw);
+      if (bitrate !== null) {
         bitrates.push(bitrate);
       }
 
@@ -217,11 +235,12 @@ export async function getTranscodingStatistics(
       }
 
       // Try to get audio channels from transcoding info or session data
-      const channels =
-        transcodingInfo?.AudioChannels ||
-        transcodingInfo?.audioChannels ||
-        session.audioChannels;
-      if (channels) {
+      const channelsRaw =
+        (isRecord(transcodingInfo)
+          ? transcodingInfo.AudioChannels ?? transcodingInfo.audioChannels
+          : null) ?? session.audioChannels;
+      const channels = toFiniteNumber(channelsRaw);
+      if (channels !== null) {
         audioChannels.push(channels);
       }
     }
@@ -372,15 +391,14 @@ export async function getBitrateDistribution(
   const bitrates = sessionData
     .map((s) => {
       // Try to get transcoding bitrate from rawData first, then fall back to video bitrate
-      if (s.rawData && typeof s.rawData === "object") {
-        const transcodingInfo =
-          (s.rawData as any).TranscodingInfo ||
-          (s.rawData as any).transcodingInfo;
-        if (transcodingInfo?.Bitrate || transcodingInfo?.bitrate) {
-          return transcodingInfo.Bitrate || transcodingInfo.bitrate;
-        }
+      const transcodingInfo = getNestedTranscodingInfo(s.rawData);
+      if (isRecord(transcodingInfo)) {
+        const bitrate = toFiniteNumber(
+          transcodingInfo.Bitrate ?? transcodingInfo.bitrate
+        );
+        if (bitrate !== null) return bitrate;
       }
-      return s.videoBitRate;
+      return s.videoBitRate ?? null;
     })
     .filter((bitrate): bitrate is number => bitrate !== null);
 
@@ -394,7 +412,7 @@ export async function getBitrateDistribution(
     { label: "1-5 Mbps", min: 1000000, max: 5000000 },
     { label: "5-10 Mbps", min: 5000000, max: 10000000 },
     { label: "10-20 Mbps", min: 10000000, max: 20000000 },
-    { label: "20+ Mbps", min: 20000000, max: Infinity },
+    { label: "20+ Mbps", min: 20000000, max: Number.POSITIVE_INFINITY },
   ];
 
   return ranges

@@ -1,17 +1,17 @@
-import { Item, db, sessions, items, libraries } from "@streamystats/database";
-import { unstable_cache } from "next/cache";
+import { Item, db, items, libraries, sessions } from "@streamystats/database";
 import {
   and,
+  count,
+  desc,
   eq,
   gte,
+  inArray,
+  isNotNull,
   lte,
   sql,
-  count,
   sum,
-  desc,
-  isNotNull,
-  inArray,
 } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 
 interface ItemWithStats extends Item {
   totalPlayCount: number;
@@ -74,7 +74,7 @@ const getMostWatchedItemsImpl = async ({
         totalPlayCount: stat.totalPlayCount,
         totalPlayDuration: stat.totalPlayDuration,
       };
-    })
+    }),
   );
 
   const itemsWithStats: ItemWithStats[] = results.map((result) => ({
@@ -118,11 +118,11 @@ const getMostWatchedItemsImpl = async ({
   for (const [seriesId, episodes] of episodesBySeriesId) {
     const totalPlayCount = episodes.reduce(
       (sum, ep) => sum + ep.totalPlayCount,
-      0
+      0,
     );
     const totalPlayDuration = episodes.reduce(
       (sum, ep) => sum + ep.totalPlayDuration,
-      0
+      0,
     );
 
     seriesStatsMap.set(seriesId, { totalPlayCount, totalPlayDuration });
@@ -138,8 +138,8 @@ const getMostWatchedItemsImpl = async ({
         and(
           inArray(items.id, seriesIds),
           eq(items.type, "Series"),
-          eq(items.serverId, Number(serverId))
-        )
+          eq(items.serverId, Number(serverId)),
+        ),
       );
 
     for (const seriesItem of seriesItems) {
@@ -157,13 +157,13 @@ const getMostWatchedItemsImpl = async ({
   // Sort each category by total play duration (descending) and limit to top items
   const limit = 10; // You can adjust this or make it a parameter
   grouped.Movie = grouped.Movie.sort(
-    (a, b) => b.totalPlayDuration - a.totalPlayDuration
+    (a, b) => b.totalPlayDuration - a.totalPlayDuration,
   ).slice(0, limit);
   grouped.Episode = grouped.Episode.sort(
-    (a, b) => b.totalPlayDuration - a.totalPlayDuration
+    (a, b) => b.totalPlayDuration - a.totalPlayDuration,
   ).slice(0, limit);
   grouped.Series = grouped.Series.sort(
-    (a, b) => b.totalPlayDuration - a.totalPlayDuration
+    (a, b) => b.totalPlayDuration - a.totalPlayDuration,
   ).slice(0, limit);
 
   return grouped;
@@ -172,7 +172,7 @@ const getMostWatchedItemsImpl = async ({
 export const getMostWatchedItems = unstable_cache(
   getMostWatchedItemsImpl,
   ["db-statistics", "getMostWatchedItems"],
-  { revalidate: CACHE_TTL }
+  { revalidate: CACHE_TTL },
 );
 
 export interface WatchTimePerType {
@@ -300,7 +300,7 @@ const getWatchTimePerTypeImpl = async ({
 export const getWatchTimePerType = unstable_cache(
   getWatchTimePerTypeImpl,
   ["db-statistics", "getWatchTimePerType"],
-  { revalidate: CACHE_TTL }
+  { revalidate: CACHE_TTL },
 );
 
 export interface LibraryWatchTime {
@@ -337,14 +337,14 @@ const getWatchTimeByLibraryImpl = async ({
         eq(sessions.serverId, Number(serverId)),
         gte(sessions.startTime, new Date(startDate)),
         lte(sessions.startTime, new Date(endDate)),
-        isNotNull(sessions.itemId)
-      )
+        isNotNull(sessions.itemId),
+      ),
     )
     .groupBy(
       sql`DATE(${sessions.startTime})`,
       libraries.id,
       libraries.name,
-      libraries.type
+      libraries.type,
     )
     .orderBy(sql`DATE(${sessions.startTime})`, libraries.name);
 
@@ -370,5 +370,5 @@ const getWatchTimeByLibraryImpl = async ({
 export const getWatchTimeByLibrary = unstable_cache(
   getWatchTimeByLibraryImpl,
   ["db-statistics", "getWatchTimeByLibrary"],
-  { revalidate: CACHE_TTL }
+  { revalidate: CACHE_TTL },
 );

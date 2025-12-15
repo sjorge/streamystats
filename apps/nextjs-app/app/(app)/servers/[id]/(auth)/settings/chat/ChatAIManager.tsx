@@ -1,25 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  saveChatConfig,
-  clearChatConfig,
-  testChatConnection,
-  type ChatProvider,
-  type ChatAIConfig,
-} from "@/lib/db/server";
-import { Separator } from "@/components/ui/separator";
-import type { Server } from "@/lib/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +11,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -38,7 +28,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  type ChatAIConfig,
+  type ChatProvider,
+  clearChatConfig,
+  saveChatConfig,
+  testChatConnection,
+} from "@/lib/db/server";
+import type { Server } from "@/lib/types";
+import { Loader, Zap } from "lucide-react";
+import { useState } from "react";
 
 const PROVIDER_PRESETS = {
   openai: {
@@ -116,18 +116,18 @@ function detectPreset(server: Server): PresetKey {
 
 export function ChatAIManager({ server }: { server: Server }) {
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>(
-    detectPreset(server)
+    detectPreset(server),
   );
 
   const [baseUrl, setBaseUrl] = useState(
-    server.chatBaseUrl || PROVIDER_PRESETS.openai.baseUrl
+    server.chatBaseUrl || PROVIDER_PRESETS.openai.baseUrl,
   );
   const [apiKey, setApiKey] = useState(server.chatApiKey || "");
   const [model, setModel] = useState(
-    server.chatModel || PROVIDER_PRESETS.openai.defaultModel
+    server.chatModel || PROVIDER_PRESETS.openai.defaultModel,
   );
   const [provider, setProvider] = useState<ChatProvider>(
-    (server.chatProvider as ChatProvider) || "openai-compatible"
+    (server.chatProvider as ChatProvider) || "openai-compatible",
   );
 
   const [isSaving, setIsSaving] = useState(false);

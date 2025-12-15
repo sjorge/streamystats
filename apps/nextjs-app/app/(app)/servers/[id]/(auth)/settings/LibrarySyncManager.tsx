@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,21 +9,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  RefreshCw,
-  Library,
-  CheckCircle,
-  AlertTriangle,
-  Loader,
-} from "lucide-react";
 import { fetch } from "@/lib/utils";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Library,
+  Loader,
+  RefreshCw,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface LibrarySyncManagerProps {
   serverId: number;
 }
 
-interface Library {
+interface LibraryData {
   id: string;
   name: string;
   type: string;
@@ -36,36 +36,36 @@ interface SyncResult {
 }
 
 export function LibrarySyncManager({ serverId }: LibrarySyncManagerProps) {
-  const [libraries, setLibraries] = useState<Library[]>([]);
+  const [libraries, setLibraries] = useState<LibraryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [syncingLibraries, setSyncingLibraries] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [syncResults, setSyncResults] = useState<Map<string, SyncResult>>(
-    new Map()
+    new Map(),
   );
 
   useEffect(() => {
+    const loadLibraries = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/libraries?serverId=${serverId}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setLibraries(data.libraries || []);
+      } catch (error) {
+        console.error("Error loading libraries:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadLibraries();
   }, [serverId]);
-
-  const loadLibraries = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/libraries?serverId=${serverId}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setLibraries(data.libraries || []);
-    } catch (error) {
-      console.error("Error loading libraries:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSyncLibrary = async (libraryId: string, libraryName: string) => {
     setSyncingLibraries((prev) => new Set(prev).add(libraryId));
@@ -87,7 +87,7 @@ export function LibrarySyncManager({ serverId }: LibrarySyncManagerProps) {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 

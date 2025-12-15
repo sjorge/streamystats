@@ -39,6 +39,7 @@ exports.servers = (0, pg_core_1.pgTable)("servers", {
     autoGenerateEmbeddings: (0, pg_core_1.boolean)("auto_generate_embeddings")
         .notNull()
         .default(false),
+    testMigrationField: (0, pg_core_1.text)("test_migration_field"),
     // Generic embedding configuration
     // Supports any OpenAI-compatible API: OpenAI, Azure, Together AI, Fireworks, LocalAI, Ollama, vLLM, etc.
     embeddingProvider: (0, pg_core_1.text)("embedding_provider"), // "openai-compatible" | "ollama"

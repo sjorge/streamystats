@@ -1,10 +1,10 @@
 "use server";
 
-import { db, User, users, sessions, items } from "@streamystats/database";
-import { and, eq, sum, inArray, gte, lte, sql, isNotNull } from "drizzle-orm";
+import { User, db, items, sessions, users } from "@streamystats/database";
+import { and, eq, gte, inArray, isNotNull, lte, sql, sum } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { destroySession, getSession } from "../session";
 import { getServer } from "./server";
-import { getSession, destroySession } from "../session";
 
 interface JellyfinUser {
   Id: string;
@@ -69,7 +69,7 @@ export const getWatchTimePerWeekDay = async ({
   const whereCondition = userId
     ? and(
         eq(sessions.serverId, Number(serverId)),
-        eq(sessions.userId, String(userId))
+        eq(sessions.userId, String(userId)),
       )
     : eq(sessions.serverId, Number(serverId));
 
@@ -77,7 +77,7 @@ export const getWatchTimePerWeekDay = async ({
     .select({
       weekDay: sql<string>`TO_CHAR(${sessions.startTime}, 'Day')`.as("weekDay"),
       dayOfWeek: sql<number>`EXTRACT(DOW FROM ${sessions.startTime})`.as(
-        "dayOfWeek"
+        "dayOfWeek",
       ),
       playDuration: sessions.playDuration,
     })
@@ -126,7 +126,7 @@ export const getWatchTimePerHour = async ({
   const whereCondition = userId
     ? and(
         eq(sessions.serverId, Number(serverId)),
-        eq(sessions.userId, String(userId))
+        eq(sessions.userId, String(userId)),
       )
     : eq(sessions.serverId, Number(serverId));
 
@@ -168,7 +168,7 @@ export const getTotalWatchTime = async ({
   const whereCondition = userId
     ? and(
         eq(sessions.serverId, Number(serverId)),
-        eq(sessions.userId, String(userId))
+        eq(sessions.userId, String(userId)),
       )
     : eq(sessions.serverId, Number(serverId));
 
@@ -246,8 +246,8 @@ export const getUserActivityPerDay = async ({
       and(
         eq(sessions.serverId, Number(serverId)),
         gte(sessions.startTime, new Date(startDate)),
-        lte(sessions.startTime, new Date(endDate))
-      )
+        lte(sessions.startTime, new Date(endDate)),
+      ),
     );
 
   // Group by date and count distinct users manually
@@ -430,7 +430,7 @@ export const getUserStatsSummaryForServer = async ({
       userName: result.userName || "Unknown",
       totalWatchTime: Number(result.totalWatchTime || 0),
       sessionCount: Number(result.sessionCount || 0),
-    })
+    }),
   );
 };
 
@@ -459,7 +459,7 @@ export const getServerStatistics = async ({
     totalUsers: userStatsSummary.length,
     totalSessions: userStatsSummary.reduce(
       (sum, user) => sum + user.sessionCount,
-      0
+      0,
     ),
   };
 };
@@ -497,8 +497,8 @@ export const getUserWatchStats = async ({
       .where(
         and(
           eq(sessions.userId, userId),
-          eq(sessions.serverId, Number(serverId))
-        )
+          eq(sessions.serverId, Number(serverId)),
+        ),
       )
       .orderBy(sessions.startTime),
   ]);
@@ -515,7 +515,7 @@ export const getUserWatchStats = async ({
       if (lastDate) {
         const daysDiff = Math.floor(
           (new Date(currentDate).getTime() - new Date(lastDate).getTime()) /
-            (1000 * 60 * 60 * 24)
+            (1000 * 60 * 60 * 24),
         );
 
         if (daysDiff === 1) {
@@ -539,7 +539,7 @@ export const getUserWatchStats = async ({
     total_watch_time: totalWatchTime,
     total_plays: userSessions.filter(
       (s: { playDuration: number | null }) =>
-        s.playDuration && s.playDuration > 0
+        s.playDuration && s.playDuration > 0,
     ).length,
     longest_streak: longestStreak, // Return the number of days directly
   };
@@ -589,8 +589,8 @@ export const getUserGenreStats = async ({
       and(
         eq(sessions.userId, userId),
         eq(sessions.serverId, Number(serverId)),
-        inArray(items.type, ["Movie", "Episode", "Series"])
-      )
+        inArray(items.type, ["Movie", "Episode", "Series"]),
+      ),
     );
 
   const genreMap: Record<string, { watchTime: number; playCount: number }> = {};

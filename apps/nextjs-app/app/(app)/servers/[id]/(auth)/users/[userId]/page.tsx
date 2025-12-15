@@ -16,8 +16,8 @@ import { HistoryTable } from "../../history/HistoryTable";
 import { GenreStatsGraph } from "./GenreStatsGraph";
 import { TopItemsList } from "./TopItems";
 import UserBadges from "./UserBadges";
-import { WatchTimePerDay } from "./WatchTimePerDay";
 import { UserSimilarity } from "./UserSimilarity";
+import { WatchTimePerDay } from "./WatchTimePerDay";
 
 export default async function User({
   params,
@@ -47,7 +47,7 @@ export default async function User({
   const showAdminStats = await showAdminStatistics();
 
   // Get additional user statistics and history
-  const currentPage = parseInt(page);
+  const currentPage = Number.parseInt(page);
   const [
     watchStats,
     watchTimePerWeekday,

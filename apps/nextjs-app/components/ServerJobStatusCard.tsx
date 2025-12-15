@@ -1,9 +1,9 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetch } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 type ServerJobState =
   | "running"
@@ -47,7 +47,7 @@ function getStateBadgeClass(state: ServerJobState): string {
 }
 
 async function fetchServerJobStatus(
-  serverId: number
+  serverId: number,
 ): Promise<ServerJobStatusResponse> {
   const response = await fetch(`/api/jobs/servers/${serverId}/status`);
 

@@ -1,11 +1,11 @@
 import { requireAdmin } from "@/lib/api-auth";
 import {
   db,
+  hiddenRecommendations,
   items,
   sessions,
-  hiddenRecommendations,
 } from "@streamystats/database";
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
         .update(sessions)
         .set({ itemId: rightId })
         .where(
-          and(eq(sessions.serverId, serverId), eq(sessions.itemId, leftId))
+          and(eq(sessions.serverId, serverId), eq(sessions.itemId, leftId)),
         )
         .returning({ id: sessions.id });
 
@@ -120,8 +120,8 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(hiddenRecommendations.serverId, serverId),
-            eq(hiddenRecommendations.itemId, rightId)
-          )
+            eq(hiddenRecommendations.itemId, rightId),
+          ),
         );
       const existingUserIds = existingRightRecs.map((r) => r.userId);
 
@@ -133,8 +133,8 @@ export async function POST(request: Request) {
             and(
               eq(hiddenRecommendations.serverId, serverId),
               eq(hiddenRecommendations.itemId, leftId),
-              inArray(hiddenRecommendations.userId, existingUserIds)
-            )
+              inArray(hiddenRecommendations.userId, existingUserIds),
+            ),
           )
           .returning({ id: hiddenRecommendations.id });
         deletedDuplicateRecs = deleted.length;
@@ -146,8 +146,8 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(hiddenRecommendations.serverId, serverId),
-            eq(hiddenRecommendations.itemId, leftId)
-          )
+            eq(hiddenRecommendations.itemId, leftId),
+          ),
         )
         .returning({ id: hiddenRecommendations.id });
 
@@ -171,7 +171,7 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   } catch (error) {
     console.error("Error merging items:", error);
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

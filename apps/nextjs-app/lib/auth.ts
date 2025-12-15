@@ -1,9 +1,9 @@
 "use server";
 
+import { shouldUseSecureCookies } from "@/lib/secure-cookies";
 import { cookies } from "next/headers";
 import { getServer } from "./db/server";
 import { createSession } from "./session";
-import { shouldUseSecureCookies } from "@/lib/secure-cookies";
 
 export const login = async ({
   serverId,
@@ -35,9 +35,9 @@ export const login = async ({
 
   const data = await res.json();
 
-  const accessToken = data["AccessToken"];
-  const user = data["User"];
-  const isAdmin = user["Policy"]["IsAdministrator"];
+  const accessToken = data.AccessToken;
+  const user = data.User;
+  const isAdmin = user.Policy.IsAdministrator;
 
   const secure = await shouldUseSecureCookies();
   const maxAge = 30 * 24 * 60 * 60;

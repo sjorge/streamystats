@@ -28,7 +28,7 @@ const vector = customType<{
     return value
       .slice(1, -1)
       .split(",")
-      .map((v) => parseFloat(v));
+      .map((v) => Number.parseFloat(v.trim()));
   },
   toDriver(value: number[]): string {
     return `[${value.join(",")}]`;
@@ -57,6 +57,7 @@ export const servers = pgTable(
     autoGenerateEmbeddings: boolean("auto_generate_embeddings")
       .notNull()
       .default(false),
+    testMigrationField: text("test_migration_field"),
 
     // Generic embedding configuration
     // Supports any OpenAI-compatible API: OpenAI, Azure, Together AI, Fireworks, LocalAI, Ollama, vLLM, etc.

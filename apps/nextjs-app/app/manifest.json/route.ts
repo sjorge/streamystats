@@ -1,5 +1,5 @@
+import crypto from "node:crypto";
 import { basePath } from "@/lib/utils";
-import crypto from "crypto";
 
 const manifest = {
   name: "Streamystats",

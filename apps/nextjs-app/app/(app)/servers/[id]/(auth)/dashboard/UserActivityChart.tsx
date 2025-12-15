@@ -35,14 +35,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useQueryParams } from "@/hooks/useQueryParams";
-import { UserActivityPerDay } from "@/lib/db/users";
-import { UsersIcon } from "lucide-react";
 import {
   getDefaultEndDate,
   getDefaultStartDate,
   setEndDateToEndOfDay,
 } from "@/dates";
+import { useQueryParams } from "@/hooks/useQueryParams";
+import { UserActivityPerDay } from "@/lib/db/users";
+import { UsersIcon } from "lucide-react";
 
 const chartConfig = {
   active_users: {
@@ -82,9 +82,9 @@ function UserActivityChartView({
 
     // Create a map of existing data for quick lookup
     const dataMap = new Map();
-    Object.entries(data).forEach(([date, totalWatchTime]) => {
+    for (const [date, totalWatchTime] of Object.entries(data)) {
       dataMap.set(date, totalWatchTime);
-    });
+    }
 
     // Fill in all dates in the range
     const result = [];

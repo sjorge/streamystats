@@ -4,7 +4,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Cog, Zap, Video, Volume2 } from "lucide-react";
+import { Cog, Video, Volume2, Zap } from "lucide-react";
 import React from "react";
 
 export interface PlaybackMethodBadgeProps {

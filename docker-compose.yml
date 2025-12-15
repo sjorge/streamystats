@@ -88,6 +88,7 @@ services:
 
   vectorchord:
     image: tensorchord/vchord-postgres:pg17-v0.4.1
+    command: ["postgres", "-c", "log_checkpoints=off"]
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}

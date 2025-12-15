@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/api-auth";
+import { getServer } from "@/lib/db/server";
 import { db } from "@streamystats/database";
 import {
+  type NewSession,
+  items,
   sessions,
   users,
-  items,
-  type NewSession,
 } from "@streamystats/database/schema";
-import { getServer } from "@/lib/db/server";
 import { eq } from "drizzle-orm";
-import { requireAdmin } from "@/lib/api-auth";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -108,13 +108,13 @@ export async function POST(req: NextRequest) {
     if (!file || !serverId) {
       return NextResponse.json(
         { error: "File and serverId are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Validate serverId
     const serverIdNum = Number(serverId);
-    if (isNaN(serverIdNum)) {
+    if (Number.isNaN(serverIdNum)) {
       return NextResponse.json({ error: "Invalid server ID" }, { status: 400 });
     }
 
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
     if (!targetServer) {
       return NextResponse.json(
         { error: "Target server not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
     if (!file.name.toLowerCase().endsWith(".json")) {
       return NextResponse.json(
         { error: "Only JSON files are supported" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid JSON format" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Invalid import file format - missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         {
           error: `Unsupported export version: ${importData.exportInfo.version}. Expected: streamystats-v2`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -176,15 +176,15 @@ export async function POST(req: NextRequest) {
         {
           error: `Unsupported export type: ${importData.exportInfo.exportType}. Expected: sessions-only`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     console.log(
-      `Starting import for server ${targetServer.name} (${serverIdNum})`
+      `Starting import for server ${targetServer.name} (${serverIdNum})`,
     );
     console.log(
-      `Import file from: ${importData.server.name} (original ID: ${importData.exportInfo.serverId})`
+      `Import file from: ${importData.server.name} (original ID: ${importData.exportInfo.serverId})`,
     );
     console.log(`Sessions to import: ${importData.sessions.length}`);
 
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
     const existingItemIds = new Set(existingItems.map((i) => i.id));
 
     console.log(
-      `Found ${existingUsers.length} existing users and ${existingItems.length} existing items on target server`
+      `Found ${existingUsers.length} existing users and ${existingItems.length} existing items on target server`,
     );
 
     // Process and import sessions
@@ -341,7 +341,7 @@ export async function POST(req: NextRequest) {
         } catch (error) {
           console.error(
             `Failed to process session ${importSession.id}:`,
-            error
+            error,
           );
           errorCount++;
           processedCount++;
@@ -354,7 +354,7 @@ export async function POST(req: NextRequest) {
           await db.insert(sessions).values(sessionBatch).onConflictDoNothing();
           importedCount += sessionBatch.length;
         } catch (error) {
-          console.error(`Failed to insert batch:`, error);
+          console.error("Failed to insert batch:", error);
           errorCount += sessionBatch.length;
         }
       }
@@ -368,12 +368,12 @@ export async function POST(req: NextRequest) {
     }
     if (userIdNullified > 0) {
       console.warn(
-        `Nullified ${userIdNullified} user references (users not found on target server)`
+        `Nullified ${userIdNullified} user references (users not found on target server)`,
       );
     }
     if (itemIdNullified > 0) {
       console.warn(
-        `Nullified ${itemIdNullified} item references (items not found on target server)`
+        `Nullified ${itemIdNullified} item references (items not found on target server)`,
       );
     }
 
@@ -396,7 +396,7 @@ export async function POST(req: NextRequest) {
         error: error instanceof Error ? error.message : "Import failed",
         success: false,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

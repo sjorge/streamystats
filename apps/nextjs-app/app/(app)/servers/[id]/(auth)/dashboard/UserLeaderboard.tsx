@@ -1,6 +1,6 @@
 import { getTotalWatchTimeForUsers, getUsers } from "@/lib/db/users";
-import { UserLeaderboardTable } from "./UserLeaderBoardTable";
 import { Server, User } from "@streamystats/database/schema";
+import { UserLeaderboardTable } from "./UserLeaderBoardTable";
 
 interface Props {
   server: Server;
@@ -9,7 +9,7 @@ interface Props {
 export const UserLeaderboard = async ({ server }: Props) => {
   const users = await getUsers({ serverId: server.id });
   const totalWatchTime = await getTotalWatchTimeForUsers({
-    userIds: users.map((user: User) => user.id)
+    userIds: users.map((user: User) => user.id),
   });
 
   return (

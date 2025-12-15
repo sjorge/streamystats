@@ -12,7 +12,8 @@
       ".github",
       ".vscode",
       "dist",
-      "server"
+      "server",
+      ".next"
     ]
   },
   "linter": {

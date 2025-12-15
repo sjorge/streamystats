@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  CustomBarLabel,
+  CustomValueLabel,
+} from "@/components/ui/CustomBarLabel";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -9,13 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { NumericStat } from "@/lib/db/transcoding-statistics";
+import type { ChartConfig } from "@/components/ui/chart";
+import type { NumericStat } from "@/lib/db/transcoding-statistics";
 import { ZapIcon } from "lucide-react";
+import React from "react";
 import {
   Bar,
   BarChart,
@@ -24,14 +29,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  CustomBarLabel,
-  CustomValueLabel,
-} from "@/components/ui/CustomBarLabel";
-import React from "react";
 
 interface BitrateDistributionCardProps {
   data: NumericStat;
+}
+
+interface BitrateRange {
+  range: string;
+  count: number;
+}
+
+interface BitrateRangeWithPercent extends BitrateRange {
+  labelWithPercent: string;
 }
 
 export const BitrateDistributionCard = ({
@@ -45,7 +54,7 @@ export const BitrateDistributionCard = ({
   };
 
   // Create bitrate ranges from the raw distribution data
-  const createBitrateRanges = (values: number[]) => {
+  const createBitrateRanges = (values: number[]): BitrateRange[] => {
     if (!values || values.length === 0) return [];
 
     // Define bitrate ranges (inclusive, non-overlapping)
@@ -56,13 +65,13 @@ export const BitrateDistributionCard = ({
       { label: "2-4 Mbps", min: 2000001, max: 4000000 },
       { label: "4-6 Mbps", min: 4000001, max: 6000000 },
       { label: "6-8 Mbps", min: 6000001, max: 8000000 },
-      { label: "8+ Mbps", min: 8000001, max: Infinity },
+      { label: "8+ Mbps", min: 8000001, max: Number.POSITIVE_INFINITY },
     ];
 
     return ranges
       .map((range) => {
         const valuesInRange = values.filter(
-          (b) => b >= range.min && b <= range.max
+          (b) => b >= range.min && b <= range.max,
         );
         return {
           range: range.label,
@@ -92,30 +101,27 @@ export const BitrateDistributionCard = ({
     const maxHeightPerBar = 35;
     return Math.min(
       Math.max(minHeightPerBar, 200 / fixedLength),
-      maxHeightPerBar
+      maxHeightPerBar,
     );
   };
 
   // Find categories with data for the footer
-  const categoriesWithData = bitrateData.sort(
-    (a: any, b: any) => b.count - a.count
-  );
+  const categoriesWithData = [...bitrateData].sort((a, b) => b.count - a.count);
 
   const mostCommonCategory =
     categoriesWithData.length > 0 ? categoriesWithData[0].range : "N/A";
 
-  const maxCount = Math.max(...bitrateData.map((d: any) => d.count));
+  const maxCount = Math.max(...bitrateData.map((d) => d.count));
 
-  const total = bitrateData.reduce(
-    (sum: number, item: any) => sum + item.count,
-    0
+  const total = bitrateData.reduce((sum, item) => sum + item.count, 0);
+  const bitrateDataWithPercent: BitrateRangeWithPercent[] = bitrateData.map(
+    (item) => ({
+      ...item,
+      labelWithPercent: `${item.range} - ${
+        total > 0 ? ((item.count / total) * 100).toFixed(1) : "0.0"
+      }%`,
+    }),
   );
-  const bitrateDataWithPercent = bitrateData.map((item: any) => ({
-    ...item,
-    labelWithPercent: `${item.range} - ${
-      total > 0 ? ((item.count / total) * 100).toFixed(1) : "0.0"
-    }%`,
-  }));
 
   return (
     <Card>

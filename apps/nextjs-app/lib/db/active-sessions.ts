@@ -35,7 +35,7 @@ export type ActiveSession = {
 };
 
 export const getActiveSessions = async (
-  serverId: number
+  serverId: number,
 ): Promise<ActiveSession[]> => {
   try {
     const response = await fetch(`/api/Sessions?serverId=${serverId}`);

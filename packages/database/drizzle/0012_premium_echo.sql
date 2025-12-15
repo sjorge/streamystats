@@ -1,0 +1,1 @@
+ALTER TABLE "servers" ADD COLUMN "test_migration_field" text;

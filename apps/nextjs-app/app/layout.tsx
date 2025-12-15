@@ -2,9 +2,9 @@ import { basePath } from "@/lib/utils";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { ServerConnectivityMonitor } from "@/components/ServerConnectivityMonitor";
 import { Toaster } from "@/components/ui/sonner";
 import NextTopLoader from "nextjs-toploader";
-import { ServerConnectivityMonitor } from "@/components/ServerConnectivityMonitor";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",

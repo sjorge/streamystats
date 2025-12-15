@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: RouteParams) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -62,7 +62,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

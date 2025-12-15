@@ -93,9 +93,7 @@ const LibraryDropdown = ({ libraries }: LibraryDropdownProps) => {
           <DropdownMenuCheckboxItem
             key={library.id}
             checked={selectedIds.includes(library.id)}
-            onCheckedChange={(checked) =>
-              handleToggle(library.id, checked)
-            }
+            onCheckedChange={(checked) => handleToggle(library.id, checked)}
           >
             <div className="flex flex-col">
               <span>{library.name}</span>

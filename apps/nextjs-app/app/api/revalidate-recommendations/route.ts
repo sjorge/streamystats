@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     if (!serverId) {
       return NextResponse.json(
         { error: "serverId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to revalidate recommendations cache" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

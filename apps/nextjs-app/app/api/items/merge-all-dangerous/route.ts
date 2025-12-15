@@ -1,11 +1,11 @@
 import { requireAdmin } from "@/lib/api-auth";
 import {
   db,
+  hiddenRecommendations,
   items,
   sessions,
-  hiddenRecommendations,
 } from "@streamystats/database";
-import { eq, and, isNotNull, isNull, sql, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 interface MergeResult {
   sessionsMigrated: number;
@@ -16,14 +16,17 @@ interface MergeResult {
 async function mergeSinglePair(
   deletedItemId: string,
   activeItemId: string,
-  serverId: number
+  serverId: number,
 ): Promise<MergeResult> {
   return await db.transaction(async (tx) => {
     const migratedSessions = await tx
       .update(sessions)
       .set({ itemId: activeItemId })
       .where(
-        and(eq(sessions.serverId, serverId), eq(sessions.itemId, deletedItemId))
+        and(
+          eq(sessions.serverId, serverId),
+          eq(sessions.itemId, deletedItemId),
+        ),
       )
       .returning({ id: sessions.id });
 
@@ -33,8 +36,8 @@ async function mergeSinglePair(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.itemId, activeItemId)
-        )
+          eq(hiddenRecommendations.itemId, activeItemId),
+        ),
       );
     const existingUserIds = existingRightRecs.map((r) => r.userId);
 
@@ -46,8 +49,8 @@ async function mergeSinglePair(
           and(
             eq(hiddenRecommendations.serverId, serverId),
             eq(hiddenRecommendations.itemId, deletedItemId),
-            inArray(hiddenRecommendations.userId, existingUserIds)
-          )
+            inArray(hiddenRecommendations.userId, existingUserIds),
+          ),
         )
         .returning({ id: hiddenRecommendations.id });
       deletedDuplicateRecs = deleted.length;
@@ -59,8 +62,8 @@ async function mergeSinglePair(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.itemId, deletedItemId)
-        )
+          eq(hiddenRecommendations.itemId, deletedItemId),
+        ),
       )
       .returning({ id: hiddenRecommendations.id });
 
@@ -91,7 +94,7 @@ export async function POST(request: Request) {
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -108,8 +111,8 @@ export async function POST(request: Request) {
           eq(items.serverId, serverId),
           eq(items.type, "Movie"),
           isNotNull(items.deletedAt),
-          isNotNull(items.productionYear)
-        )
+          isNotNull(items.productionYear),
+        ),
       )
       .as("deleted_items");
 
@@ -126,8 +129,8 @@ export async function POST(request: Request) {
           eq(items.serverId, serverId),
           eq(items.type, "Movie"),
           isNull(items.deletedAt),
-          isNotNull(items.productionYear)
-        )
+          isNotNull(items.productionYear),
+        ),
       )
       .as("active_items");
 
@@ -142,8 +145,8 @@ export async function POST(request: Request) {
         and(
           sql`lower(${deletedItemsSub.name}) = lower(${activeItemsSub.name})`,
           eq(deletedItemsSub.productionYear, activeItemsSub.productionYear),
-          eq(deletedItemsSub.type, activeItemsSub.type)
-        )
+          eq(deletedItemsSub.type, activeItemsSub.type),
+        ),
       );
 
     if (matches.length === 0) {
@@ -161,7 +164,7 @@ export async function POST(request: Request) {
         {
           status: 200,
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -176,7 +179,7 @@ export async function POST(request: Request) {
         const result = await mergeSinglePair(
           match.deletedId,
           match.activeId,
-          serverId
+          serverId,
         );
         totalSessionsMigrated += result.sessionsMigrated;
         totalRecsMigrated += result.recsMigrated;
@@ -186,7 +189,7 @@ export async function POST(request: Request) {
         errors.push(
           `Error merging ${match.deletedId} -> ${match.activeId}: ${
             pairError instanceof Error ? pairError.message : "Unknown error"
-          }`
+          }`,
         );
       }
     }
@@ -218,7 +221,7 @@ export async function POST(request: Request) {
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error merging all dangerous matches:", error);
@@ -231,7 +234,7 @@ export async function POST(request: Request) {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 }

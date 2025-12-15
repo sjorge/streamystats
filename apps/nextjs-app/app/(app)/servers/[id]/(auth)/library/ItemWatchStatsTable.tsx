@@ -36,10 +36,15 @@ import { useRouter } from "nextjs-toploader/app";
 import * as React from "react";
 import { useDebounce } from "use-debounce";
 
+import type {
+  ItemWatchStats,
+  ItemWatchStatsResponse,
+  Library,
+  Server,
+} from "@/lib/types";
+import Link from "next/link";
 import { Poster } from "../dashboard/Poster";
 import LibraryDropdown from "./LibraryDropdown";
-import Link from "next/link";
-import type { Server, ItemWatchStats, ItemWatchStatsResponse, Library } from "@/lib/types";
 
 export interface ItemWatchStatsTableProps {
   server: Server;
@@ -76,7 +81,7 @@ export function ItemWatchStatsTable({
   }, [debouncedSearch]);
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -220,7 +225,7 @@ export function ItemWatchStatsTable({
       cell: ({ row }) => (
         <div className="text-left">
           {row.original.item.communityRating
-            ? row.original.item.communityRating.toFixed(1) + "★"
+            ? `${row.original.item.communityRating.toFixed(1)}★`
             : "-"}
         </div>
       ),
@@ -343,7 +348,7 @@ export function ItemWatchStatsTable({
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   );
@@ -430,5 +435,5 @@ const MemoizedTableRow = React.memo(
   (prevProps, nextProps) => {
     // Only re-render if row data has changed
     return prevProps.row.original.item_id === nextProps.row.original.item_id;
-  }
+  },
 );

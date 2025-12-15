@@ -19,12 +19,12 @@ export async function GET(request: Request) {
           headers: {
             "Content-Type": "application/json",
           },
-        }
+        },
       );
     }
 
     const libraries = await getLibraries({
-      serverId: parseInt(serverId),
+      serverId: Number.parseInt(serverId),
     });
 
     return new Response(
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   } catch (error) {
     console.error("Error fetching libraries:", error);
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 }

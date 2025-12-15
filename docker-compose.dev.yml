@@ -29,6 +29,7 @@ services:
 
   vectorchord:
     image: tensorchord/vchord-postgres:pg17-v0.4.1
+    command: ["postgres", "-c", "log_checkpoints=off"]
     ports:
       - "5432:5432"
     environment:

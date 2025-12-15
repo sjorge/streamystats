@@ -35,15 +35,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useQueryParams } from "@/hooks/useQueryParams";
 import { usePersistantState } from "@/hooks/usePersistantState";
-import { formatDuration } from "@/lib/utils";
+import { useQueryParams } from "@/hooks/useQueryParams";
+import { HistoryItem, HistoryResponse } from "@/lib/db/history";
 import { formatLocalDate } from "@/lib/timezone";
+import type { Server } from "@/lib/types";
+import { formatDuration } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import { useDebounce } from "use-debounce";
-import { HistoryItem, HistoryResponse } from "@/lib/db/history";
-import type { Server } from "@/lib/types";
 
 export interface HistoryTableProps {
   data: HistoryResponse;
@@ -408,7 +408,7 @@ export function HistoryTable({
         }
 
         const date = new Date(dateValue);
-        if (isNaN(date.getTime())) {
+        if (Number.isNaN(date.getTime())) {
           return <div>Invalid Date</div>;
         }
 
@@ -418,14 +418,14 @@ export function HistoryTable({
   ];
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
   const [columnVisibility, setColumnVisibility, isLoadingVisibility] =
     usePersistantState<VisibilityState>(
       `history-column-visibility-${server.id}`,
       {
         user_name: !hideUserColumn,
-      }
+      },
     );
 
   // Handle pagination with URL query params
@@ -503,7 +503,7 @@ export function HistoryTable({
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   );
@@ -522,7 +522,7 @@ export function HistoryTable({
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}

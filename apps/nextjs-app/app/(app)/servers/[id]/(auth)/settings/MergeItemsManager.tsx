@@ -1,15 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -21,16 +11,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
-  GitMerge,
-  CheckCircle,
-  AlertTriangle,
-  Loader,
-  ArrowRight,
-} from "lucide-react";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { Item, Server } from "@/lib/types";
 import { fetch } from "@/lib/utils";
-import type { Server, Item } from "@/lib/types";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle,
+  GitMerge,
+  Loader,
+} from "lucide-react";
+import { useState } from "react";
 import { Poster } from "../dashboard/Poster";
 
 interface MergeItemsManagerProps {
@@ -107,15 +107,15 @@ export function MergeItemsManager({ server }: MergeItemsManagerProps) {
 
       if (!response.ok) {
         throw new Error(
-          data.error || `HTTP ${response.status}: ${response.statusText}`
+          data.error || `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 
       const leftItem = data.items.find(
-        (i: PreviewItem) => i.id === leftId.trim()
+        (i: PreviewItem) => i.id === leftId.trim(),
       );
       const rightItem = data.items.find(
-        (i: PreviewItem) => i.id === rightId.trim()
+        (i: PreviewItem) => i.id === rightId.trim(),
       );
 
       if (!leftItem?.item) {
@@ -167,7 +167,7 @@ export function MergeItemsManager({ server }: MergeItemsManagerProps) {
 
       if (!response.ok) {
         throw new Error(
-          data.error || `HTTP ${response.status}: ${response.statusText}`
+          data.error || `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 

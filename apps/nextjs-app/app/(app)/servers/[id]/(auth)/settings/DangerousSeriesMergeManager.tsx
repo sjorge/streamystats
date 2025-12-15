@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,6 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -17,25 +24,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import type { Server } from "@/lib/types";
+import { fetch } from "@/lib/utils";
 import {
   AlertTriangle,
-  Loader,
   CheckCircle,
   ChevronDown,
   ChevronRight,
-  Tv,
+  Loader,
   Trash2,
+  Tv,
 } from "lucide-react";
-import { fetch } from "@/lib/utils";
-import type { Server } from "@/lib/types";
+import { useCallback, useState } from "react";
 
 interface DangerousSeriesMergeManagerProps {
   server: Server;
@@ -105,7 +105,7 @@ export function DangerousSeriesMergeManager({
   const [seriesGroups, setSeriesGroups] = useState<SeriesGroup[]>([]);
   const [expandedSeries, setExpandedSeries] = useState<Set<string>>(new Set());
   const [selectedEpisodes, setSelectedEpisodes] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [summary, setSummary] = useState<{
     totalDeletedEpisodes: number;
@@ -123,7 +123,7 @@ export function DangerousSeriesMergeManager({
     setIsLoading(true);
     try {
       const response = await fetch(
-        `/api/items/dangerous-matches-series?serverId=${server.id}`
+        `/api/items/dangerous-matches-series?serverId=${server.id}`,
       );
       const data = await response.json();
 
@@ -193,15 +193,19 @@ export function DangerousSeriesMergeManager({
       .map((e) => e.deletedEpisode.id);
 
     const allSelected = matchedEpisodeIds.every((id) =>
-      selectedEpisodes.has(id)
+      selectedEpisodes.has(id),
     );
 
     setSelectedEpisodes((prev) => {
       const next = new Set(prev);
       if (allSelected) {
-        matchedEpisodeIds.forEach((id) => next.delete(id));
+        for (const id of matchedEpisodeIds) {
+          next.delete(id);
+        }
       } else {
-        matchedEpisodeIds.forEach((id) => next.add(id));
+        for (const id of matchedEpisodeIds) {
+          next.add(id);
+        }
       }
       return next;
     });
@@ -209,7 +213,7 @@ export function DangerousSeriesMergeManager({
 
   const selectAllMatched = () => {
     const allMatchedIds = seriesGroups.flatMap((g) =>
-      g.episodes.filter((e) => e.activeEpisode).map((e) => e.deletedEpisode.id)
+      g.episodes.filter((e) => e.activeEpisode).map((e) => e.deletedEpisode.id),
     );
     setSelectedEpisodes(new Set(allMatchedIds));
   };
@@ -221,13 +225,16 @@ export function DangerousSeriesMergeManager({
     try {
       const pairs = seriesGroups
         .flatMap((g) => g.episodes)
-        .filter(
-          (e) => selectedEpisodes.has(e.deletedEpisode.id) && e.activeEpisode
-        )
-        .map((e) => ({
-          deletedEpisodeId: e.deletedEpisode.id,
-          activeEpisodeId: e.activeEpisode!.id,
-        }));
+        .flatMap((e) =>
+          selectedEpisodes.has(e.deletedEpisode.id) && e.activeEpisode
+            ? [
+                {
+                  deletedEpisodeId: e.deletedEpisode.id,
+                  activeEpisodeId: e.activeEpisode.id,
+                },
+              ]
+            : [],
+        );
 
       const response = await fetch("/api/items/merge-episodes-bulk", {
         method: "POST",
@@ -295,7 +302,7 @@ export function DangerousSeriesMergeManager({
 
   const formatEpisodeCode = (
     seasonNumber: number | null,
-    episodeNumber: number | null
+    episodeNumber: number | null,
   ) => {
     const s = seasonNumber?.toString().padStart(2, "0") ?? "??";
     const e = episodeNumber?.toString().padStart(2, "0") ?? "??";
@@ -394,13 +401,13 @@ export function DangerousSeriesMergeManager({
                   const seriesKey = getSeriesKey(group);
                   const isExpanded = expandedSeries.has(seriesKey);
                   const matchedEpisodes = group.episodes.filter(
-                    (e) => e.activeEpisode
+                    (e) => e.activeEpisode,
                   );
                   const allSelected = matchedEpisodes.every((e) =>
-                    selectedEpisodes.has(e.deletedEpisode.id)
+                    selectedEpisodes.has(e.deletedEpisode.id),
                   );
                   const someSelected = matchedEpisodes.some((e) =>
-                    selectedEpisodes.has(e.deletedEpisode.id)
+                    selectedEpisodes.has(e.deletedEpisode.id),
                   );
 
                   return (
@@ -412,7 +419,9 @@ export function DangerousSeriesMergeManager({
                       <div className="border rounded-lg">
                         <CollapsibleTrigger className="w-full">
                           <div className="flex items-center gap-3 p-3 hover:bg-muted/50">
-                            <div
+                            <button
+                              type="button"
+                              className="w-full text-left"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleAllInSeries(group);
@@ -427,7 +436,7 @@ export function DangerousSeriesMergeManager({
                                 }
                                 disabled={matchedEpisodes.length === 0}
                               />
-                            </div>
+                            </button>
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4" />
                             ) : (
@@ -469,7 +478,7 @@ export function DangerousSeriesMergeManager({
                             <table className="w-full text-sm">
                               <thead>
                                 <tr className="border-b bg-muted/30">
-                                  <th className="w-10 p-2"></th>
+                                  <th className="w-10 p-2" />
                                   <th className="text-left p-2">Episode</th>
                                   <th className="text-left p-2">
                                     Deleted Episode
@@ -494,7 +503,7 @@ export function DangerousSeriesMergeManager({
                                     <td className="p-2">
                                       <Checkbox
                                         checked={selectedEpisodes.has(
-                                          ep.deletedEpisode.id
+                                          ep.deletedEpisode.id,
                                         )}
                                         onCheckedChange={() =>
                                           toggleEpisode(ep.deletedEpisode.id)
@@ -505,7 +514,7 @@ export function DangerousSeriesMergeManager({
                                     <td className="p-2 font-mono text-xs">
                                       {formatEpisodeCode(
                                         ep.deletedEpisode.seasonNumber,
-                                        ep.deletedEpisode.episodeNumber
+                                        ep.deletedEpisode.episodeNumber,
                                       )}
                                     </td>
                                     <td className="p-2">

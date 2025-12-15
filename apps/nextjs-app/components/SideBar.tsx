@@ -16,9 +16,11 @@ import {
   User as UserIcon,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { ServerSelector } from "./ServerSelector";
+import { ShowAdminStatisticsSwitch } from "./ShowAdminStatisticsSwitch";
 import { UserMenu } from "./UserMenu";
 import {
   Collapsible,
@@ -39,8 +41,6 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "./ui/sidebar";
-import { ShowAdminStatisticsSwitch } from "./ShowAdminStatisticsSwitch";
-import Link from "next/link";
 
 const dashboard_items = [
   {
@@ -137,7 +137,7 @@ export const SideBar: React.FC<Props> = ({
       },
       {
         title: "Me",
-        url: "/users/" + me?.id,
+        url: `/users/${me?.id}`,
         icon: UserIcon,
       },
     ];
@@ -244,7 +244,7 @@ export const SideBar: React.FC<Props> = ({
         />
         <UserMenu
           me={fullUser || undefined}
-          serverUrl={servers.find((s) => s.id === parseInt(id))?.url}
+          serverUrl={servers.find((s) => s.id === Number.parseInt(id))?.url}
         />
       </SidebarFooter>
     </Sidebar>
