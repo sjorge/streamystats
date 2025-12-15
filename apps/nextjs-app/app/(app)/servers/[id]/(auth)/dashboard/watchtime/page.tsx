@@ -5,9 +5,11 @@ import { setEndDateToEndOfDay } from "@/dates";
 import { getServer } from "@/lib/db/server";
 import {
   getMe,
+  getUserStatsSummaryForServer,
   getWatchTimePerHour,
   getWatchTimePerWeekDay,
 } from "@/lib/db/users";
+import { getMostActiveUsersDay, getMostWatchedDay } from "@/lib/db/statistics";
 import { showAdminStatistics } from "@/utils/adminTools";
 import { Server } from "@streamystats/database/schema";
 import { addDays } from "date-fns";
@@ -18,6 +20,8 @@ import TotalWatchTime from "../TotalWatchTime";
 import { WatchTimePerHour } from "../WatchTimePerHour";
 import { WatchTimePerWeekDay } from "../WatchTimePerWeekDay";
 import { WatchtimeDateRangeFilter } from "./WatchtimeDateRangeFilter";
+import { WatchtimeHighlights } from "./WatchtimeHighlights";
+import { WatchtimeTopUsersTable } from "./WatchtimeTopUsersTable";
 
 export default async function WatchtimePage({
   params,
@@ -82,7 +86,10 @@ async function WatchtimeStats({
     redirect("/not-found");
   }
 
-  const [d1, d2] = await Promise.all([
+  const scopedUserId = sas ? undefined : me.id;
+
+  const [d1, d2, mostWatchedDay, mostActiveUsersDay, topUsers] =
+    await Promise.all([
     getWatchTimePerWeekDay({
       serverId: server.id,
       userId: sas ? undefined : me.id,
@@ -95,10 +102,35 @@ async function WatchtimeStats({
       startDate,
       endDate,
     }),
+    getMostWatchedDay({
+      serverId: server.id,
+      userId: scopedUserId,
+      startDate,
+      endDate,
+    }),
+    sas
+      ? getMostActiveUsersDay({
+          serverId: server.id,
+          startDate,
+          endDate,
+        })
+      : Promise.resolve(null),
+    sas
+      ? getUserStatsSummaryForServer({
+          serverId: server.id,
+          startDate,
+          endDate,
+        })
+      : Promise.resolve([]),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
+      <WatchtimeHighlights
+        mostWatchedDay={mostWatchedDay}
+        mostActiveUsersDay={mostActiveUsersDay}
+        showAdminStats={sas}
+      />
       <div className="flex md:flex-row flex-col gap-2">
         <TotalWatchTime
           server={server}
@@ -119,6 +151,7 @@ async function WatchtimeStats({
         title="Watch Time Per Hour"
         subtitle="Showing total watch time for each hour of the day"
       />
+      {sas ? <WatchtimeTopUsersTable server={server} users={topUsers} /> : null}
     </div>
   );
 }

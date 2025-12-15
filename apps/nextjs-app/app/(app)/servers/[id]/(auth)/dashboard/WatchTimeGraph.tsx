@@ -1,6 +1,17 @@
 "use client";
 
-import { addDays, startOfDay } from "date-fns";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  addYears,
+  format,
+  parseISO,
+  startOfDay,
+  startOfISOWeek,
+  startOfMonth,
+  startOfYear,
+} from "date-fns";
 import * as React from "react";
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 
@@ -17,8 +28,17 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { ChartConfig } from "@/components/ui/chart";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useQueryParams } from "@/hooks/useQueryParams";
 import type { WatchTimePerType } from "@/lib/db/statistics";
 import { formatDuration } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 const chartConfig = {
@@ -40,6 +60,31 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+type WatchtimeBucket = "day" | "week" | "month" | "year";
+
+function parseBucketParam(value: string | null): WatchtimeBucket {
+  if (value === "week" || value === "month" || value === "year") return value;
+  return "day";
+}
+
+function bucketStart(bucket: WatchtimeBucket, date: Date): Date {
+  if (bucket === "week") return startOfISOWeek(date);
+  if (bucket === "month") return startOfMonth(date);
+  if (bucket === "year") return startOfYear(date);
+  return startOfDay(date);
+}
+
+function addBucket(bucket: WatchtimeBucket, date: Date): Date {
+  if (bucket === "week") return addWeeks(date, 1);
+  if (bucket === "month") return addMonths(date, 1);
+  if (bucket === "year") return addYears(date, 1);
+  return addDays(date, 1);
+}
+
+function formatBucketKey(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
+
 interface Props {
   data?: WatchTimePerType;
   onLoadingChange?: (isLoading: boolean) => void;
@@ -51,10 +96,12 @@ function WatchTimeChartView({
   data,
   startDate,
   endDate,
+  bucket,
 }: {
   data: WatchTimePerType;
   startDate: string;
   endDate: string;
+  bucket: WatchtimeBucket;
 }) {
   const rangeStart = React.useMemo(() => {
     const d = startOfDay(new Date(startDate));
@@ -72,13 +119,28 @@ function WatchTimeChartView({
     return d;
   }, [endDate]);
 
-  const tickFormatter = React.useCallback((value: string) => {
-    const date = new Date(value);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  }, []);
+  const tickFormatter = React.useCallback(
+    (value: string) => {
+      const date = new Date(value);
+      if (bucket === "month") {
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          year: "numeric",
+        });
+      }
+
+      if (bucket === "year") {
+        return date.toLocaleDateString("en-US", { year: "numeric" });
+      }
+
+      // day + week
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    },
+    [bucket],
+  );
 
   const tooltipFormatter = React.useCallback(
     (value: unknown, name: unknown, item: { color?: string } | undefined) => {
@@ -99,67 +161,62 @@ function WatchTimeChartView({
   const filteredData = React.useMemo(() => {
     if (!data) return [];
 
-    const start = rangeStart;
-    const end = rangeEnd;
+    const start = bucketStart(bucket, rangeStart);
+    const end = bucketStart(bucket, rangeEnd);
 
-    // Group data by date
-    const dataByDate: Record<
+    const bucketMap: Record<
       string,
       { Movie: number; Episode: number; Music: number; Other: number }
     > = {};
 
-    // Process the new data structure
-    for (const [key, value] of Object.entries(data)) {
-      // Parse the composite key: "2024-01-15-movie"
-      const lastDashIndex = key.lastIndexOf("-");
-      if (lastDashIndex === -1) {
-        continue;
-      }
+    const ensureBucket = (bucketKey: string) => {
+      if (bucketMap[bucketKey]) return;
+      bucketMap[bucketKey] = { Movie: 0, Episode: 0, Music: 0, Other: 0 };
+    };
 
-      const date = key.substring(0, lastDashIndex);
+    for (const [key, value] of Object.entries(data)) {
+      const lastDashIndex = key.lastIndexOf("-");
+      if (lastDashIndex === -1) continue;
+
+      const dateStr = key.substring(0, lastDashIndex);
       const type = key.substring(lastDashIndex + 1);
 
-      // Initialize date entry if it doesn't exist
-      if (!dataByDate[date]) {
-        dataByDate[date] = { Movie: 0, Episode: 0, Music: 0, Other: 0 };
-      }
+      const parsed = parseISO(dateStr);
+      if (Number.isNaN(parsed.getTime())) continue;
 
-      // Convert seconds to minutes and assign to appropriate type
+      const bStart = bucketStart(bucket, parsed);
+      const bucketKey = formatBucketKey(bStart);
+      ensureBucket(bucketKey);
+
       const watchTimeMinutes = Math.floor(value.totalWatchTime / 60);
-
-      if (type === "movie") {
-        dataByDate[date].Movie = watchTimeMinutes;
-      } else if (type === "episode") {
-        dataByDate[date].Episode = watchTimeMinutes;
-      } else if (type === "music") {
-        dataByDate[date].Music = watchTimeMinutes;
-      } else if (type === "other") {
-        dataByDate[date].Other = watchTimeMinutes;
-      }
+      if (type === "movie") bucketMap[bucketKey].Movie += watchTimeMinutes;
+      else if (type === "episode") bucketMap[bucketKey].Episode += watchTimeMinutes;
+      else if (type === "music") bucketMap[bucketKey].Music += watchTimeMinutes;
+      else if (type === "other") bucketMap[bucketKey].Other += watchTimeMinutes;
     }
 
-    // Create array with all dates in range
-    const result = [];
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateString = d.toISOString().split("T")[0];
-      const dayData = dataByDate[dateString] || {
-        Movie: 0,
-        Episode: 0,
-        Music: 0,
-        Other: 0,
-      };
+    const result: Array<{
+      date: string;
+      Movie: number;
+      Episode: number;
+      Music: number;
+      Other: number;
+    }> = [];
 
+    for (let d = new Date(start); d <= end; d = addBucket(bucket, d)) {
+      const bucketKey = formatBucketKey(d);
+      ensureBucket(bucketKey);
       result.push({
-        date: dateString,
-        Movie: dayData.Movie,
-        Episode: dayData.Episode,
-        Music: dayData.Music,
-        Other: dayData.Other,
+        date: bucketKey,
+        Movie: bucketMap[bucketKey].Movie,
+        Episode: bucketMap[bucketKey].Episode,
+        Music: bucketMap[bucketKey].Music,
+        Other: bucketMap[bucketKey].Other,
       });
     }
 
     return result;
-  }, [data, rangeStart, rangeEnd]);
+  }, [data, rangeStart, rangeEnd, bucket]);
 
   return (
     <ChartContainer
@@ -230,15 +287,55 @@ function LoadingChart() {
 }
 
 export function WatchTimeGraph({ data, startDate, endDate }: Props) {
+  const searchParams = useSearchParams();
+  const bucketParam = searchParams.get("bucket");
+  const bucket = React.useMemo(
+    () => parseBucketParam(bucketParam),
+    [bucketParam],
+  );
+
+  const { updateQueryParams, isLoading } = useQueryParams();
+
+  React.useEffect(() => {
+    if (bucketParam !== null) return;
+    updateQueryParams({ bucket: "day" });
+  }, [bucketParam, updateQueryParams]);
+
+  const handleBucketChange = React.useCallback(
+    (next: string) => {
+      const parsed = parseBucketParam(next);
+      updateQueryParams({ bucket: parsed });
+    },
+    [updateQueryParams],
+  );
+
+  const title = React.useMemo(() => {
+    if (bucket === "week") return "Watch Time Per Week";
+    if (bucket === "month") return "Watch Time Per Month";
+    if (bucket === "year") return "Watch Time Per Year";
+    return "Watch Time Per Day";
+  }, [bucket]);
+
   return (
     <Card>
       <CardHeader className="flex md:items-center gap-2 space-y-0 border-b py-5 sm:flex-row p-4 md:p-6">
         <div className="grid flex-1 gap-1">
-          <CardTitle>Watch Time Per Day</CardTitle>
+          <CardTitle>{title}</CardTitle>
           <CardDescription>
             Showing total watch time for the selected period
           </CardDescription>
         </div>
+        <Select value={bucket} onValueChange={handleBucketChange} disabled={isLoading}>
+          <SelectTrigger className="w-[160px]" aria-label="Select aggregation period">
+            <SelectValue placeholder="Period" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="day">Day</SelectItem>
+            <SelectItem value="week">Week</SelectItem>
+            <SelectItem value="month">Month</SelectItem>
+            <SelectItem value="year">Year</SelectItem>
+          </SelectContent>
+        </Select>
         <div className="mr-4">
           {Object.entries(chartConfig).map(([key, config]) => (
             <div key={key} className="flex items-center gap-2">
@@ -257,6 +354,7 @@ export function WatchTimeGraph({ data, startDate, endDate }: Props) {
             data={data || {}}
             startDate={startDate}
             endDate={endDate}
+            bucket={bucket}
           />
         </Suspense>
       </CardContent>
