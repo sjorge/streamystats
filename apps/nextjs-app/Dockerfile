@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # Dependencies stage - Full Bun
 FROM oven/bun:1.3.4-alpine AS deps
 
@@ -15,7 +17,8 @@ COPY apps/nextjs-app/package.json ./apps/nextjs-app/
 COPY apps/job-server/package.json ./apps/job-server/
 
 # Install dependencies with Bun
-RUN bun install --frozen-lockfile || bun install
+RUN --mount=type=cache,target=/root/.bun \
+    bun install --frozen-lockfile
 
 # Database build stage
 FROM deps AS database-builder
@@ -39,10 +42,12 @@ ENV NEXT_PUBLIC_VERSION=${VERSION}
 ENV NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA}
 ENV NEXT_PUBLIC_BUILD_TIME=${BUILD_TIME}
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build Next.js with Bun
 WORKDIR /app/apps/nextjs-app
-RUN bun --bun next build
+RUN --mount=type=cache,target=/app/apps/nextjs-app/.next/cache \
+    bun --bun next build
 
 # Production runtime stage
 FROM oven/bun:1.3.4-alpine AS runner
