@@ -2,7 +2,7 @@
 
 import { addDays, startOfDay } from "date-fns";
 import * as React from "react";
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 
 import {
   Card,
@@ -167,7 +167,7 @@ function WatchTimeChartView({
       config={chartConfig}
       className="aspect-auto h-[250px] w-full"
     >
-      <BarChart data={filteredData}>
+      <LineChart data={filteredData}>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
@@ -182,31 +182,39 @@ function WatchTimeChartView({
           formatter={tooltipFormatter}
           content={<ChartTooltipContent indicator="dashed" />}
         />
-        <Bar
+        <Line
+          type="monotone"
           dataKey="Episode"
-          fill={chartConfig.Episode.color}
-          radius={[4, 4, 0, 0]}
+          stroke={chartConfig.Episode.color}
+          strokeWidth={2}
+          dot={false}
           name="Episode"
         />
-        <Bar
+        <Line
+          type="monotone"
           dataKey="Movie"
-          fill={chartConfig.Movie.color}
-          radius={[4, 4, 0, 0]}
+          stroke={chartConfig.Movie.color}
+          strokeWidth={2}
+          dot={false}
           name="Movie"
         />
-        <Bar
+        <Line
+          type="monotone"
           dataKey="Music"
-          fill={chartConfig.Music.color}
-          radius={[4, 4, 0, 0]}
+          stroke={chartConfig.Music.color}
+          strokeWidth={2}
+          dot={false}
           name="Music"
         />
-        <Bar
+        <Line
+          type="monotone"
           dataKey="Other"
-          fill={chartConfig.Other.color}
-          radius={[4, 4, 0, 0]}
+          stroke={chartConfig.Other.color}
+          strokeWidth={2}
+          dot={false}
           name="Other"
         />
-      </BarChart>
+      </LineChart>
     </ChartContainer>
   );
 }
