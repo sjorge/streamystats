@@ -190,7 +190,8 @@ function WatchTimeChartView({
 
       const watchTimeMinutes = Math.floor(value.totalWatchTime / 60);
       if (type === "movie") bucketMap[bucketKey].Movie += watchTimeMinutes;
-      else if (type === "episode") bucketMap[bucketKey].Episode += watchTimeMinutes;
+      else if (type === "episode")
+        bucketMap[bucketKey].Episode += watchTimeMinutes;
       else if (type === "music") bucketMap[bucketKey].Music += watchTimeMinutes;
       else if (type === "other") bucketMap[bucketKey].Other += watchTimeMinutes;
     }
@@ -325,8 +326,15 @@ export function WatchTimeGraph({ data, startDate, endDate }: Props) {
             Showing total watch time for the selected period
           </CardDescription>
         </div>
-        <Select value={bucket} onValueChange={handleBucketChange} disabled={isLoading}>
-          <SelectTrigger className="w-[160px]" aria-label="Select aggregation period">
+        <Select
+          value={bucket}
+          onValueChange={handleBucketChange}
+          disabled={isLoading}
+        >
+          <SelectTrigger
+            className="w-[160px]"
+            aria-label="Select aggregation period"
+          >
             <SelectValue placeholder="Period" />
           </SelectTrigger>
           <SelectContent>

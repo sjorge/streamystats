@@ -83,5 +83,3 @@ export function WatchtimeTopUsersTable({
     </Card>
   );
 }
-
-

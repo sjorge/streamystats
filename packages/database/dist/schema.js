@@ -13,7 +13,7 @@ const vector = (0, pg_core_1.customType)({
         return value
             .slice(1, -1)
             .split(",")
-            .map((v) => parseFloat(v));
+            .map((v) => Number.parseFloat(v.trim()));
     },
     toDriver(value) {
         return `[${value.join(",")}]`;

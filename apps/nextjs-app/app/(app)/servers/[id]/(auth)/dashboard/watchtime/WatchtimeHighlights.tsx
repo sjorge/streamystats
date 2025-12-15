@@ -70,5 +70,3 @@ export function WatchtimeHighlights({
     </div>
   );
 }
-
-

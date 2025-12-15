@@ -3,13 +3,13 @@ import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { setEndDateToEndOfDay } from "@/dates";
 import { getServer } from "@/lib/db/server";
+import { getMostActiveUsersDay, getMostWatchedDay } from "@/lib/db/statistics";
 import {
   getMe,
   getUserStatsSummaryForServer,
   getWatchTimePerHour,
   getWatchTimePerWeekDay,
 } from "@/lib/db/users";
-import { getMostActiveUsersDay, getMostWatchedDay } from "@/lib/db/statistics";
 import { showAdminStatistics } from "@/utils/adminTools";
 import { Server } from "@streamystats/database/schema";
 import { addDays } from "date-fns";
@@ -90,39 +90,39 @@ async function WatchtimeStats({
 
   const [d1, d2, mostWatchedDay, mostActiveUsersDay, topUsers] =
     await Promise.all([
-    getWatchTimePerWeekDay({
-      serverId: server.id,
-      userId: sas ? undefined : me.id,
-      startDate,
-      endDate,
-    }),
-    getWatchTimePerHour({
-      serverId: server.id,
-      userId: sas ? undefined : me.id,
-      startDate,
-      endDate,
-    }),
-    getMostWatchedDay({
-      serverId: server.id,
-      userId: scopedUserId,
-      startDate,
-      endDate,
-    }),
-    sas
-      ? getMostActiveUsersDay({
-          serverId: server.id,
-          startDate,
-          endDate,
-        })
-      : Promise.resolve(null),
-    sas
-      ? getUserStatsSummaryForServer({
-          serverId: server.id,
-          startDate,
-          endDate,
-        })
-      : Promise.resolve([]),
-  ]);
+      getWatchTimePerWeekDay({
+        serverId: server.id,
+        userId: sas ? undefined : me.id,
+        startDate,
+        endDate,
+      }),
+      getWatchTimePerHour({
+        serverId: server.id,
+        userId: sas ? undefined : me.id,
+        startDate,
+        endDate,
+      }),
+      getMostWatchedDay({
+        serverId: server.id,
+        userId: scopedUserId,
+        startDate,
+        endDate,
+      }),
+      sas
+        ? getMostActiveUsersDay({
+            serverId: server.id,
+            startDate,
+            endDate,
+          })
+        : Promise.resolve(null),
+      sas
+        ? getUserStatsSummaryForServer({
+            serverId: server.id,
+            startDate,
+            endDate,
+          })
+        : Promise.resolve([]),
+    ]);
 
   return (
     <div className="flex flex-col gap-6">
