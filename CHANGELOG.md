@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.10.0](https://github.com/fredrikburmester/streamystats/compare/v2.9.0...v2.10.0) (2025-12-15)
+
+
+### Features
+
+* see what user you share taste with ([c123290](https://github.com/fredrikburmester/streamystats/commit/c1232905e91c4bb9fba8a8893b946134e5da3deb))
+* use top items on user page ([448e175](https://github.com/fredrikburmester/streamystats/commit/448e175e4941c79070fe04146c57100a07da8a22))
+
+
+### Bug Fixes
+
+* build error ([7ba7da4](https://github.com/fredrikburmester/streamystats/commit/7ba7da4d3d51158d862ae604889dd0f9831cc871))
+* build error ([caee7f3](https://github.com/fredrikburmester/streamystats/commit/caee7f3d17445f8dac3e3a5e686026c562f173f4))
+* build issue ([b5fd8ea](https://github.com/fredrikburmester/streamystats/commit/b5fd8ea1470b325f77558bcbb64ba6cb9bfbb030))
+* cache + remove arm from pr images ([cd49939](https://github.com/fredrikburmester/streamystats/commit/cd49939ea240b534601b17af073eb017462b40fa))
+* cache data ([c4cfee6](https://github.com/fredrikburmester/streamystats/commit/c4cfee698c0a000a587bda5e080bd44f4fdcf23a))
+* **design:** rename chat ai and fix hover effect ([1937baa](https://github.com/fredrikburmester/streamystats/commit/1937baa3731bb6a0aeb756665af3414676d616e5))
+* **design:** toltip clipping card ([734f8a9](https://github.com/fredrikburmester/streamystats/commit/734f8a96d7ff6d9caec8fc70bf3a467647e6607d))
+* don't log checkpoints ([ca09b1c](https://github.com/fredrikburmester/streamystats/commit/ca09b1cf7e95b0ec590cf9612450a8da7b72db49))
+* lock bun version ([65fdeee](https://github.com/fredrikburmester/streamystats/commit/65fdeee5f5befbc53375bd8b99882cefe5019461))
+* smaller image ([aac92dd](https://github.com/fredrikburmester/streamystats/commit/aac92dd65f9903d0edea279539bb93eb0b3422a0))
+
 ## [2.9.0](https://github.com/fredrikburmester/streamystats/compare/v2.8.0...v2.9.0) (2025-12-14)
 
 
