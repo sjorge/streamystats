@@ -29,6 +29,6 @@ export async function Graph({
     return <p>No data available</p>;
   }
 
-  return <WatchTimeGraph data={data} />;
+  return <WatchTimeGraph data={data} startDate={startDate} endDate={endDate} />;
 }
 export default Graph;

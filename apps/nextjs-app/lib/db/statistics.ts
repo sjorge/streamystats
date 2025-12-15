@@ -372,3 +372,94 @@ export const getWatchTimeByLibrary = unstable_cache(
   ["db-statistics", "getWatchTimeByLibrary"],
   { revalidate: CACHE_TTL },
 );
+
+export interface MostWatchedDay {
+  date: string;
+  watchTime: number;
+}
+
+export async function getMostWatchedDay({
+  serverId,
+  startDate,
+  endDate,
+  userId,
+}: {
+  serverId: string | number;
+  startDate: string;
+  endDate: string;
+  userId?: string | number;
+}): Promise<MostWatchedDay | null> {
+  const whereConditions = [
+    eq(sessions.serverId, Number(serverId)),
+    isNotNull(sessions.startTime),
+    gte(sessions.startTime, new Date(startDate)),
+    lte(sessions.startTime, new Date(endDate)),
+  ];
+
+  if (userId !== undefined) {
+    whereConditions.push(eq(sessions.userId, String(userId)));
+  }
+
+  const rows = await db
+    .select({
+      date: sql<string>`DATE(${sessions.startTime})`.as("date"),
+      totalWatchTime: sum(sessions.playDuration).as("totalWatchTime"),
+    })
+    .from(sessions)
+    .where(and(...whereConditions))
+    .groupBy(sql`DATE(${sessions.startTime})`)
+    .orderBy(desc(sum(sessions.playDuration)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row?.date) return null;
+
+  return {
+    date: row.date,
+    watchTime: Number(row.totalWatchTime || 0),
+  };
+}
+
+export interface MostActiveUsersDay {
+  date: string;
+  activeUsers: number;
+}
+
+export async function getMostActiveUsersDay({
+  serverId,
+  startDate,
+  endDate,
+}: {
+  serverId: string | number;
+  startDate: string;
+  endDate: string;
+}): Promise<MostActiveUsersDay | null> {
+  const whereConditions = [
+    eq(sessions.serverId, Number(serverId)),
+    isNotNull(sessions.startTime),
+    isNotNull(sessions.userId),
+    gte(sessions.startTime, new Date(startDate)),
+    lte(sessions.startTime, new Date(endDate)),
+  ];
+
+  const rows = await db
+    .select({
+      date: sql<string>`DATE(${sessions.startTime})`.as("date"),
+      activeUsers: sql<number>`COUNT(DISTINCT ${sessions.userId})`.as(
+        "activeUsers",
+      ),
+    })
+    .from(sessions)
+    .where(and(...whereConditions))
+    .groupBy(sql`DATE(${sessions.startTime})`)
+    .orderBy(desc(sql<number>`COUNT(DISTINCT ${sessions.userId})`))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row?.date) return null;
+
+  return {
+    date: row.date,
+    activeUsers: Number(row.activeUsers || 0),
+  };
+}

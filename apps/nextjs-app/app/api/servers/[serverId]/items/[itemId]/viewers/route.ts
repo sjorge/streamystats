@@ -3,6 +3,7 @@ import { getServer } from "@/lib/db/server";
 import { isUserAdmin } from "@/lib/db/users";
 import { db, items, sessions, users } from "@streamystats/database";
 import {
+  type SQL,
   and,
   asc,
   count,
@@ -12,7 +13,6 @@ import {
   like,
   sql,
   sum,
-  type SQL,
 } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 
@@ -24,7 +24,7 @@ export async function GET(
     params,
   }: {
     params: Promise<{ serverId: string; itemId: string }>;
-  }
+  },
 ) {
   const { serverId, itemId } = await params;
 
@@ -39,7 +39,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 
@@ -54,7 +54,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 
@@ -62,7 +62,7 @@ export async function GET(
   const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1"));
   const pageSize = Math.max(
     1,
-    Math.min(100, Number.parseInt(searchParams.get("pageSize") || "5"))
+    Math.min(100, Number.parseInt(searchParams.get("pageSize") || "5")),
   );
   const search = searchParams.get("search")?.trim() || "";
   const completion = searchParams.get("completion") || "all";
@@ -83,7 +83,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 
@@ -97,7 +97,7 @@ export async function GET(
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
   }
 
@@ -124,7 +124,7 @@ export async function GET(
             "Content-Type": "application/json",
             "Cache-Control": "private, max-age=60",
           },
-        }
+        },
       );
     }
   }
@@ -247,6 +247,6 @@ export async function GET(
         "Content-Type": "application/json",
         "Cache-Control": "private, max-age=60",
       },
-    }
+    },
   );
 }

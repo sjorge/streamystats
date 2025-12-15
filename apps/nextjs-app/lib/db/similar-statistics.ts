@@ -2,7 +2,7 @@
 
 import { db } from "@streamystats/database";
 import {
-  Item,
+  type Item,
   hiddenRecommendations,
   items,
   sessions,
@@ -13,8 +13,10 @@ import {
   desc,
   eq,
   gt,
+  gte,
   isNotNull,
   isNull,
+  lte,
   notInArray,
   sql,
 } from "drizzle-orm";
@@ -22,17 +24,11 @@ import { cosineDistance } from "drizzle-orm";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { getMe } from "./users";
 
-const enableDebug = false;
+const debugLog = (..._args: unknown[]) => {};
 
-// Debug logging helper - only logs in development or when DEBUG_RECOMMENDATIONS is enabled
-const debugLog = (...args: any[]) => {
-  if (
-    (process.env.NODE_ENV === "development" ||
-      process.env.DEBUG_RECOMMENDATIONS === "true") &&
-    enableDebug
-  ) {
-    console.log(...args);
-  }
+export type RecommendationTimeWindow = {
+  start?: Date;
+  end?: Date;
 };
 
 export interface RecommendationItem {
@@ -129,6 +125,7 @@ const getSimilarStatisticsUncached = async (
   serverId: number,
   userId: string | undefined,
   limit: number,
+  timeWindow?: RecommendationTimeWindow,
 ): Promise<RecommendationItem[]> => {
   try {
     debugLog(
@@ -146,6 +143,7 @@ const getSimilarStatisticsUncached = async (
         serverId,
         userId,
         limit,
+        timeWindow,
       );
       debugLog(
         `✅ Got ${recommendations.length} user-specific recommendations`,
@@ -183,10 +181,18 @@ const getCachedSimilarStatistics = (
   serverId: number,
   userId: string,
   limit: number,
+  timeWindow?: RecommendationTimeWindow,
 ) =>
   unstable_cache(
-    () => getSimilarStatisticsUncached(serverId, userId, limit),
-    ["similar-statistics", String(serverId), userId, String(limit)],
+    () => getSimilarStatisticsUncached(serverId, userId, limit, timeWindow),
+    [
+      "similar-statistics",
+      String(serverId),
+      userId,
+      String(limit),
+      timeWindow?.start ? timeWindow.start.toISOString() : "start:all",
+      timeWindow?.end ? timeWindow.end.toISOString() : "end:all",
+    ],
     {
       revalidate: CACHE_TTL,
       tags: [
@@ -200,6 +206,7 @@ export const getSimilarStatistics = async (
   serverId: string | number,
   userId?: string,
   limit = 20,
+  timeWindow?: RecommendationTimeWindow,
 ): Promise<RecommendationItem[]> => {
   const serverIdNum = Number(serverId);
 
@@ -215,7 +222,12 @@ export const getSimilarStatistics = async (
     }
   }
 
-  return getCachedSimilarStatistics(serverIdNum, targetUserId, limit);
+  return getCachedSimilarStatistics(
+    serverIdNum,
+    targetUserId,
+    limit,
+    timeWindow,
+  );
 };
 
 export const revalidateRecommendations = async (
@@ -232,10 +244,16 @@ async function getUserSpecificRecommendations(
   serverId: number,
   userId: string,
   limit: number,
+  timeWindow?: RecommendationTimeWindow,
 ): Promise<RecommendationItem[]> {
   debugLog(
     `\n🎯 Starting user-specific recommendations for user ${userId}, server ${serverId}, limit ${limit}`,
   );
+
+  const sessionTimeConditions = [
+    timeWindow?.start ? gte(sessions.startTime, timeWindow.start) : null,
+    timeWindow?.end ? lte(sessions.startTime, timeWindow.end) : null,
+  ].filter((c): c is Exclude<typeof c, null> => c !== null);
 
   // Get user's watch history with total play duration and recent activity
   const userWatchHistory = await db
@@ -255,6 +273,7 @@ async function getUserSpecificRecommendations(
         eq(sessions.userId, userId),
         isNotNull(items.embedding),
         isNotNull(sessions.playDuration),
+        ...sessionTimeConditions,
       ),
     )
     .groupBy(sessions.itemId, items.id)
@@ -327,6 +346,7 @@ async function getUserSpecificRecommendations(
         eq(sessions.userId, userId),
         isNotNull(items.embedding),
         isNotNull(sessions.playDuration),
+        ...sessionTimeConditions,
       ),
     )
     .groupBy(sessions.itemId, items.id)
@@ -449,7 +469,8 @@ async function getUserSpecificRecommendations(
         });
       }
 
-      const candidate = candidateItems.get(itemId)!;
+      const candidate = candidateItems.get(itemId);
+      if (!candidate) continue;
       candidate.similarities.push(simScore);
       candidate.basedOn.push(watchedItem);
     }
@@ -470,7 +491,9 @@ async function getUserSpecificRecommendations(
         recommendationsPerBaseMovie.set(baseMovie.id, []);
       }
 
-      recommendationsPerBaseMovie.get(baseMovie.id)!.push({
+      const bucket = recommendationsPerBaseMovie.get(baseMovie.id);
+      if (!bucket) continue;
+      bucket.push({
         item: candidate.item,
         similarity,
         basedOn: [stripEmbedding(baseMovie)],

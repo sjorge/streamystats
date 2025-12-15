@@ -1,6 +1,6 @@
 import { revalidateSeriesRecommendations } from "@/lib/db/similar-series-statistics";
 import { revalidateRecommendations } from "@/lib/db/similar-statistics";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {

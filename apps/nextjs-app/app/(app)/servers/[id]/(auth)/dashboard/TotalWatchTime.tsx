@@ -9,9 +9,15 @@ import React from "react";
 
 interface Props {
   server: Server;
+  startDate: string;
+  endDate: string;
 }
 
-const TotalWatchTime: React.FC<Props> = async ({ server }) => {
+const TotalWatchTime: React.FC<Props> = async ({
+  server,
+  startDate,
+  endDate,
+}) => {
   const me = await getMe();
   const sas = await showAdminStatistics();
 
@@ -22,6 +28,8 @@ const TotalWatchTime: React.FC<Props> = async ({ server }) => {
   const d1 = await getTotalWatchTime({
     serverId: server.id,
     userId: sas ? undefined : me.id,
+    startDate,
+    endDate,
   });
 
   return (
@@ -36,7 +44,7 @@ const TotalWatchTime: React.FC<Props> = async ({ server }) => {
         <div className="text-start">
           <p className="text-3xl font-bold">{formatDuration(d1)}</p>
           <p className="text-sm text-muted-foreground">
-            Total time spent watching
+            Total time spent watching in selected period
           </p>
         </div>
       </CardContent>

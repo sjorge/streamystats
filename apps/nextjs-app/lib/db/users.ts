@@ -58,20 +58,49 @@ export interface WatchTimePerWeekDay {
   watchTime: number;
 }
 
+function getStartDateConstraint(startDate?: string) {
+  if (!startDate) return undefined;
+  const start = new Date(startDate);
+  if (!startDate.includes("T")) {
+    start.setHours(0, 0, 0, 0);
+  }
+  return start;
+}
+
+function getEndDateConstraint(endDate?: string) {
+  if (!endDate) return undefined;
+  const end = new Date(endDate);
+  if (!endDate.includes("T")) {
+    end.setHours(23, 59, 59, 999);
+  }
+  return end;
+}
+
 export const getWatchTimePerWeekDay = async ({
   serverId,
   userId,
+  startDate,
+  endDate,
 }: {
   serverId: string | number;
   userId?: string | number;
+  startDate?: string;
+  endDate?: string;
 }): Promise<WatchTimePerWeekDay[]> => {
+  const start = getStartDateConstraint(startDate);
+  const end = getEndDateConstraint(endDate);
+
   // Build the where condition based on whether userId is provided
-  const whereCondition = userId
-    ? and(
-        eq(sessions.serverId, Number(serverId)),
-        eq(sessions.userId, String(userId)),
-      )
-    : eq(sessions.serverId, Number(serverId));
+  const whereConditions = [eq(sessions.serverId, Number(serverId))];
+  if (userId !== undefined) {
+    whereConditions.push(eq(sessions.userId, String(userId)));
+  }
+  if (start) {
+    whereConditions.push(gte(sessions.startTime, start));
+  }
+  if (end) {
+    whereConditions.push(lte(sessions.startTime, end));
+  }
 
   const sessionData = await db
     .select({
@@ -82,7 +111,7 @@ export const getWatchTimePerWeekDay = async ({
       playDuration: sessions.playDuration,
     })
     .from(sessions)
-    .where(whereCondition);
+    .where(and(...whereConditions));
 
   // Group and sum manually
   const resultMap: Record<string, number> = {};
@@ -118,17 +147,28 @@ export interface WatchTimePerHour {
 export const getWatchTimePerHour = async ({
   serverId,
   userId,
+  startDate,
+  endDate,
 }: {
   serverId: string | number;
   userId?: string | number;
+  startDate?: string;
+  endDate?: string;
 }): Promise<WatchTimePerHour[]> => {
+  const start = getStartDateConstraint(startDate);
+  const end = getEndDateConstraint(endDate);
+
   // Build the where condition based on whether userId is provided
-  const whereCondition = userId
-    ? and(
-        eq(sessions.serverId, Number(serverId)),
-        eq(sessions.userId, String(userId)),
-      )
-    : eq(sessions.serverId, Number(serverId));
+  const whereConditions = [eq(sessions.serverId, Number(serverId))];
+  if (userId !== undefined) {
+    whereConditions.push(eq(sessions.userId, String(userId)));
+  }
+  if (start) {
+    whereConditions.push(gte(sessions.startTime, start));
+  }
+  if (end) {
+    whereConditions.push(lte(sessions.startTime, end));
+  }
 
   // Get sessions with their hour information
   const sessionData = await db
@@ -137,7 +177,7 @@ export const getWatchTimePerHour = async ({
       playDuration: sessions.playDuration,
     })
     .from(sessions)
-    .where(whereCondition);
+    .where(and(...whereConditions));
 
   // Group and sum manually
   const hourMap: Record<number, number> = {};
@@ -160,24 +200,35 @@ export const getWatchTimePerHour = async ({
 export const getTotalWatchTime = async ({
   serverId,
   userId,
+  startDate,
+  endDate,
 }: {
   serverId: string | number;
   userId?: string | number;
+  startDate?: string;
+  endDate?: string;
 }): Promise<number> => {
+  const start = getStartDateConstraint(startDate);
+  const end = getEndDateConstraint(endDate);
+
   // Build the where condition based on whether userId is provided
-  const whereCondition = userId
-    ? and(
-        eq(sessions.serverId, Number(serverId)),
-        eq(sessions.userId, String(userId)),
-      )
-    : eq(sessions.serverId, Number(serverId));
+  const whereConditions = [eq(sessions.serverId, Number(serverId))];
+  if (userId !== undefined) {
+    whereConditions.push(eq(sessions.userId, String(userId)));
+  }
+  if (start) {
+    whereConditions.push(gte(sessions.startTime, start));
+  }
+  if (end) {
+    whereConditions.push(lte(sessions.startTime, end));
+  }
 
   const result = await db
     .select({
       playDuration: sum(sessions.playDuration),
     })
     .from(sessions)
-    .where(whereCondition);
+    .where(and(...whereConditions));
 
   return Number(result[0]?.playDuration || 0);
 };
