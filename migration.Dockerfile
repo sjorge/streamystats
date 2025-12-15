@@ -20,14 +20,14 @@ WORKDIR /app/packages/database
 # RUN bun run build # Skipping build as we compile ts directly
 
 # Compile the migration script to a single binary
-# --target=bun-linux-musl-x64 is for Alpine compatibility
-RUN bun build ./src/migrate-entrypoint.ts --compile --minify --target=bun-linux-musl-x64 --outfile migrate-bin
+# Buildx will run this stage per-platform, so this emits the correct arch binary.
+RUN bun build ./src/migrate-entrypoint.ts --compile --minify --outfile migrate-bin
 
-# Production runtime stage - Alpine
-FROM alpine:latest AS runner
+# Production runtime stage - Debian Slim (glibc compatible)
+FROM debian:stable-slim AS runner
 
-# Install minimal dependencies (ca-certificates for SSL if needed)
-RUN apk add --no-cache ca-certificates
+# Install minimal runtime deps for the compiled binary + TLS
+RUN apt-get update && apt-get install -y ca-certificates libstdc++6 libgcc-s1 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
