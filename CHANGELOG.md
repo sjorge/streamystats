@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.11.0](https://github.com/fredrikburmester/streamystats/compare/v2.10.0...v2.11.0) (2025-12-15)
+
+
+### Features
+
+* global watchtime page date picker ([1c09ffc](https://github.com/fredrikburmester/streamystats/commit/1c09ffc2ae09df8db7588e95c2e7aade02c76e0c))
+* more watch stats ([f4653fc](https://github.com/fredrikburmester/streamystats/commit/f4653fc24660e726083c27a5436f6c49f85e8046))
+
+
+### Bug Fixes
+
+* breadcrumbs for watchtime page ([c3847b4](https://github.com/fredrikburmester/streamystats/commit/c3847b4c5c230f686de6c6ce89d80f1051dd21ab))
+* change to linegraph ([def8229](https://github.com/fredrikburmester/streamystats/commit/def822964969c13b58d59a8e61b47d3ec7dc14a3))
+* update healthcheck to use 127.0.0.1 and remove redundant checks from docker-compose ([fd57920](https://github.com/fredrikburmester/streamystats/commit/fd5792006cb7f5f033383d3871055b3ce4331ae1))
+* version badge zindex issue ([bbe6a22](https://github.com/fredrikburmester/streamystats/commit/bbe6a227085435266780353892e2ad854de2f2fb))
+
 ## [2.10.0](https://github.com/fredrikburmester/streamystats/compare/v2.9.0...v2.10.0) (2025-12-15)
 
 
