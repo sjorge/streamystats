@@ -27,7 +27,10 @@ import {
 } from "@/components/ui/dialog";
 import type { User } from "@/lib/types";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithToolCalls,
+} from "ai";
 import {
   AlertCircle,
   Bot,
@@ -147,8 +150,9 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
     [serverId],
   );
 
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, addToolOutput, status, error } = useChat({
     transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   });
 
   const isLoading = status === "streaming" || status === "submitted";
@@ -156,57 +160,73 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
   const itemsCache = useMemo(() => {
     const cache = new Map<string, ChatItemData>();
 
+    const extractItems = (data: unknown) => {
+      if (!data || typeof data !== "object") return;
+      const obj = data as Record<string, unknown>;
+      const itemArrays = [
+        obj.movies,
+        obj.series,
+        obj.items,
+        obj.recommendations,
+        obj.similar,
+      ];
+      for (const arr of itemArrays) {
+        if (Array.isArray(arr)) {
+          for (const item of arr) {
+            const itemData =
+              (item as Record<string, unknown>)?.item || item;
+            if (itemData?.id && !cache.has(itemData.id as string)) {
+              cache.set(itemData.id as string, {
+                id: itemData.id as string,
+                name: itemData.name as string,
+                type: itemData.type as string | undefined,
+                year: (itemData.year || itemData.productionYear) as
+                  | number
+                  | undefined,
+                rating: (itemData.rating || itemData.communityRating) as
+                  | number
+                  | undefined,
+                primaryImageTag: itemData.primaryImageTag as string | undefined,
+                seriesId: itemData.seriesId as string | undefined,
+                seriesPrimaryImageTag: itemData.seriesPrimaryImageTag as
+                  | string
+                  | undefined,
+              });
+            }
+          }
+        }
+      }
+      if (
+        obj.sourceItem &&
+        typeof obj.sourceItem === "object" &&
+        (obj.sourceItem as Record<string, unknown>).id &&
+        !cache.has((obj.sourceItem as Record<string, unknown>).id as string)
+      ) {
+        const src = obj.sourceItem as Record<string, unknown>;
+        cache.set(src.id as string, {
+          id: src.id as string,
+          name: src.name as string,
+          type: src.type as string | undefined,
+          year: (src.year || src.productionYear) as number | undefined,
+          rating: (src.rating || src.communityRating) as number | undefined,
+          primaryImageTag: src.primaryImageTag as string | undefined,
+          seriesId: src.seriesId as string | undefined,
+          seriesPrimaryImageTag: src.seriesPrimaryImageTag as
+            | string
+            | undefined,
+        });
+      }
+    };
+
     for (const message of messages) {
       for (const part of message.parts) {
-        if (
-          part.type === "tool-result" ||
-          (part as any).type?.startsWith("tool-")
-        ) {
-          const toolPart = part as any;
-          if (toolPart.result) {
-            const extractItems = (data: any) => {
-              if (!data) return;
-              const itemArrays = [
-                data.movies,
-                data.series,
-                data.items,
-                data.recommendations,
-                data.similar,
-              ];
-              for (const arr of itemArrays) {
-                if (Array.isArray(arr)) {
-                  for (const item of arr) {
-                    const itemData = item.item || item;
-                    if (itemData?.id && !cache.has(itemData.id)) {
-                      cache.set(itemData.id, {
-                        id: itemData.id,
-                        name: itemData.name,
-                        type: itemData.type,
-                        year: itemData.year || itemData.productionYear,
-                        rating: itemData.rating || itemData.communityRating,
-                        primaryImageTag: itemData.primaryImageTag,
-                        seriesId: itemData.seriesId,
-                        seriesPrimaryImageTag: itemData.seriesPrimaryImageTag,
-                      });
-                    }
-                  }
-                }
-              }
-              if (data.sourceItem && !cache.has(data.sourceItem.id)) {
-                cache.set(data.sourceItem.id, {
-                  id: data.sourceItem.id,
-                  name: data.sourceItem.name,
-                  type: data.sourceItem.type,
-                  year: data.sourceItem.year || data.sourceItem.productionYear,
-                  rating:
-                    data.sourceItem.rating || data.sourceItem.communityRating,
-                  primaryImageTag: data.sourceItem.primaryImageTag,
-                  seriesId: data.sourceItem.seriesId,
-                  seriesPrimaryImageTag: data.sourceItem.seriesPrimaryImageTag,
-                });
-              }
-            };
-            extractItems(toolPart.result);
+        if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
+          const toolPart = part as {
+            state: string;
+            output?: unknown;
+          };
+          if (toolPart.state === "output-available" && toolPart.output) {
+            extractItems(toolPart.output);
           }
         }
       }
@@ -416,43 +436,67 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
                                     </div>
                                   );
                                 }
-                                if (part.type.startsWith("tool-")) {
+                                if (
+                                  part.type.startsWith("tool-") ||
+                                  part.type === "dynamic-tool"
+                                ) {
                                   const toolPart = part as {
                                     type: string;
                                     toolName?: string;
-                                    state?: string;
+                                    state:
+                                      | "input-streaming"
+                                      | "input-available"
+                                      | "output-available"
+                                      | "output-error";
+                                    toolCallId: string;
+                                    input?: Record<string, unknown>;
+                                    output?: unknown;
+                                    errorText?: string;
                                   };
-                                  const toolDisplayName = toolPart.toolName
-                                    ?.replace(/([A-Z])/g, " $1")
+                                  const toolName =
+                                    toolPart.toolName ||
+                                    part.type.replace("tool-", "");
+                                  const toolDisplayName = toolName
+                                    .replace(/([A-Z])/g, " $1")
                                     .toLowerCase()
                                     .trim();
 
-                                  if (
-                                    toolPart.state === "call" ||
-                                    toolPart.state === "partial-call"
-                                  ) {
-                                    return (
-                                      <div
-                                        key={partIndex}
-                                        className="flex items-center gap-2 text-xs text-muted-foreground py-1"
-                                      >
-                                        <Loader size={12} />
-                                        Looking up {toolDisplayName}...
-                                      </div>
-                                    );
-                                  }
-                                  if (toolPart.state === "result") {
-                                    return (
-                                      <div
-                                        key={partIndex}
-                                        className="flex items-center gap-2 text-xs text-muted-foreground py-1"
-                                      >
-                                        <span className="text-green-500">
-                                          ✓
-                                        </span>
-                                        Found {toolDisplayName} data
-                                      </div>
-                                    );
+                                  switch (toolPart.state) {
+                                    case "input-streaming":
+                                    case "input-available":
+                                      return (
+                                        <div
+                                          key={partIndex}
+                                          className="flex items-center gap-2 text-xs text-muted-foreground py-1"
+                                        >
+                                          <Loader size={12} />
+                                          Looking up {toolDisplayName}...
+                                        </div>
+                                      );
+                                    case "output-available":
+                                      return (
+                                        <div
+                                          key={partIndex}
+                                          className="flex items-center gap-2 text-xs text-muted-foreground py-1"
+                                        >
+                                          <span className="text-green-500">
+                                            ✓
+                                          </span>
+                                          Found {toolDisplayName} data
+                                        </div>
+                                      );
+                                    case "output-error":
+                                      return (
+                                        <div
+                                          key={partIndex}
+                                          className="flex items-center gap-2 text-xs text-destructive py-1"
+                                        >
+                                          <AlertCircle className="h-3 w-3" />
+                                          Error: {toolPart.errorText}
+                                        </div>
+                                      );
+                                    default:
+                                      return null;
                                   }
                                 }
                                 return null;

@@ -2,9 +2,27 @@ import { type ChatConfig, createChatModel } from "@/lib/ai/providers";
 import { createChatTools } from "@/lib/ai/tools";
 import { getServer } from "@/lib/db/server";
 import { getMe } from "@/lib/db/users";
-import { convertToModelMessages, stepCountIs, streamText } from "ai";
+import {
+  type UIMessage,
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+} from "ai";
 
 export const maxDuration = 60;
+
+function errorHandler(error: unknown): string {
+  if (error == null) {
+    return "unknown error";
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return JSON.stringify(error);
+}
 
 const BASE_SYSTEM_PROMPT = `You are a helpful media assistant for Streamystats, a Jellyfin statistics and analytics platform. You help users discover content, understand their watching habits, and get personalized recommendations.
 
@@ -46,7 +64,8 @@ Never list recommendations without mentioning what they're based on. The basedOn
 
 export async function POST(req: Request) {
   try {
-    const { messages, serverId } = await req.json();
+    const { messages, serverId }: { messages: UIMessage[]; serverId: string } =
+      await req.json();
 
     if (!serverId) {
       return new Response(JSON.stringify({ error: "Server ID is required" }), {
@@ -86,7 +105,7 @@ export async function POST(req: Request) {
           error:
             "AI Chat not configured. Please configure it in Settings > AI Chat.",
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -127,14 +146,16 @@ Current user context:
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      onError: errorHandler,
+    });
   } catch (error) {
     console.error("[Chat API] Error:", error);
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "An error occurred",
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }
