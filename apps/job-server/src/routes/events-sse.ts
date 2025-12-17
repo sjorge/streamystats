@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
 import {
   getBufferedEventsSince,
   jobEventBus,
@@ -9,42 +8,92 @@ import {
 
 const app = new Hono();
 
+function formatSSE(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 app.get("/events", (c) => {
   const sinceParam = c.req.query("since");
   const sinceEpoch = sinceParam ? Number(sinceParam) : undefined;
 
-  return streamSSE(c, async (stream) => {
-    await stream.writeSSE({
-      event: "hello",
-      data: JSON.stringify({ type: "hello", timestamp: nowIsoMicroUtc() }),
-    });
+  // Queue-based approach with promise signaling
+  const encoder = new TextEncoder();
+  const queue: Uint8Array[] = [];
+  let waitingResolve: ((value: Uint8Array | null) => void) | null = null;
+  let closed = false;
 
-    if (sinceEpoch && !Number.isNaN(sinceEpoch)) {
-      for (const evt of getBufferedEventsSince(sinceEpoch)) {
-        await stream.writeSSE({ event: "job", data: JSON.stringify(evt) });
+  const enqueue = (msg: string) => {
+    const chunk = encoder.encode(msg);
+    if (waitingResolve) {
+      waitingResolve(chunk);
+      waitingResolve = null;
+    } else {
+      queue.push(chunk);
+    }
+  };
+
+  const waitForNext = (): Promise<Uint8Array | null> => {
+    if (closed) return Promise.resolve(null);
+    const next = queue.shift();
+    if (next) return Promise.resolve(next);
+    return new Promise((resolve) => {
+      waitingResolve = resolve;
+    });
+  };
+
+  // Send hello
+  enqueue(formatSSE("hello", { type: "hello", timestamp: nowIsoMicroUtc() }));
+
+  // Send buffered events
+  if (sinceEpoch && !Number.isNaN(sinceEpoch)) {
+    for (const evt of getBufferedEventsSince(sinceEpoch)) {
+      enqueue(formatSSE("job", evt));
+    }
+  }
+
+  // Listen for job events
+  const onJob = (evt: JobEvent) => {
+    if (!closed) enqueue(formatSSE("job", evt));
+  };
+  jobEventBus.on("job", onJob);
+
+  // Heartbeat every 15 seconds to keep connection alive
+  const heartbeat = setInterval(() => {
+    if (!closed)
+      enqueue(formatSSE("ping", { type: "ping", timestamp: nowIsoMicroUtc() }));
+  }, 15000);
+
+  const cleanup = () => {
+    closed = true;
+    clearInterval(heartbeat);
+    jobEventBus.off("job", onJob);
+    waitingResolve?.(null);
+  };
+
+  // Cleanup on disconnect
+  c.req.raw.signal.addEventListener("abort", cleanup);
+
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const chunk = await waitForNext();
+      if (chunk === null || closed) {
+        controller.close();
+        return;
       }
-    }
+      controller.enqueue(chunk);
+    },
+    cancel() {
+      cleanup();
+    },
+  });
 
-    const onJob = async (evt: JobEvent) => {
-      await stream.writeSSE({ event: "job", data: JSON.stringify(evt) });
-    };
-    jobEventBus.on("job", onJob);
-
-    const heartbeat = setInterval(async () => {
-      await stream.writeSSE({
-        event: "ping",
-        data: JSON.stringify({ type: "ping", timestamp: nowIsoMicroUtc() }),
-      });
-    }, 30000);
-
-    stream.onAbort(() => {
-      clearInterval(heartbeat);
-      jobEventBus.off("job", onJob);
-    });
-
-    while (true) {
-      await stream.sleep(60000);
-    }
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
   });
 });
 

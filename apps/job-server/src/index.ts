@@ -90,6 +90,7 @@ async function startServer() {
       port: PORT,
       hostname: HOST,
       fetch: app.fetch,
+      idleTimeout: 255, // Max value, for SSE connections
     });
 
     console.log(
