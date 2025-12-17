@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.hiddenRecommendationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serversRelations = exports.hiddenRecommendations = exports.sessions = exports.items = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
+exports.hiddenRecommendationsRelations = exports.anomalyEventsRelations = exports.userFingerprintsRelations = exports.activityLocationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serversRelations = exports.anomalyEvents = exports.userFingerprints = exports.activityLocations = exports.hiddenRecommendations = exports.sessions = exports.items = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 // Custom vector type that supports variable dimensions
 // This allows storing embeddings of any size without hardcoding dimensions
@@ -361,6 +361,92 @@ exports.hiddenRecommendations = (0, pg_core_1.pgTable)("hidden_recommendations",
         .notNull(),
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
 });
+// Activity locations table - geolocated IP data for activities
+exports.activityLocations = (0, pg_core_1.pgTable)("activity_locations", {
+    id: (0, pg_core_1.serial)("id").primaryKey(),
+    activityId: (0, pg_core_1.text)("activity_id")
+        .references(() => exports.activities.id, { onDelete: "cascade" })
+        .notNull(),
+    ipAddress: (0, pg_core_1.text)("ip_address").notNull(),
+    // Geolocation data
+    countryCode: (0, pg_core_1.text)("country_code"),
+    country: (0, pg_core_1.text)("country"),
+    region: (0, pg_core_1.text)("region"),
+    city: (0, pg_core_1.text)("city"),
+    latitude: (0, pg_core_1.doublePrecision)("latitude"),
+    longitude: (0, pg_core_1.doublePrecision)("longitude"),
+    timezone: (0, pg_core_1.text)("timezone"),
+    // IP classification
+    isPrivateIp: (0, pg_core_1.boolean)("is_private_ip").default(false).notNull(),
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
+}, (table) => [
+    (0, pg_core_1.index)("activity_locations_activity_id_idx").on(table.activityId),
+    (0, pg_core_1.index)("activity_locations_ip_address_idx").on(table.ipAddress),
+]);
+// User fingerprints table - aggregated behavioral patterns per user
+exports.userFingerprints = (0, pg_core_1.pgTable)("user_fingerprints", {
+    id: (0, pg_core_1.serial)("id").primaryKey(),
+    userId: (0, pg_core_1.text)("user_id")
+        .references(() => exports.users.id, { onDelete: "cascade" })
+        .notNull(),
+    serverId: (0, pg_core_1.integer)("server_id")
+        .references(() => exports.servers.id, { onDelete: "cascade" })
+        .notNull(),
+    // Known patterns (JSONB arrays)
+    knownDeviceIds: (0, pg_core_1.jsonb)("known_device_ids").$type().default([]),
+    knownCountries: (0, pg_core_1.jsonb)("known_countries").$type().default([]),
+    knownCities: (0, pg_core_1.jsonb)("known_cities").$type().default([]),
+    knownClients: (0, pg_core_1.jsonb)("known_clients").$type().default([]),
+    // Location patterns with frequency
+    locationPatterns: (0, pg_core_1.jsonb)("location_patterns")
+        .$type()
+        .default([]),
+    // Device patterns with frequency
+    devicePatterns: (0, pg_core_1.jsonb)("device_patterns")
+        .$type()
+        .default([]),
+    // Behavioral patterns
+    typicalHoursUtc: (0, pg_core_1.jsonb)("typical_hours_utc").$type().default([]),
+    avgSessionsPerDay: (0, pg_core_1.doublePrecision)("avg_sessions_per_day"),
+    totalSessions: (0, pg_core_1.integer)("total_sessions").default(0),
+    lastCalculatedAt: (0, pg_core_1.timestamp)("last_calculated_at", { withTimezone: true }),
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+}, (table) => [
+    (0, pg_core_1.index)("user_fingerprints_user_id_idx").on(table.userId),
+    (0, pg_core_1.index)("user_fingerprints_server_id_idx").on(table.serverId),
+    (0, pg_core_1.unique)("user_fingerprints_user_server_unique").on(table.userId, table.serverId),
+]);
+// Anomaly events table - flagged suspicious activity
+exports.anomalyEvents = (0, pg_core_1.pgTable)("anomaly_events", {
+    id: (0, pg_core_1.serial)("id").primaryKey(),
+    userId: (0, pg_core_1.text)("user_id").references(() => exports.users.id, { onDelete: "cascade" }),
+    serverId: (0, pg_core_1.integer)("server_id")
+        .references(() => exports.servers.id, { onDelete: "cascade" })
+        .notNull(),
+    activityId: (0, pg_core_1.text)("activity_id").references(() => exports.activities.id, {
+        onDelete: "set null",
+    }),
+    // Anomaly classification
+    anomalyType: (0, pg_core_1.text)("anomaly_type").notNull(), // 'impossible_travel', 'new_location', 'concurrent_streams', 'new_device', 'new_country'
+    severity: (0, pg_core_1.text)("severity").notNull(), // 'low', 'medium', 'high', 'critical'
+    // Anomaly details
+    details: (0, pg_core_1.jsonb)("details")
+        .$type()
+        .notNull(),
+    // Resolution status
+    resolved: (0, pg_core_1.boolean)("resolved").default(false).notNull(),
+    resolvedAt: (0, pg_core_1.timestamp)("resolved_at", { withTimezone: true }),
+    resolvedBy: (0, pg_core_1.text)("resolved_by"),
+    resolutionNote: (0, pg_core_1.text)("resolution_note"),
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
+}, (table) => [
+    (0, pg_core_1.index)("anomaly_events_user_id_idx").on(table.userId),
+    (0, pg_core_1.index)("anomaly_events_server_id_idx").on(table.serverId),
+    (0, pg_core_1.index)("anomaly_events_activity_id_idx").on(table.activityId),
+    (0, pg_core_1.index)("anomaly_events_anomaly_type_idx").on(table.anomalyType),
+    (0, pg_core_1.index)("anomaly_events_resolved_idx").on(table.resolved),
+]);
 // Define relationships
 exports.serversRelations = (0, drizzle_orm_1.relations)(exports.servers, ({ many }) => ({
     libraries: many(exports.libraries),
@@ -369,6 +455,8 @@ exports.serversRelations = (0, drizzle_orm_1.relations)(exports.servers, ({ many
     items: many(exports.items),
     sessions: many(exports.sessions),
     hiddenRecommendations: many(exports.hiddenRecommendations),
+    userFingerprints: many(exports.userFingerprints),
+    anomalyEvents: many(exports.anomalyEvents),
 }));
 exports.librariesRelations = (0, drizzle_orm_1.relations)(exports.libraries, ({ one, many }) => ({
     server: one(exports.servers, {
@@ -384,8 +472,10 @@ exports.usersRelations = (0, drizzle_orm_1.relations)(exports.users, ({ one, man
     }),
     activities: many(exports.activities),
     sessions: many(exports.sessions),
+    fingerprints: many(exports.userFingerprints),
+    anomalyEvents: many(exports.anomalyEvents),
 }));
-exports.activitiesRelations = (0, drizzle_orm_1.relations)(exports.activities, ({ one }) => ({
+exports.activitiesRelations = (0, drizzle_orm_1.relations)(exports.activities, ({ one, many }) => ({
     server: one(exports.servers, {
         fields: [exports.activities.serverId],
         references: [exports.servers.id],
@@ -394,6 +484,8 @@ exports.activitiesRelations = (0, drizzle_orm_1.relations)(exports.activities, (
         fields: [exports.activities.userId],
         references: [exports.users.id],
     }),
+    location: one(exports.activityLocations),
+    anomalyEvents: many(exports.anomalyEvents),
 }));
 exports.itemsRelations = (0, drizzle_orm_1.relations)(exports.items, ({ one, many }) => ({
     server: one(exports.servers, {
@@ -411,7 +503,7 @@ exports.itemsRelations = (0, drizzle_orm_1.relations)(exports.items, ({ one, man
     sessions: many(exports.sessions),
     hiddenRecommendations: many(exports.hiddenRecommendations),
 }));
-exports.sessionsRelations = (0, drizzle_orm_1.relations)(exports.sessions, ({ one }) => ({
+exports.sessionsRelations = (0, drizzle_orm_1.relations)(exports.sessions, ({ one, many }) => ({
     server: one(exports.servers, {
         fields: [exports.sessions.serverId],
         references: [exports.servers.id],
@@ -423,6 +515,36 @@ exports.sessionsRelations = (0, drizzle_orm_1.relations)(exports.sessions, ({ on
     item: one(exports.items, {
         fields: [exports.sessions.itemId],
         references: [exports.items.id],
+    }),
+}));
+exports.activityLocationsRelations = (0, drizzle_orm_1.relations)(exports.activityLocations, ({ one }) => ({
+    activity: one(exports.activities, {
+        fields: [exports.activityLocations.activityId],
+        references: [exports.activities.id],
+    }),
+}));
+exports.userFingerprintsRelations = (0, drizzle_orm_1.relations)(exports.userFingerprints, ({ one }) => ({
+    user: one(exports.users, {
+        fields: [exports.userFingerprints.userId],
+        references: [exports.users.id],
+    }),
+    server: one(exports.servers, {
+        fields: [exports.userFingerprints.serverId],
+        references: [exports.servers.id],
+    }),
+}));
+exports.anomalyEventsRelations = (0, drizzle_orm_1.relations)(exports.anomalyEvents, ({ one }) => ({
+    user: one(exports.users, {
+        fields: [exports.anomalyEvents.userId],
+        references: [exports.users.id],
+    }),
+    server: one(exports.servers, {
+        fields: [exports.anomalyEvents.serverId],
+        references: [exports.servers.id],
+    }),
+    activity: one(exports.activities, {
+        fields: [exports.anomalyEvents.activityId],
+        references: [exports.activities.id],
     }),
 }));
 exports.hiddenRecommendationsRelations = (0, drizzle_orm_1.relations)(exports.hiddenRecommendations, ({ one }) => ({

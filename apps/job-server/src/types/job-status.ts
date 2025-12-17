@@ -1,5 +1,31 @@
 export type JobStatus = "processing" | "completed" | "failed";
 
+export type ServerJobState =
+  | "running"
+  | "queued"
+  | "scheduled"
+  | "failed"
+  | "cancelled"
+  | "stopped";
+
+export type ServerJobStatusItem = {
+  key: string;
+  label: string;
+  state: ServerJobState;
+  updatedAt: string;
+  activeSince?: string;
+  scheduledFor?: string;
+  jobId?: string;
+  lastError?: string;
+};
+
+export type ServerJobStatusResponse = {
+  success: boolean;
+  timestamp: string;
+  serverId: number;
+  jobs: ServerJobStatusItem[];
+};
+
 export interface JobStatusInfo {
   jobId: string;
   status: JobStatus;

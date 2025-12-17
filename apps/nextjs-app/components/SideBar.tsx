@@ -1,7 +1,7 @@
 "use client";
 
 import { getUser } from "@/lib/db/users";
-import { Server, User } from "@streamystats/database";
+import type { Server, User } from "@streamystats/database";
 import {
   Activity,
   ActivitySquare,
@@ -12,13 +12,15 @@ import {
   Library,
   MessageSquare,
   Settings,
+  Shield,
   TrendingUp,
   User as UserIcon,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import React, { useEffect, useMemo, useState } from "react";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ServerSelector } from "./ServerSelector";
 import { ShowAdminStatisticsSwitch } from "./ShowAdminStatisticsSwitch";
 import { UserMenu } from "./UserMenu";
@@ -61,6 +63,11 @@ const dashboard_items = [
 ];
 
 const admin_items = [
+  {
+    title: "Security",
+    url: "/dashboard/security",
+    icon: Shield,
+  },
   {
     title: "Activity Log",
     url: "/activities",

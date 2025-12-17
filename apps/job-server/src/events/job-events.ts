@@ -1,7 +1,14 @@
 import { EventEmitter } from "events";
 
 export type JobEvent = {
-  type: "hello" | "ping" | "started" | "completed" | "failed" | "progress";
+  type:
+    | "hello"
+    | "ping"
+    | "started"
+    | "completed"
+    | "failed"
+    | "progress"
+    | "anomaly_detected";
   epochMs?: number;
   jobId?: string;
   jobName?: string;

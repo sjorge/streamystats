@@ -13,6 +13,7 @@ import {
 import { syncPeopleForServer } from "./sync/people";
 import { getJobQueue } from "../jobs/queue";
 import { logJobResult } from "../jobs/job-logger";
+import { publishJobEvent, nowIsoMicroUtc } from "../events/job-events";
 
 export interface JellyfinSyncJobData {
   serverId: number;
@@ -47,6 +48,14 @@ export async function jellyfinSyncWorker(job: {
   console.info(
     `[jellyfin-sync] serverId=${serverId} syncType=${syncType} action=start`
   );
+
+  // Publish job started event
+  publishJobEvent({
+    type: "started",
+    jobName: `jellyfin-${syncType}-sync`,
+    serverId,
+    timestamp: nowIsoMicroUtc(),
+  });
 
   try {
     // Get server configuration
@@ -102,6 +111,18 @@ export async function jellyfinSyncWorker(job: {
       `[jellyfin-sync] server=${server.name} serverId=${serverId} syncType=${syncType} action=completed status=${result.status} durationMs=${result.metrics.duration}`
     );
 
+    // Publish job completed event
+    publishJobEvent({
+      type: "completed",
+      jobName: `jellyfin-${syncType}-sync`,
+      serverId,
+      timestamp: nowIsoMicroUtc(),
+      data: {
+        status: result.status,
+        duration: result.metrics.duration,
+      },
+    });
+
     // Update server sync status based on result
     if (result.status === "success") {
       await updateServerSyncStatus(serverId, "completed", "completed");
@@ -149,6 +170,16 @@ export async function jellyfinSyncWorker(job: {
 
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+
+    // Publish job failed event
+    publishJobEvent({
+      type: "failed",
+      jobName: `jellyfin-${syncType}-sync`,
+      serverId,
+      timestamp: nowIsoMicroUtc(),
+      error: errorMessage,
+    });
+
     await updateServerSyncStatus(serverId, "failed", syncType, errorMessage);
 
     throw error; // Re-throw to mark job as failed

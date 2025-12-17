@@ -6,6 +6,8 @@ import { activityScheduler } from "./jobs/scheduler";
 import { sessionPoller } from "./jobs/session-poller";
 import { closeConnection } from "@streamystats/database";
 import jobRoutes from "./routes/jobs/index";
+import locationRoutes from "./routes/locations";
+import eventsRoutes from "./routes/events-sse";
 
 process.on("warning", (warning) => {
   if (warning?.name === "TimeoutNegativeWarning") return;
@@ -14,10 +16,10 @@ process.on("warning", (warning) => {
 
 const app = new Hono();
 
-const PORT = parseInt(Bun.env.PORT || "3000", 10);
+const PORT = Number.parseInt(Bun.env.PORT || "3000", 10);
 const HOST = Bun.env.HOST || "localhost";
 
-if (isNaN(PORT) || PORT < 1 || PORT > 65535) {
+if (Number.isNaN(PORT) || PORT < 1 || PORT > 65535) {
   throw new Error(
     `Invalid PORT value: "${Bun.env.PORT}". Please provide a valid port number between 1 and 65535.`
   );
@@ -27,6 +29,8 @@ app.use("*", secureHeaders());
 app.use("*", cors());
 
 app.route("/api/jobs", jobRoutes);
+app.route("/api", locationRoutes);
+app.route("/api", eventsRoutes);
 
 app.get("/health", (c) => {
   return c.json({
@@ -86,12 +90,13 @@ async function startServer() {
       port: PORT,
       hostname: HOST,
       fetch: app.fetch,
+      idleTimeout: 255, // Max value, for SSE connections
     });
 
     console.log(
       `[job-server] status=running host=${server.hostname} port=${server.port}`
     );
-    console.log(`[scheduler] started=session-poller interval=5s`);
+    console.log("[scheduler] started=session-poller interval=5s");
   } catch (error) {
     console.error("[job-server] status=start-failed", error);
     process.exit(1);

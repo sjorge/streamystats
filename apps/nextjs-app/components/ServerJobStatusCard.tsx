@@ -2,52 +2,36 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useJobEvents, type JobEvent } from "@/hooks/useJobEvents";
+import {
+  JOB_NAME_TO_KEY,
+  type ServerJobState,
+  type ServerJobStatusItem,
+  type ServerJobStatusResponse,
+} from "@/lib/types/job-status";
 import { fetch } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-
-type ServerJobState =
-  | "running"
-  | "queued"
-  | "scheduled"
-  | "failed"
-  | "cancelled"
-  | "stopped";
-
-type ServerJobStatusResponse = {
-  success: boolean;
-  timestamp: string;
-  serverId: number;
-  jobs: Array<{
-    key: string;
-    label: string;
-    state: ServerJobState;
-    updatedAt: string;
-    activeSince?: string;
-    scheduledFor?: string;
-    jobId?: string;
-    lastError?: string;
-  }>;
-};
+import { useCallback, useEffect, useState } from "react";
 
 function getStateBadgeClass(state: ServerJobState): string {
   switch (state) {
     case "running":
-      return "text-blue-600 bg-blue-50 border-blue-200";
+      return "text-white bg-blue-600 border-blue-700";
     case "queued":
-      return "text-yellow-600 bg-yellow-50 border-yellow-200";
+      return "text-white bg-amber-500 border-amber-600";
     case "scheduled":
-      return "text-gray-600 bg-gray-50 border-gray-200";
+      return "text-white bg-slate-500 border-slate-600";
     case "failed":
-      return "text-red-600 bg-red-50 border-red-200";
+      return "text-white bg-red-600 border-red-700";
     case "cancelled":
-      return "text-gray-600 bg-gray-50 border-gray-200";
+      return "text-white bg-slate-400 border-slate-500";
     case "stopped":
-      return "text-gray-600 bg-gray-50 border-gray-200";
+      return "text-zinc-300 bg-zinc-700 border-zinc-600";
   }
 }
 
 async function fetchServerJobStatus(
-  serverId: number,
+  serverId: number
 ): Promise<ServerJobStatusResponse> {
   const response = await fetch(`/api/jobs/servers/${serverId}/status`);
 
@@ -58,13 +42,80 @@ async function fetchServerJobStatus(
   return response.json();
 }
 
+function updateJobFromEvent(
+  jobs: ServerJobStatusItem[],
+  event: JobEvent
+): ServerJobStatusItem[] {
+  if (!event.jobName) return jobs;
+
+  const jobKey = JOB_NAME_TO_KEY[event.jobName];
+  if (!jobKey) return jobs;
+
+  return jobs.map((job) => {
+    if (job.key !== jobKey) return job;
+
+    const now = new Date().toISOString();
+
+    switch (event.type) {
+      case "started":
+        return {
+          ...job,
+          state: "running" as const,
+          activeSince: now,
+          updatedAt: now,
+          lastError: undefined,
+        };
+      case "completed":
+        return {
+          ...job,
+          state: "stopped" as const,
+          activeSince: undefined,
+          updatedAt: now,
+          lastError: undefined,
+        };
+      case "failed":
+        return {
+          ...job,
+          state: "failed" as const,
+          activeSince: undefined,
+          updatedAt: now,
+          lastError: event.error,
+        };
+      default:
+        return job;
+    }
+  });
+}
+
 export function ServerJobStatusCard({ serverId }: { serverId: number }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["serverJobStatus", serverId],
     queryFn: () => fetchServerJobStatus(serverId),
-    refetchInterval: 5000,
+    staleTime: Number.POSITIVE_INFINITY, // Don't refetch - SSE handles updates
     retry: 2,
   });
+
+  const [jobs, setJobs] = useState<ServerJobStatusItem[]>([]);
+
+  // Sync initial data to local state
+  useEffect(() => {
+    if (data?.jobs) {
+      setJobs(data.jobs);
+    }
+  }, [data?.jobs]);
+
+  // Handle SSE events for real-time updates
+  const handleJobEvent = useCallback(
+    (event: JobEvent) => {
+      if (event.serverId !== serverId) return;
+      if (!event.jobName) return;
+
+      setJobs((prev) => updateJobFromEvent(prev, event));
+    },
+    [serverId]
+  );
+
+  useJobEvents({ onJobEvent: handleJobEvent });
 
   if (isLoading) {
     return (
@@ -98,7 +149,7 @@ export function ServerJobStatusCard({ serverId }: { serverId: number }) {
         <CardTitle>Jobs</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {data.jobs.map((job) => (
+        {jobs.map((job) => (
           <div
             key={job.key}
             className="flex items-start justify-between gap-3 border rounded-md p-3"

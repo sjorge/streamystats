@@ -3,6 +3,7 @@ import { db, servers, jobResults, items } from "@streamystats/database";
 import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
+import { GEOLOCATION_JOB_NAMES } from "./geolocation-jobs";
 import { cleanupDeletedItems } from "../jellyfin/sync/deleted-items";
 import { cancelJobsByName } from "../routes/jobs/utils";
 
@@ -14,6 +15,8 @@ class SyncScheduler {
   private userSyncInterval: string = "*/1 * * * *"; // Every minute
   private peopleSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
   private embeddingsSyncInterval: string = "*/15 * * * *"; // Every 15 minutes
+  private geolocationSyncInterval: string = "*/5 * * * *"; // Every 5 minutes
+  private fingerprintSyncInterval: string = "0 */6 * * *"; // Every 6 hours
   private jobCleanupInterval: string = "*/1 * * * *"; // Every minute
   private oldJobCleanupInterval: string = "0 3 * * *"; // Daily at 3 AM
   private fullSyncInterval: string = "0 2 * * *"; // Daily at 2 AM
@@ -146,6 +149,26 @@ class SyncScheduler {
         }
       );
 
+      // Geolocation sync task - geolocate new sessions
+      const geolocationSyncTask = cron.schedule(
+        this.geolocationSyncInterval,
+        () => {
+          this.triggerGeolocationSync().catch((error) => {
+            console.error("Error during scheduled geolocation sync:", error);
+          });
+        }
+      );
+
+      // Fingerprint sync task - recalculate user fingerprints
+      const fingerprintSyncTask = cron.schedule(
+        this.fingerprintSyncInterval,
+        () => {
+          this.triggerFingerprintSync().catch((error) => {
+            console.error("Error during scheduled fingerprint sync:", error);
+          });
+        }
+      );
+
       this.scheduledTasks.set("activity-sync", activityTask);
       this.scheduledTasks.set("recent-items-sync", recentItemsTask);
       this.scheduledTasks.set("user-sync", userSyncTask);
@@ -155,6 +178,8 @@ class SyncScheduler {
       this.scheduledTasks.set("old-job-cleanup", oldJobCleanupTask);
       this.scheduledTasks.set("full-sync", fullSyncTask);
       this.scheduledTasks.set("deleted-items-cleanup", deletedItemsCleanupTask);
+      this.scheduledTasks.set("geolocation-sync", geolocationSyncTask);
+      this.scheduledTasks.set("fingerprint-sync", fingerprintSyncTask);
 
       // Start all tasks
       activityTask.start();
@@ -166,9 +191,11 @@ class SyncScheduler {
       oldJobCleanupTask.start();
       fullSyncTask.start();
       deletedItemsCleanupTask.start();
+      geolocationSyncTask.start();
+      fingerprintSyncTask.start();
 
       console.log(
-        `[scheduler] status=started activity=${this.activitySyncInterval} recentItems=${this.recentItemsSyncInterval} users=${this.userSyncInterval} people=${this.peopleSyncInterval} embeddings=${this.embeddingsSyncInterval} jobCleanup=${this.jobCleanupInterval} oldJobCleanup=${this.oldJobCleanupInterval} fullSync=${this.fullSyncInterval} deletedItems=${this.deletedItemsCleanupInterval}`
+        `[scheduler] status=started activity=${this.activitySyncInterval} recentItems=${this.recentItemsSyncInterval} users=${this.userSyncInterval} people=${this.peopleSyncInterval} embeddings=${this.embeddingsSyncInterval} geolocation=${this.geolocationSyncInterval} fingerprint=${this.fingerprintSyncInterval} jobCleanup=${this.jobCleanupInterval} oldJobCleanup=${this.oldJobCleanupInterval} fullSync=${this.fullSyncInterval} deletedItems=${this.deletedItemsCleanupInterval}`
       );
     } catch (error) {
       console.error("[scheduler] status=start-failed", error);
@@ -1058,6 +1085,112 @@ class SyncScheduler {
   }
 
   /**
+   * Trigger geolocation sync for all active servers.
+   * Geolocates activities that don't have location data yet.
+   */
+  private async triggerGeolocationSync(): Promise<void> {
+    try {
+      const activeServers = await this.getServersForPeriodicSync();
+
+      if (activeServers.length === 0) {
+        return;
+      }
+
+      const boss = await getJobQueue();
+
+      for (const server of activeServers) {
+        try {
+          await boss.send(
+            GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES,
+            { serverId: server.id, batchSize: 100 },
+            {
+              singletonKey: `geolocate-activities-${server.id}`,
+              expireInMinutes: 30,
+              retryLimit: 1,
+              retryDelay: 60,
+            }
+          );
+        } catch (error) {
+          console.error(
+            `[scheduler] queued=geolocation-sync server=${server.name} status=error`,
+            error
+          );
+        }
+      }
+    } catch (error) {
+      console.error("[scheduler] trigger=geolocation-sync status=error", error);
+    }
+  }
+
+  /**
+   * Trigger fingerprint calculation for all active servers.
+   * Recalculates user behavioral fingerprints based on session data.
+   */
+  private async triggerFingerprintSync(): Promise<void> {
+    try {
+      const activeServers = await this.getServersForPeriodicSync();
+
+      if (activeServers.length === 0) {
+        return;
+      }
+
+      const boss = await getJobQueue();
+
+      for (const server of activeServers) {
+        try {
+          await boss.send(
+            GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
+            { serverId: server.id },
+            {
+              singletonKey: `calculate-fingerprints-${server.id}`,
+              expireInMinutes: 60,
+              retryLimit: 1,
+              retryDelay: 120,
+            }
+          );
+        } catch (error) {
+          console.error(
+            `[scheduler] queued=fingerprint-sync server=${server.name} status=error`,
+            error
+          );
+        }
+      }
+    } catch (error) {
+      console.error("[scheduler] trigger=fingerprint-sync status=error", error);
+    }
+  }
+
+  /**
+   * Manually trigger geolocation backfill for a specific server.
+   * Processes all existing activities that don't have location data.
+   */
+  async triggerServerGeolocationBackfill(serverId: number): Promise<void> {
+    try {
+      const boss = await getJobQueue();
+
+      await boss.send(
+        GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
+        { serverId, batchSize: 500 },
+        {
+          expireInMinutes: 360,
+          retryLimit: 1,
+          retryDelay: 300,
+        }
+      );
+
+      console.log(
+        `[scheduler] queued=geolocation-backfill serverId=${serverId}`
+      );
+    } catch (error) {
+      console.error(
+        `[scheduler] queued=geolocation-backfill serverId=${serverId} status=error`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Get current scheduler status
    */
   getStatus() {
@@ -1068,6 +1201,8 @@ class SyncScheduler {
       userSyncInterval: this.userSyncInterval,
       peopleSyncInterval: this.peopleSyncInterval,
       embeddingsSyncInterval: this.embeddingsSyncInterval,
+      geolocationSyncInterval: this.geolocationSyncInterval,
+      fingerprintSyncInterval: this.fingerprintSyncInterval,
       jobCleanupInterval: this.jobCleanupInterval,
       oldJobCleanupInterval: this.oldJobCleanupInterval,
       fullSyncInterval: this.fullSyncInterval,
