@@ -35,16 +35,3 @@ export const JOB_NAME_TO_KEY: Record<string, string> = {
   "jellyfin-recent-activities-sync": "jellyfin-recent-activities-sync",
   "generate-item-embeddings": "generate-item-embeddings",
 };
-
-/** Maps SSE jobName to status endpoint job key */
-export const JOB_NAME_TO_KEY: Record<string, string> = {
-  "jellyfin-full-sync": "jellyfin-full-sync",
-  "jellyfin-users-sync": "jellyfin-users-sync",
-  "jellyfin-libraries-sync": "jellyfin-libraries-sync",
-  "jellyfin-items-sync": "jellyfin-items-sync",
-  "jellyfin-activities-sync": "jellyfin-activities-sync",
-  "jellyfin-recent-items-sync": "jellyfin-recent-items-sync",
-  "jellyfin-recent-activities-sync": "jellyfin-recent-activities-sync",
-  "generate-item-embeddings": "generate-item-embeddings",
-};
-
