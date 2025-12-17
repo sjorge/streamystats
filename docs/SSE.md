@@ -164,6 +164,58 @@ function SyncButton({ serverId }: { serverId: number }) {
 }
 ```
 
+### Example: Job Status Card (Real Implementation)
+
+`ServerJobStatusCard` uses SSE instead of polling for real-time job status updates:
+
+```typescript
+import { useJobEvents, type JobEvent } from "@/hooks/useJobEvents";
+import { JOB_NAME_TO_KEY, type ServerJobStatusItem } from "@/lib/types/job-status";
+
+export function ServerJobStatusCard({ serverId }: { serverId: number }) {
+  // Initial fetch only - no polling
+  const { data } = useQuery({
+    queryKey: ["serverJobStatus", serverId],
+    queryFn: () => fetchServerJobStatus(serverId),
+    staleTime: Infinity, // SSE handles updates
+  });
+
+  const [jobs, setJobs] = useState<ServerJobStatusItem[]>([]);
+
+  useEffect(() => {
+    if (data?.jobs) setJobs(data.jobs);
+  }, [data?.jobs]);
+
+  const handleJobEvent = useCallback((event: JobEvent) => {
+    if (event.serverId !== serverId) return;
+    
+    const jobKey = JOB_NAME_TO_KEY[event.jobName];
+    if (!jobKey) return;
+
+    setJobs((prev) => prev.map((job) => {
+      if (job.key !== jobKey) return job;
+      
+      switch (event.type) {
+        case "started":
+          return { ...job, state: "running", activeSince: new Date().toISOString() };
+        case "completed":
+          return { ...job, state: "stopped", activeSince: undefined };
+        case "failed":
+          return { ...job, state: "failed", lastError: event.error };
+        default:
+          return job;
+      }
+    }));
+  }, [serverId]);
+
+  useJobEvents({ onJobEvent: handleJobEvent });
+  
+  // ... render jobs
+}
+```
+
+**Key pattern:** Fetch initial state once, then use SSE for real-time updates. This eliminates polling overhead (~12 requests/min saved per user).
+
 ## Endpoints
 
 | Endpoint | Description |
@@ -220,9 +272,12 @@ es.addEventListener('ping', e => console.log('Ping'));
 |------|---------|
 | `job-server/src/events/job-events.ts` | Event types, publishing, buffering |
 | `job-server/src/routes/events-sse.ts` | SSE endpoint (Hono/Bun) |
+| `job-server/src/types/job-status.ts` | Shared job status types |
 | `job-server/src/index.ts` | Mounts route, configures idleTimeout |
 | `nextjs-app/app/api/jobs/events/route.ts` | Proxy to job-server |
 | `nextjs-app/hooks/useJobEvents.ts` | Client hook with auto-reconnect |
+| `nextjs-app/lib/types/job-status.ts` | Job status types & `JOB_NAME_TO_KEY` mapping |
+| `nextjs-app/components/ServerJobStatusCard.tsx` | Real-time job status using SSE |
 
 ## Reconnection
 

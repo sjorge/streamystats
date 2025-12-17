@@ -10,29 +10,14 @@ import {
 import { activityScheduler } from "../../jobs/scheduler";
 import { sessionPoller } from "../../jobs/session-poller";
 import { eq, desc, sql } from "drizzle-orm";
-import type { JobStatus } from "../../types/job-status";
+import type {
+  JobStatus,
+  ServerJobState,
+  ServerJobStatusItem,
+} from "../../types/job-status";
 import { toIsoUtcMicros } from "./utils";
 
 const app = new Hono();
-
-type ServerJobState =
-  | "running"
-  | "queued"
-  | "scheduled"
-  | "failed"
-  | "cancelled"
-  | "stopped";
-
-type ServerJobStatusItem = {
-  key: string;
-  label: string;
-  state: ServerJobState;
-  updatedAt: string;
-  activeSince?: string;
-  scheduledFor?: string;
-  jobId?: string;
-  lastError?: string;
-};
 
 app.get("/servers/:serverId/status", async (c) => {
   try {
