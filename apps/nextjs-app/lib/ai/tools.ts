@@ -28,7 +28,7 @@ import {
   isNotNull,
   sql,
 } from "drizzle-orm";
-import { z } from "zod/v3";
+import { z } from "zod";
 
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
