@@ -38,6 +38,9 @@ WORKDIR /app
 # Copy only the compiled binary
 COPY --from=builder /app/apps/job-server/server ./server
 
+# Copy geoip-lite data files (required at runtime, not bundled in binary)
+COPY --from=builder /app/node_modules/geoip-lite/data ./node_modules/geoip-lite/data
+
 # Environment setup
 ENV NODE_ENV=production
 ENV PORT=3005
