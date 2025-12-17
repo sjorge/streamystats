@@ -22,7 +22,7 @@ import { getServers } from "./lib/server";
  */
 
 const SESSION_SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production",
+  process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production"
 );
 
 interface SessionUser {
@@ -72,6 +72,9 @@ const ADMIN_ONLY_PATHS = [
   "users",
   "setup",
 ];
+const ADMIN_ONLY_SUB_PATHS: Record<string, string[]> = {
+  dashboard: ["security"],
+};
 const PUBLIC_PATHS = ["login", "reconnect"];
 
 const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&");
@@ -101,6 +104,7 @@ const parsePathname = (pathname: string) => {
   if (segments[0] === "servers" && segments[1]) {
     const id = segments[1];
     const page = segments[2];
+    const subPage = segments[3];
 
     // Handle /servers/:id/users/:name
     if (page === "users" && segments[3]) {
@@ -112,8 +116,8 @@ const parsePathname = (pathname: string) => {
       return { id, page, itemId: segments[3] };
     }
 
-    // Handle /servers/:id/:page
-    return { id, page };
+    // Handle /servers/:id/:page/:subPage
+    return { id, page, subPage };
   }
 
   return {};
@@ -124,7 +128,7 @@ const parsePathname = (pathname: string) => {
  * The JWT signature ensures the cookie cannot be tampered with.
  */
 const getSessionUser = async (
-  request: NextRequest,
+  request: NextRequest
 ): Promise<Result<SessionUser>> => {
   const sessionCookie = request.cookies.get("streamystats-session");
 
@@ -180,7 +184,7 @@ const getSessionUser = async (
  */
 const validateJellyfinToken = async (
   request: NextRequest,
-  session: SessionUser,
+  session: SessionUser
 ): Promise<Result<boolean>> => {
   const tokenCookie = request.cookies.get("streamystats-token");
   if (!tokenCookie?.value) {
@@ -263,7 +267,7 @@ const validateJellyfinToken = async (
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const { id, page, name } = parsePathname(pathname);
+  const { id, page, subPage, name } = parsePathname(pathname);
 
   const servers = await getServers();
 
@@ -300,12 +304,12 @@ export async function proxy(request: NextRequest) {
     // Redirect to reconnect page
     if (id) {
       return NextResponse.redirect(
-        new URL(`${basePath}/servers/${id}/reconnect`, request.url),
+        new URL(`${basePath}/servers/${id}/reconnect`, request.url)
       );
     }
     if (servers.length > 0) {
       return NextResponse.redirect(
-        new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url),
+        new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url)
       );
     }
     return NextResponse.redirect(new URL(`${basePath}/setup`, request.url));
@@ -319,7 +323,7 @@ export async function proxy(request: NextRequest) {
     } else if (servers.length > 0) {
       redirectUrl = new URL(
         `${basePath}/servers/${servers[0].id}/login`,
-        request.url,
+        request.url
       );
     } else {
       redirectUrl = new URL(`${basePath}/setup`, request.url);
@@ -340,7 +344,7 @@ export async function proxy(request: NextRequest) {
   // If the user is trying to access a server they are not a member of
   if (id && session.serverId !== Number(id)) {
     return NextResponse.redirect(
-      new URL(`${basePath}/servers/${id}/login`, request.url),
+      new URL(`${basePath}/servers/${id}/login`, request.url)
     );
   }
 
@@ -354,6 +358,16 @@ export async function proxy(request: NextRequest) {
 
   // Check admin permission for restricted paths
   if (page && !name && ADMIN_ONLY_PATHS.includes(page) && !isAdmin) {
+    return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+  }
+
+  // Check admin permission for restricted sub-paths (e.g., /dashboard/security)
+  if (
+    page &&
+    subPage &&
+    ADMIN_ONLY_SUB_PATHS[page]?.includes(subPage) &&
+    !isAdmin
+  ) {
     return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
   }
 

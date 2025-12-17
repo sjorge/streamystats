@@ -60,14 +60,14 @@ const dashboard_items = [
     url: "/dashboard/transcoding",
     icon: Activity,
   },
+];
+
+const admin_items = [
   {
     title: "Security",
     url: "/dashboard/security",
     icon: Shield,
   },
-];
-
-const admin_items = [
   {
     title: "Activity Log",
     url: "/activities",

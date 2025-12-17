@@ -6,7 +6,7 @@ import {
   getServerLocations,
 } from "@/lib/db/locations";
 import { getServer } from "@/lib/db/server";
-import { getUsers } from "@/lib/db/users";
+import { getUsers, isUserAdmin } from "@/lib/db/users";
 import { redirect } from "next/navigation";
 import { ServerSecurityContent } from "./ServerSecurityContent";
 
@@ -26,10 +26,17 @@ export default async function ServerSecurityPage({
   const { id } = await params;
   const { resolved, severity, userId, dateFrom, dateTo } = await searchParams;
 
-  const server = await getServer({ serverId: id });
+  const [server, isAdmin] = await Promise.all([
+    getServer({ serverId: id }),
+    isUserAdmin(),
+  ]);
 
   if (!server) {
     redirect("/");
+  }
+
+  if (!isAdmin) {
+    redirect(`/servers/${id}/dashboard`);
   }
 
   const [locations, anomalyData, stats, serverUsers] = await Promise.all([
@@ -60,4 +67,3 @@ export default async function ServerSecurityPage({
     </Container>
   );
 }
-
