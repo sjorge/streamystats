@@ -71,4 +71,3 @@ export default async function UserSecurityPage({
     </Container>
   );
 }
-

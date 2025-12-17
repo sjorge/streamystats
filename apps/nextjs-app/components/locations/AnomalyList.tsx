@@ -186,7 +186,7 @@ export function AnomalyList({
           <div>
             <CardTitle>Security Anomalies</CardTitle>
             <CardDescription>
-              Unusual activity detected for this account
+              Unusual activity detected for this server
             </CardDescription>
           </div>
           {onResolveAll && unresolvedCount > 0 && (
@@ -415,9 +415,10 @@ export function AnomalyList({
                             <Clock className="h-3 w-3" />
                             {format(
                               new Date(
-                                selectedAnomaly.details.previousLocation.activityTime
+                                selectedAnomaly.details.previousLocation
+                                  .activityTime,
                               ),
-                              "PPpp"
+                              "PPpp",
                             )}
                           </p>
                         )}
@@ -430,7 +431,7 @@ export function AnomalyList({
                             <code className="bg-muted px-1 rounded text-[10px]">
                               {selectedAnomaly.details.previousLocation.activityId.slice(
                                 0,
-                                8
+                                8,
                               )}
                               ...
                             </code>
@@ -460,9 +461,10 @@ export function AnomalyList({
                             <Clock className="h-3 w-3" />
                             {format(
                               new Date(
-                                selectedAnomaly.details.currentLocation.activityTime
+                                selectedAnomaly.details.currentLocation
+                                  .activityTime,
                               ),
-                              "PPpp"
+                              "PPpp",
                             )}
                           </p>
                         )}
@@ -474,7 +476,7 @@ export function AnomalyList({
                             <code className="bg-muted px-1 rounded text-[10px]">
                               {selectedAnomaly.details.currentLocation.activityId.slice(
                                 0,
-                                8
+                                8,
                               )}
                               ...
                             </code>
@@ -497,7 +499,7 @@ export function AnomalyList({
                         <p className="text-2xl font-bold">
                           {selectedAnomaly.details.timeDiffMinutes != null
                             ? Math.abs(
-                                selectedAnomaly.details.timeDiffMinutes
+                                selectedAnomaly.details.timeDiffMinutes,
                               ).toFixed(0)
                             : "?"}
                         </p>
@@ -555,7 +557,7 @@ export function AnomalyList({
                             {selectedAnomaly.details.deviceId.length > 24
                               ? `${selectedAnomaly.details.deviceId.slice(
                                   0,
-                                  24
+                                  24,
                                 )}...`
                               : selectedAnomaly.details.deviceId}
                           </code>

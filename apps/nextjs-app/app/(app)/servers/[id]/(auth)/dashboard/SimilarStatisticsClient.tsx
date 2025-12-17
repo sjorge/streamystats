@@ -26,4 +26,3 @@ interface Props {
 export function SimilarStatisticsClient({ data, server }: Props) {
   return <SimilarStatistics data={data} server={server} />;
 }
-

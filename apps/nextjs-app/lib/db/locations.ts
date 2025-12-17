@@ -2,9 +2,9 @@
 
 import {
   activities,
+  activityLocations,
   anomalyEvents,
   db,
-  activityLocations,
   userFingerprints,
   users,
 } from "@streamystats/database";
@@ -116,7 +116,7 @@ export interface UserFingerprint {
  */
 export async function getUserUniqueLocations(
   serverId: number,
-  userId: string
+  userId: string,
 ): Promise<LocationPoint[]> {
   const result = await db
     .select({
@@ -134,15 +134,15 @@ export async function getUserUniqueLocations(
       and(
         eq(activities.userId, userId),
         eq(activities.serverId, serverId),
-        eq(activityLocations.isPrivateIp, false)
-      )
+        eq(activityLocations.isPrivateIp, false),
+      ),
     )
     .groupBy(
       activityLocations.countryCode,
       activityLocations.country,
       activityLocations.city,
       activityLocations.latitude,
-      activityLocations.longitude
+      activityLocations.longitude,
     )
     .orderBy(desc(sql`MAX(${activities.date})`));
 
@@ -163,7 +163,7 @@ export async function getUserUniqueLocations(
 export async function getUserLocationHistory(
   serverId: number,
   userId: string,
-  limit = 50
+  limit = 50,
 ): Promise<LocationEntry[]> {
   const result = await db
     .select({
@@ -186,7 +186,7 @@ export async function getUserLocationHistory(
     .from(activityLocations)
     .innerJoin(activities, eq(activityLocations.activityId, activities.id))
     .where(
-      and(eq(activities.userId, userId), eq(activities.serverId, serverId))
+      and(eq(activities.userId, userId), eq(activities.serverId, serverId)),
     )
     .orderBy(desc(activities.date))
     .limit(limit);
@@ -215,12 +215,12 @@ export async function getUserLocationHistory(
  */
 export async function getUserFingerprint(
   serverId: number,
-  userId: string
+  userId: string,
 ): Promise<UserFingerprint | null> {
   const result = await db.query.userFingerprints.findFirst({
     where: and(
       eq(userFingerprints.userId, userId),
-      eq(userFingerprints.serverId, serverId)
+      eq(userFingerprints.serverId, serverId),
     ),
   });
 
@@ -251,13 +251,13 @@ export async function getUserFingerprint(
 export async function getUserAnomalies(
   serverId: number,
   userId: string,
-  options: { resolved?: boolean; limit?: number } = {}
+  options: { resolved?: boolean; limit?: number } = {},
 ): Promise<{ anomalies: Anomaly[]; unresolvedCount: number }> {
   const { resolved, limit = 50 } = options;
 
   let whereClause = and(
     eq(anomalyEvents.userId, userId),
-    eq(anomalyEvents.serverId, serverId)
+    eq(anomalyEvents.serverId, serverId),
   );
 
   if (resolved !== undefined) {
@@ -278,8 +278,8 @@ export async function getUserAnomalies(
       and(
         eq(anomalyEvents.userId, userId),
         eq(anomalyEvents.serverId, serverId),
-        eq(anomalyEvents.resolved, false)
-      )
+        eq(anomalyEvents.resolved, false),
+      ),
     );
 
   const unresolvedCount = Number(unresolvedResult[0]?.count || 0);
@@ -314,7 +314,7 @@ export async function getServerAnomalies(
     dateFrom?: string;
     dateTo?: string;
     limit?: number;
-  } = {}
+  } = {},
 ): Promise<{
   anomalies: Anomaly[];
   severityBreakdown: Record<string, number>;
@@ -375,8 +375,8 @@ export async function getServerAnomalies(
     .where(
       and(
         eq(anomalyEvents.serverId, serverId),
-        eq(anomalyEvents.resolved, false)
-      )
+        eq(anomalyEvents.resolved, false),
+      ),
     )
     .groupBy(anomalyEvents.severity);
 
@@ -396,7 +396,7 @@ export async function getServerAnomalies(
       createdAt: a.createdAt.toISOString(),
     })),
     severityBreakdown: Object.fromEntries(
-      severityBreakdown.map((s) => [s.severity, Number(s.count)])
+      severityBreakdown.map((s) => [s.severity, Number(s.count)]),
     ),
   };
 }
@@ -407,7 +407,7 @@ export async function getServerAnomalies(
 export async function resolveAnomaly(
   serverId: number,
   anomalyId: number,
-  options: { resolvedBy?: string; resolutionNote?: string } = {}
+  options: { resolvedBy?: string; resolutionNote?: string } = {},
 ): Promise<boolean> {
   const result = await db
     .update(anomalyEvents)
@@ -418,7 +418,10 @@ export async function resolveAnomaly(
       resolutionNote: options.resolutionNote ?? null,
     })
     .where(
-      and(eq(anomalyEvents.id, anomalyId), eq(anomalyEvents.serverId, serverId))
+      and(
+        eq(anomalyEvents.id, anomalyId),
+        eq(anomalyEvents.serverId, serverId),
+      ),
     )
     .returning({ id: anomalyEvents.id });
 
@@ -430,7 +433,7 @@ export async function resolveAnomaly(
  */
 export async function resolveAllAnomalies(
   serverId: number,
-  options: { resolvedBy?: string; resolutionNote?: string } = {}
+  options: { resolvedBy?: string; resolutionNote?: string } = {},
 ): Promise<number> {
   const result = await db
     .update(anomalyEvents)
@@ -443,8 +446,8 @@ export async function resolveAllAnomalies(
     .where(
       and(
         eq(anomalyEvents.serverId, serverId),
-        eq(anomalyEvents.resolved, false)
-      )
+        eq(anomalyEvents.resolved, false),
+      ),
     )
     .returning({ id: anomalyEvents.id });
 
@@ -456,7 +459,7 @@ export async function resolveAllAnomalies(
  */
 export async function unresolveAnomaly(
   serverId: number,
-  anomalyId: number
+  anomalyId: number,
 ): Promise<boolean> {
   const result = await db
     .update(anomalyEvents)
@@ -467,7 +470,10 @@ export async function unresolveAnomaly(
       resolutionNote: null,
     })
     .where(
-      and(eq(anomalyEvents.id, anomalyId), eq(anomalyEvents.serverId, serverId))
+      and(
+        eq(anomalyEvents.id, anomalyId),
+        eq(anomalyEvents.serverId, serverId),
+      ),
     )
     .returning({ id: anomalyEvents.id });
 
@@ -486,7 +492,7 @@ export interface LocationFilters {
  */
 export async function getServerLocations(
   serverId: number,
-  filters: LocationFilters = {}
+  filters: LocationFilters = {},
 ): Promise<LocationPoint[]> {
   const conditions = [
     eq(activities.serverId, serverId),
@@ -529,7 +535,7 @@ export async function getServerLocations(
       activityLocations.country,
       activityLocations.city,
       activityLocations.latitude,
-      activityLocations.longitude
+      activityLocations.longitude,
     )
     .orderBy(desc(sql`MAX(${activities.date})`));
 
@@ -635,7 +641,7 @@ export async function triggerGeolocationBackfill(serverId: number): Promise<{
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -657,7 +663,7 @@ export async function triggerGeolocationBackfill(serverId: number): Promise<{
  * Trigger fingerprint recalculation job for a server
  */
 export async function triggerFingerprintRecalculation(
-  serverId: number
+  serverId: number,
 ): Promise<{
   success: boolean;
   error?: string;
@@ -669,7 +675,7 @@ export async function triggerFingerprintRecalculation(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -707,8 +713,8 @@ export async function getServerLocationStats(serverId: number): Promise<{
     .where(
       and(
         eq(activities.serverId, serverId),
-        eq(activityLocations.isPrivateIp, false)
-      )
+        eq(activityLocations.isPrivateIp, false),
+      ),
     );
 
   // Total activities without location (pending geolocation)
@@ -718,14 +724,14 @@ export async function getServerLocationStats(serverId: number): Promise<{
     .from(activities)
     .leftJoin(
       activityLocations,
-      eq(activities.id, activityLocations.activityId)
+      eq(activities.id, activityLocations.activityId),
     )
     .where(
       and(
         eq(activities.serverId, serverId),
         sql`${activityLocations.id} IS NULL`,
-        sql`${activities.shortOverview} LIKE '%IP%'`
-      )
+        sql`${activities.shortOverview} LIKE '%IP%'`,
+      ),
     );
 
   // Unique countries
@@ -736,8 +742,8 @@ export async function getServerLocationStats(serverId: number): Promise<{
     .where(
       and(
         eq(activities.serverId, serverId),
-        eq(activityLocations.isPrivateIp, false)
-      )
+        eq(activityLocations.isPrivateIp, false),
+      ),
     );
 
   // Unique cities
@@ -749,8 +755,8 @@ export async function getServerLocationStats(serverId: number): Promise<{
       and(
         eq(activities.serverId, serverId),
         eq(activityLocations.isPrivateIp, false),
-        sql`${activityLocations.city} IS NOT NULL`
-      )
+        sql`${activityLocations.city} IS NOT NULL`,
+      ),
     );
 
   // Users with fingerprints
@@ -769,8 +775,8 @@ export async function getServerLocationStats(serverId: number): Promise<{
     .where(
       and(
         eq(anomalyEvents.serverId, serverId),
-        eq(anomalyEvents.resolved, false)
-      )
+        eq(anomalyEvents.resolved, false),
+      ),
     )
     .groupBy(anomalyEvents.severity);
 
@@ -784,7 +790,7 @@ export async function getServerLocationStats(serverId: number): Promise<{
     uniqueCities: citiesResult.length,
     usersWithFingerprints: Number(fingerprintsResult[0]?.count || 0),
     unresolvedAnomalies: Object.fromEntries(
-      anomaliesResult.map((a) => [a.severity, Number(a.count)])
+      anomaliesResult.map((a) => [a.severity, Number(a.count)]),
     ),
     isBackfillRunning,
   };

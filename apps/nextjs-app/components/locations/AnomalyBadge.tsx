@@ -109,4 +109,3 @@ export function AnomalyTypeBadge({ type }: AnomalyTypeBadgeProps) {
 
   return <Badge variant="outline">{label}</Badge>;
 }
-

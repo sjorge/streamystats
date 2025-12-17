@@ -146,7 +146,9 @@ export default function MapComponent({
                     </p>
                   )}
                   <p>
-                    <span className="text-muted-foreground">Total Activities:</span>{" "}
+                    <span className="text-muted-foreground">
+                      Total Activities:
+                    </span>{" "}
                     {location.activityCount}
                   </p>
                   <p>
@@ -167,7 +169,7 @@ export default function MapComponent({
                           className="flex justify-between items-center text-xs bg-gray-50 px-2 py-1 rounded"
                         >
                           <span className="font-medium truncate max-w-[140px]">
-                            {user.userName || user.userId.slice(0, 8) + "..."}
+                            {user.userName || `${user.userId.slice(0, 8)}...`}
                           </span>
                           <span className="text-muted-foreground whitespace-nowrap ml-2">
                             {user.activityCount} activities

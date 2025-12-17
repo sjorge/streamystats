@@ -49,7 +49,7 @@ export default async function WatchtimePage({
 
   if (!startDate || !endDate) {
     redirect(
-      `/servers/${server.id}/dashboard/watchtime?startDate=${startDateParam}&endDate=${endDateParam}`
+      `/servers/${server.id}/dashboard/watchtime?startDate=${startDateParam}&endDate=${endDateParam}`,
     );
   }
 

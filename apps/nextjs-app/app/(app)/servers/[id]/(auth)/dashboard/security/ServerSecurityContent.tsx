@@ -78,10 +78,11 @@ export function ServerSecurityContent({
   const [isBackfilling, setIsBackfilling] = useState(stats.isBackfillRunning);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
-  const hasLocationFilters =
+  const hasLocationFilters = !!(
     searchParams.get("userId") ||
     searchParams.get("dateFrom") ||
-    searchParams.get("dateTo");
+    searchParams.get("dateTo")
+  );
 
   const dateRange = useMemo((): DateRange | undefined => {
     const fromStr = searchParams.get("dateFrom");
@@ -102,7 +103,7 @@ export function ServerSecurityContent({
     if (!dateRange.to) return format(dateRange.from, "MMM dd, yyyy");
     return `${format(dateRange.from, "MMM dd")} - ${format(
       dateRange.to,
-      "MMM dd, yyyy"
+      "MMM dd, yyyy",
     )}`;
   }, [dateRange]);
 
@@ -186,12 +187,14 @@ export function ServerSecurityContent({
 
   const totalUnresolved = Object.values(stats.unresolvedAnomalies).reduce(
     (a, b) => a + b,
-    0
+    0,
   );
 
   // When filters are applied, show filtered count; otherwise show total unresolved
   const filteredUnresolvedCount = anomalies.filter((a) => !a.resolved).length;
-  const badgeCount = hasLocationFilters ? filteredUnresolvedCount : totalUnresolved;
+  const badgeCount = hasLocationFilters
+    ? filteredUnresolvedCount
+    : totalUnresolved;
 
   return (
     <div className="space-y-6">
@@ -282,8 +285,8 @@ export function ServerSecurityContent({
               {stats.isBackfillRunning
                 ? "Job Running..."
                 : isBackfilling
-                ? "Starting..."
-                : "Run Backfill"}
+                  ? "Starting..."
+                  : "Run Backfill"}
             </Button>
           </CardContent>
         </Card>

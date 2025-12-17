@@ -67,8 +67,8 @@ export function LocationTimeline({
                     location.isPrivateIp
                       ? "bg-muted"
                       : index === 0
-                      ? "bg-primary"
-                      : "bg-muted-foreground"
+                        ? "bg-primary"
+                        : "bg-muted-foreground"
                   }`}
                 />
                 <div className="flex flex-col gap-1">
@@ -113,7 +113,7 @@ export function LocationTimeline({
                             new Date(location.activityDate),
                             {
                               addSuffix: true,
-                            }
+                            },
                           )}
                           )
                         </span>

@@ -22,7 +22,7 @@ import { getServers } from "./lib/server";
  */
 
 const SESSION_SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production"
+  process.env.SESSION_SECRET || "fallback-dev-secret-change-in-production",
 );
 
 interface SessionUser {
@@ -128,7 +128,7 @@ const parsePathname = (pathname: string) => {
  * The JWT signature ensures the cookie cannot be tampered with.
  */
 const getSessionUser = async (
-  request: NextRequest
+  request: NextRequest,
 ): Promise<Result<SessionUser>> => {
   const sessionCookie = request.cookies.get("streamystats-session");
 
@@ -184,7 +184,7 @@ const getSessionUser = async (
  */
 const validateJellyfinToken = async (
   request: NextRequest,
-  session: SessionUser
+  session: SessionUser,
 ): Promise<Result<boolean>> => {
   const tokenCookie = request.cookies.get("streamystats-token");
   if (!tokenCookie?.value) {
@@ -304,12 +304,12 @@ export async function proxy(request: NextRequest) {
     // Redirect to reconnect page
     if (id) {
       return NextResponse.redirect(
-        new URL(`${basePath}/servers/${id}/reconnect`, request.url)
+        new URL(`${basePath}/servers/${id}/reconnect`, request.url),
       );
     }
     if (servers.length > 0) {
       return NextResponse.redirect(
-        new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url)
+        new URL(`${basePath}/servers/${servers[0].id}/reconnect`, request.url),
       );
     }
     return NextResponse.redirect(new URL(`${basePath}/setup`, request.url));
@@ -323,7 +323,7 @@ export async function proxy(request: NextRequest) {
     } else if (servers.length > 0) {
       redirectUrl = new URL(
         `${basePath}/servers/${servers[0].id}/login`,
-        request.url
+        request.url,
       );
     } else {
       redirectUrl = new URL(`${basePath}/setup`, request.url);
@@ -344,7 +344,7 @@ export async function proxy(request: NextRequest) {
   // If the user is trying to access a server they are not a member of
   if (id && session.serverId !== Number(id)) {
     return NextResponse.redirect(
-      new URL(`${basePath}/servers/${id}/login`, request.url)
+      new URL(`${basePath}/servers/${id}/login`, request.url),
     );
   }
 
