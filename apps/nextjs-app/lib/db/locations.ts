@@ -457,10 +457,12 @@ export async function unresolveAnomaly(
 
 /**
  * Get all unique locations for a server (for map visualization)
+ * Aggregates users per location for the popup display
  */
 export async function getServerLocations(
   serverId: number
 ): Promise<LocationPoint[]> {
+  // Get per-user location data
   const result = await db
     .select({
       userId: activities.userId,
@@ -493,16 +495,60 @@ export async function getServerLocations(
     )
     .orderBy(desc(sql`MAX(${activities.date})`));
 
-  return result.map((r) => ({
-    userId: r.userId,
-    userName: r.userName,
-    countryCode: r.countryCode,
-    country: r.country,
-    city: r.city,
-    latitude: r.latitude ?? 0,
-    longitude: r.longitude ?? 0,
-    activityCount: Number(r.activityCount),
-    lastSeen: r.lastSeen,
+  // Aggregate by location (lat/lng + city)
+  const locationMap = new Map<
+    string,
+    {
+      latitude: number;
+      longitude: number;
+      countryCode: string | null;
+      country: string | null;
+      city: string | null;
+      activityCount: number;
+      lastSeen: string;
+      users: {
+        userId: string;
+        userName: string | null;
+        activityCount: number;
+        lastSeen: string;
+      }[];
+    }
+  >();
+
+  for (const r of result) {
+    const key = `${r.latitude}-${r.longitude}-${r.city || "unknown"}`;
+    const existing = locationMap.get(key);
+
+    const userEntry = {
+      userId: r.userId || "unknown",
+      userName: r.userName,
+      activityCount: Number(r.activityCount),
+      lastSeen: r.lastSeen,
+    };
+
+    if (existing) {
+      existing.activityCount += Number(r.activityCount);
+      if (r.lastSeen > existing.lastSeen) {
+        existing.lastSeen = r.lastSeen;
+      }
+      existing.users.push(userEntry);
+    } else {
+      locationMap.set(key, {
+        latitude: r.latitude ?? 0,
+        longitude: r.longitude ?? 0,
+        countryCode: r.countryCode,
+        country: r.country,
+        city: r.city,
+        activityCount: Number(r.activityCount),
+        lastSeen: r.lastSeen,
+        users: [userEntry],
+      });
+    }
+  }
+
+  return Array.from(locationMap.values()).map((loc) => ({
+    ...loc,
+    users: loc.users.sort((a, b) => b.activityCount - a.activityCount),
   }));
 }
 

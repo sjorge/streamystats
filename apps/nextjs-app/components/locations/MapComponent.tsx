@@ -130,17 +130,11 @@ export default function MapComponent({
             icon={getMarkerIcon(location.activityCount)}
           >
             <Popup>
-              <div className="min-w-[200px]">
+              <div className="min-w-[220px] max-w-[280px]">
                 <h3 className="font-semibold text-sm mb-2">
                   {location.city || location.country || "Unknown"}
                 </h3>
                 <div className="space-y-1 text-xs">
-                  {location.userName && (
-                    <p>
-                      <span className="text-muted-foreground">User:</span>{" "}
-                      {location.userName}
-                    </p>
-                  )}
                   <p>
                     <span className="text-muted-foreground">Country:</span>{" "}
                     {location.country || "Unknown"}
@@ -152,7 +146,7 @@ export default function MapComponent({
                     </p>
                   )}
                   <p>
-                    <span className="text-muted-foreground">Activities:</span>{" "}
+                    <span className="text-muted-foreground">Total Activities:</span>{" "}
                     {location.activityCount}
                   </p>
                   <p>
@@ -160,6 +154,36 @@ export default function MapComponent({
                     {formatDate(location.lastSeen)}
                   </p>
                 </div>
+
+                {location.users && location.users.length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-gray-200">
+                    <p className="text-xs font-medium mb-2">
+                      Users ({location.users.length})
+                    </p>
+                    <div className="space-y-1.5 max-h-[150px] overflow-y-auto">
+                      {location.users.map((user) => (
+                        <div
+                          key={user.userId}
+                          className="flex justify-between items-center text-xs bg-gray-50 px-2 py-1 rounded"
+                        >
+                          <span className="font-medium truncate max-w-[140px]">
+                            {user.userName || user.userId.slice(0, 8) + "..."}
+                          </span>
+                          <span className="text-muted-foreground whitespace-nowrap ml-2">
+                            {user.activityCount} activities
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!location.users && location.userName && (
+                  <div className="mt-2 text-xs">
+                    <span className="text-muted-foreground">User:</span>{" "}
+                    {location.userName}
+                  </div>
+                )}
               </div>
             </Popup>
           </Marker>

@@ -9,6 +9,13 @@ const MapWithNoSSR = dynamic(() => import("./MapComponent"), {
   loading: () => <Skeleton className="h-[400px] w-full rounded-lg" />,
 });
 
+export interface LocationUser {
+  userId: string;
+  userName: string | null;
+  activityCount: number;
+  lastSeen: string;
+}
+
 export interface LocationPoint {
   latitude: number;
   longitude: number;
@@ -19,6 +26,7 @@ export interface LocationPoint {
   lastSeen: string;
   userId?: string | null;
   userName?: string | null;
+  users?: LocationUser[];
 }
 
 interface UserLocationMapProps {
