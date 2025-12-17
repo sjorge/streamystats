@@ -15,6 +15,7 @@ import {
   checkImpossibleTravel,
   parseIpFromShortOverview,
 } from "../services/geolocation";
+import { publishJobEvent, nowIsoMicroUtc } from "../events/job-events";
 
 const JOB_NAMES = {
   GEOLOCATE_ACTIVITIES: "geolocate-activities",
@@ -174,12 +175,7 @@ async function checkActivityAnomaly(
       clientName: sessions.clientName,
     })
     .from(sessions)
-    .where(
-      and(
-        eq(sessions.userId, userId),
-        eq(sessions.serverId, serverId)
-      )
-    )
+    .where(and(eq(sessions.userId, userId), eq(sessions.serverId, serverId)))
     .orderBy(desc(sessions.startTime))
     .limit(1);
 
@@ -339,7 +335,9 @@ async function checkActivityAnomaly(
         anomalyType: "new_device",
         severity: "medium",
         details: {
-          description: `First access from device: ${latestSession.deviceName || latestSession.deviceId}`,
+          description: `First access from device: ${
+            latestSession.deviceName || latestSession.deviceId
+          }`,
           deviceId: latestSession.deviceId,
           deviceName: latestSession.deviceName ?? undefined,
           clientName: latestSession.clientName ?? undefined,
@@ -357,7 +355,7 @@ async function checkActivityAnomaly(
     await createInitialFingerprint(serverId, userId, geo);
   }
 
-  // Insert anomalies
+  // Insert anomalies and publish events
   if (anomalies.length > 0) {
     await db.insert(anomalyEvents).values(anomalies);
     console.log(
@@ -365,6 +363,21 @@ async function checkActivityAnomaly(
         .map((a) => a.anomalyType)
         .join(",")}`
     );
+
+    // Publish SSE event for each anomaly
+    for (const anomaly of anomalies) {
+      publishJobEvent({
+        type: "anomaly_detected",
+        serverId,
+        timestamp: nowIsoMicroUtc(),
+        data: {
+          anomalyType: anomaly.anomalyType,
+          severity: anomaly.severity,
+          userId: anomaly.userId,
+        },
+      });
+    }
+
     return anomalies[0];
   }
 
@@ -502,9 +515,7 @@ async function calculateUserFingerprint(
       clientName: sessions.clientName,
     })
     .from(sessions)
-    .where(
-      and(eq(sessions.userId, userId), eq(sessions.serverId, serverId))
-    );
+    .where(and(eq(sessions.userId, userId), eq(sessions.serverId, serverId)));
 
   if (userActivities.length === 0 && userSessions.length === 0) return;
 
@@ -658,12 +669,29 @@ export async function backfillActivityLocationsJob(job: {
     let totalProcessed = 0;
     let hasMore = true;
 
+    // Publish job started event
+    publishJobEvent({
+      type: "started",
+      jobName: JOB_NAMES.BACKFILL_LOCATIONS,
+      serverId,
+      timestamp: nowIsoMicroUtc(),
+    });
+
     while (hasMore) {
       const result = await geolocateActivitiesJob({
         data: { serverId, batchSize },
       });
 
       totalProcessed += result.processed;
+
+      // Publish progress event
+      publishJobEvent({
+        type: "progress",
+        jobName: JOB_NAMES.BACKFILL_LOCATIONS,
+        serverId,
+        progress: { current: totalProcessed },
+        timestamp: nowIsoMicroUtc(),
+      });
 
       // If we processed less than the batch size, we're done
       hasMore = result.processed === batchSize;
@@ -682,12 +710,31 @@ export async function backfillActivityLocationsJob(job: {
       `[backfill-locations] action=complete serverId=${serverId} totalProcessed=${totalProcessed} durationMs=${duration}`
     );
 
+    // Publish job completed event
+    publishJobEvent({
+      type: "completed",
+      jobName: JOB_NAMES.BACKFILL_LOCATIONS,
+      serverId,
+      data: { totalProcessed },
+      timestamp: nowIsoMicroUtc(),
+    });
+
     return { totalProcessed };
   } catch (error) {
     console.error(
       `[backfill-locations] action=error serverId=${serverId}`,
       error
     );
+
+    // Publish job failed event
+    publishJobEvent({
+      type: "failed",
+      jobName: JOB_NAMES.BACKFILL_LOCATIONS,
+      serverId,
+      error: error instanceof Error ? error.message : "Unknown error",
+      timestamp: nowIsoMicroUtc(),
+    });
+
     throw error;
   }
 }

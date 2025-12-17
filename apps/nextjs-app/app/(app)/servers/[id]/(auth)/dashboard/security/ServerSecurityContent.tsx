@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSecurityEvents } from "@/hooks/useSecurityEvents";
 import type { Anomaly } from "@/lib/db/locations";
 import {
   resolveAllAnomalies,
@@ -77,6 +78,9 @@ export function ServerSecurityContent({
   const [isPending, startTransition] = useTransition();
   const [isBackfilling, setIsBackfilling] = useState(stats.isBackfillRunning);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  // Subscribe to real-time security events
+  useSecurityEvents(serverId);
 
   const hasLocationFilters = !!(
     searchParams.get("userId") ||

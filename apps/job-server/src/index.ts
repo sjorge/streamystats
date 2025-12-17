@@ -7,6 +7,7 @@ import { sessionPoller } from "./jobs/session-poller";
 import { closeConnection } from "@streamystats/database";
 import jobRoutes from "./routes/jobs/index";
 import locationRoutes from "./routes/locations";
+import eventsRoutes from "./routes/events-sse";
 
 process.on("warning", (warning) => {
   if (warning?.name === "TimeoutNegativeWarning") return;
@@ -29,6 +30,7 @@ app.use("*", cors());
 
 app.route("/api/jobs", jobRoutes);
 app.route("/api", locationRoutes);
+app.route("/api", eventsRoutes);
 
 app.get("/health", (c) => {
   return c.json({
