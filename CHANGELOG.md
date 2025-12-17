@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.12.0](https://github.com/fredrikburmester/streamystats/compare/v2.11.0...v2.12.0) (2025-12-17)
+
+
+### Features
+
+* more detection rules ([1d27511](https://github.com/fredrikburmester/streamystats/commit/1d27511c926f6544867e15e6f3bfc32024ce381f))
+* refresh button ([c4ca818](https://github.com/fredrikburmester/streamystats/commit/c4ca818e76cfb91171b24e492ce1e49181aea0bb))
+* show user list on pin ([961ad67](https://github.com/fredrikburmester/streamystats/commit/961ad67753e7d24b32d3028409c4958777b4143d))
+* user fingerprinting for security and determining shared accounts ([52adda9](https://github.com/fredrikburmester/streamystats/commit/52adda93439bb01515c14a4d4a015b1fe58dd25e))
+
+
+### Bug Fixes
+
+* build error ([4bf6334](https://github.com/fredrikburmester/streamystats/commit/4bf63341a3c33e30f41463f366cea9f54ed0e69d))
+* improve ai streaming chat response and tool listing ([7d4bba1](https://github.com/fredrikburmester/streamystats/commit/7d4bba1f21effacda96e221345e4c2c8a0241f09))
+* mark all as resolved ([7c2ab4f](https://github.com/fredrikburmester/streamystats/commit/7c2ab4f01dad9a5f62d0ecb2410768080f92c044))
+* only for admin ([e2b7d5b](https://github.com/fredrikburmester/streamystats/commit/e2b7d5b04fd4120d15760fc7ed0c983a6a5e592e))
+* status types and docs ([ac190d8](https://github.com/fredrikburmester/streamystats/commit/ac190d8f9524301f99be2380a990dbe58012bf16))
+
 ## [2.11.0](https://github.com/fredrikburmester/streamystats/compare/v2.10.0...v2.11.0) (2025-12-15)
 
 
