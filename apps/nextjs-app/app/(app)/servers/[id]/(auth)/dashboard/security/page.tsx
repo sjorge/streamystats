@@ -1,5 +1,5 @@
 import { Container } from "@/components/Container";
-import { PageTitle } from "@/components/PageTitle";
+import { SecuritySyncButton } from "@/components/SecuritySyncButton";
 import {
   getServerAnomalies,
   getServerLocationStats,
@@ -7,6 +7,7 @@ import {
 } from "@/lib/db/locations";
 import { getServer } from "@/lib/db/server";
 import { getUsers, isUserAdmin } from "@/lib/db/users";
+import { BarChart2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ServerSecurityContent } from "./ServerSecurityContent";
 
@@ -55,7 +56,11 @@ export default async function ServerSecurityPage({
 
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
-      <PageTitle title="Security Dashboard" />
+      <div className="flex items-center gap-2 mb-4">
+        <BarChart2 className="w-4 h-4" />
+        <h1 className="font-bold text-2xl">Security Dashboard</h1>
+        <SecuritySyncButton serverId={server.id} />
+      </div>
       <ServerSecurityContent
         serverId={server.id}
         locations={locations}

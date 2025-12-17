@@ -10,6 +10,7 @@ import {
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { getJobQueue } from "../jobs/queue";
 import { GEOLOCATION_JOB_NAMES } from "../jobs/geolocation-jobs";
+import { SECURITY_SYNC_JOB_NAME } from "../jobs/security-sync-job";
 
 const app = new Hono();
 
@@ -620,6 +621,40 @@ app.get("/servers/:serverId/locations/stats", async (c) => {
   } catch (error) {
     console.error("Error fetching location stats:", error);
     return c.json({ error: "Failed to fetch location stats" }, 500);
+  }
+});
+
+/**
+ * Trigger full security sync (activities + geolocation + fingerprints)
+ */
+app.post("/servers/:serverId/security/sync", async (c) => {
+  try {
+    const serverId = Number.parseInt(c.req.param("serverId"));
+
+    if (Number.isNaN(serverId)) {
+      return c.json({ error: "Invalid server ID" }, 400);
+    }
+
+    const boss = await getJobQueue();
+
+    const jobId = await boss.send(
+      SECURITY_SYNC_JOB_NAME,
+      { serverId },
+      {
+        expireInMinutes: 60,
+        retryLimit: 1,
+        singletonKey: `security-sync-${serverId}`,
+      }
+    );
+
+    return c.json({
+      success: true,
+      jobId,
+      message: "Security sync job started",
+    });
+  } catch (error) {
+    console.error("Error starting security sync:", error);
+    return c.json({ error: "Failed to start security sync" }, 500);
   }
 });
 

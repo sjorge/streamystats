@@ -17,6 +17,10 @@ import {
   jellyfinPeopleSyncWorker,
   JELLYFIN_JOB_NAMES,
 } from "./workers";
+import {
+  securityFullSyncJob,
+  SECURITY_SYNC_JOB_NAME,
+} from "./security-sync-job";
 
 let bossInstance: PgBoss | null = null;
 
@@ -123,6 +127,13 @@ async function registerJobHandlers(boss: PgBoss) {
     GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
     { teamSize: 1, teamConcurrency: 1 },
     backfillActivityLocationsJob
+  );
+
+  // Register security sync job
+  await boss.work(
+    SECURITY_SYNC_JOB_NAME,
+    { teamSize: 1, teamConcurrency: 1 },
+    securityFullSyncJob
   );
 
   console.log("All job handlers registered successfully");
