@@ -4,6 +4,13 @@ export { syncServerDataJob, addServerJob } from "./server-jobs";
 export { generateItemEmbeddingsJob } from "./embedding-jobs";
 
 export {
+  geolocateActivitiesJob,
+  calculateFingerprintsJob,
+  backfillActivityLocationsJob,
+  GEOLOCATION_JOB_NAMES,
+} from "./geolocation-jobs";
+
+export {
   syncUsers,
   syncLibraries,
   syncActivities,

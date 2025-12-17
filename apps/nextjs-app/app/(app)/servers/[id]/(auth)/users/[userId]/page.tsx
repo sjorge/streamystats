@@ -1,6 +1,9 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
+import { AnomalyBadge } from "@/components/locations";
+import { Button } from "@/components/ui/button";
 import { getUserHistory } from "@/lib/db/history";
+import { getUserAnomalies } from "@/lib/db/locations";
 import { getServer } from "@/lib/db/server";
 import { getMostWatchedItems } from "@/lib/db/statistics";
 import {
@@ -11,6 +14,8 @@ import {
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { showAdminStatistics } from "@/utils/adminTools";
+import { Shield } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HistoryTable } from "../../history/HistoryTable";
 import { GenreStatsGraph } from "./GenreStatsGraph";
@@ -54,6 +59,7 @@ export default async function User({
     userHistory,
     genreStats,
     mostWatched,
+    anomalyData,
   ] = await Promise.all([
     getUserWatchStats({ serverId: server.id, userId: user.id }),
     getWatchTimePerWeekDay({
@@ -69,11 +75,26 @@ export default async function User({
     }),
     getUserGenreStats({ userId: user.id, serverId: server.id }),
     getMostWatchedItems({ serverId: server.id, userId: user.id }),
+    getUserAnomalies(server.id, user.id, { resolved: false, limit: 1 }),
   ]);
 
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
-      <PageTitle title={user.name || "N/A"} />
+      <div className="flex items-center justify-between">
+        <PageTitle title={user.name || "N/A"} />
+        <Link href={`/servers/${server.id}/users/${user.id}/security`}>
+          <Button variant="outline" size="sm" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Security
+            {anomalyData.unresolvedCount > 0 && (
+              <AnomalyBadge
+                count={anomalyData.unresolvedCount}
+                showTooltip={false}
+              />
+            )}
+          </Button>
+        </Link>
+      </div>
       <div className="flex flex-col gap-4">
         <UserBadges user={user} />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

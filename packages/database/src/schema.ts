@@ -430,6 +430,164 @@ export const hiddenRecommendations = pgTable("hidden_recommendations", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Activity locations table - geolocated IP data for activities
+export const activityLocations = pgTable(
+  "activity_locations",
+  {
+    id: serial("id").primaryKey(),
+    activityId: text("activity_id")
+      .references(() => activities.id, { onDelete: "cascade" })
+      .notNull(),
+    ipAddress: text("ip_address").notNull(),
+
+    // Geolocation data
+    countryCode: text("country_code"),
+    country: text("country"),
+    region: text("region"),
+    city: text("city"),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    timezone: text("timezone"),
+
+    // IP classification
+    isPrivateIp: boolean("is_private_ip").default(false).notNull(),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("activity_locations_activity_id_idx").on(table.activityId),
+    index("activity_locations_ip_address_idx").on(table.ipAddress),
+  ]
+);
+
+// User fingerprints table - aggregated behavioral patterns per user
+export const userFingerprints = pgTable(
+  "user_fingerprints",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    serverId: integer("server_id")
+      .references(() => servers.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Known patterns (JSONB arrays)
+    knownDeviceIds: jsonb("known_device_ids").$type<string[]>().default([]),
+    knownCountries: jsonb("known_countries").$type<string[]>().default([]),
+    knownCities: jsonb("known_cities").$type<string[]>().default([]),
+    knownClients: jsonb("known_clients").$type<string[]>().default([]),
+
+    // Location patterns with frequency
+    locationPatterns: jsonb("location_patterns")
+      .$type<
+        Array<{
+          country: string;
+          city: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          sessionCount: number;
+          lastSeenAt: string;
+        }>
+      >()
+      .default([]),
+
+    // Device patterns with frequency
+    devicePatterns: jsonb("device_patterns")
+      .$type<
+        Array<{
+          deviceId: string;
+          deviceName: string | null;
+          clientName: string | null;
+          sessionCount: number;
+          lastSeenAt: string;
+        }>
+      >()
+      .default([]),
+
+    // Behavioral patterns
+    typicalHoursUtc: jsonb("typical_hours_utc").$type<number[]>().default([]),
+    avgSessionsPerDay: doublePrecision("avg_sessions_per_day"),
+    totalSessions: integer("total_sessions").default(0),
+
+    lastCalculatedAt: timestamp("last_calculated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("user_fingerprints_user_id_idx").on(table.userId),
+    index("user_fingerprints_server_id_idx").on(table.serverId),
+    unique("user_fingerprints_user_server_unique").on(
+      table.userId,
+      table.serverId
+    ),
+  ]
+);
+
+// Anomaly events table - flagged suspicious activity
+export const anomalyEvents = pgTable(
+  "anomaly_events",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    serverId: integer("server_id")
+      .references(() => servers.id, { onDelete: "cascade" })
+      .notNull(),
+    activityId: text("activity_id").references(() => activities.id, {
+      onDelete: "set null",
+    }),
+
+    // Anomaly classification
+    anomalyType: text("anomaly_type").notNull(), // 'impossible_travel', 'new_location', 'concurrent_streams', 'new_device', 'new_country'
+    severity: text("severity").notNull(), // 'low', 'medium', 'high', 'critical'
+
+    // Anomaly details
+    details: jsonb("details")
+      .$type<{
+        description: string;
+        previousLocation?: {
+          country: string;
+          city: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          activityId?: string;
+          activityTime?: string;
+        };
+        currentLocation?: {
+          country: string;
+          city: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          activityId?: string;
+          activityTime?: string;
+        };
+        distanceKm?: number;
+        timeDiffMinutes?: number;
+        speedKmh?: number;
+        deviceId?: string;
+        deviceName?: string;
+        clientName?: string;
+        previousActivityId?: string;
+      }>()
+      .notNull(),
+
+    // Resolution status
+    resolved: boolean("resolved").default(false).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: text("resolved_by"),
+    resolutionNote: text("resolution_note"),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("anomaly_events_user_id_idx").on(table.userId),
+    index("anomaly_events_server_id_idx").on(table.serverId),
+    index("anomaly_events_activity_id_idx").on(table.activityId),
+    index("anomaly_events_anomaly_type_idx").on(table.anomalyType),
+    index("anomaly_events_resolved_idx").on(table.resolved),
+  ]
+);
+
 // Define relationships
 export const serversRelations = relations(servers, ({ many }) => ({
   libraries: many(libraries),
@@ -438,6 +596,8 @@ export const serversRelations = relations(servers, ({ many }) => ({
   items: many(items),
   sessions: many(sessions),
   hiddenRecommendations: many(hiddenRecommendations),
+  userFingerprints: many(userFingerprints),
+  anomalyEvents: many(anomalyEvents),
 }));
 
 export const librariesRelations = relations(libraries, ({ one, many }) => ({
@@ -455,9 +615,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   activities: many(activities),
   sessions: many(sessions),
+  fingerprints: many(userFingerprints),
+  anomalyEvents: many(anomalyEvents),
 }));
 
-export const activitiesRelations = relations(activities, ({ one }) => ({
+export const activitiesRelations = relations(activities, ({ one, many }) => ({
   server: one(servers, {
     fields: [activities.serverId],
     references: [servers.id],
@@ -466,6 +628,8 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
     fields: [activities.userId],
     references: [users.id],
   }),
+  location: one(activityLocations),
+  anomalyEvents: many(anomalyEvents),
 }));
 
 export const itemsRelations = relations(items, ({ one, many }) => ({
@@ -485,7 +649,7 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   hiddenRecommendations: many(hiddenRecommendations),
 }));
 
-export const sessionsRelations = relations(sessions, ({ one }) => ({
+export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   server: one(servers, {
     fields: [sessions.serverId],
     references: [servers.id],
@@ -497,6 +661,45 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   item: one(items, {
     fields: [sessions.itemId],
     references: [items.id],
+  }),
+}));
+
+export const activityLocationsRelations = relations(
+  activityLocations,
+  ({ one }) => ({
+    activity: one(activities, {
+      fields: [activityLocations.activityId],
+      references: [activities.id],
+    }),
+  })
+);
+
+export const userFingerprintsRelations = relations(
+  userFingerprints,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userFingerprints.userId],
+      references: [users.id],
+    }),
+    server: one(servers, {
+      fields: [userFingerprints.serverId],
+      references: [servers.id],
+    }),
+  })
+);
+
+export const anomalyEventsRelations = relations(anomalyEvents, ({ one }) => ({
+  user: one(users, {
+    fields: [anomalyEvents.userId],
+    references: [users.id],
+  }),
+  server: one(servers, {
+    fields: [anomalyEvents.serverId],
+    references: [servers.id],
+  }),
+  activity: one(activities, {
+    fields: [anomalyEvents.activityId],
+    references: [activities.id],
   }),
 }));
 
@@ -538,3 +741,12 @@ export type NewSession = typeof sessions.$inferInsert;
 
 export type HiddenRecommendation = typeof hiddenRecommendations.$inferSelect;
 export type NewHiddenRecommendation = typeof hiddenRecommendations.$inferInsert;
+
+export type ActivityLocation = typeof activityLocations.$inferSelect;
+export type NewActivityLocation = typeof activityLocations.$inferInsert;
+
+export type UserFingerprint = typeof userFingerprints.$inferSelect;
+export type NewUserFingerprint = typeof userFingerprints.$inferInsert;
+
+export type AnomalyEvent = typeof anomalyEvents.$inferSelect;
+export type NewAnomalyEvent = typeof anomalyEvents.$inferInsert;

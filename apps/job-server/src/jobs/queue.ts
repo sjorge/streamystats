@@ -3,6 +3,10 @@ import {
   syncServerDataJob,
   addServerJob,
   generateItemEmbeddingsJob,
+  geolocateActivitiesJob,
+  calculateFingerprintsJob,
+  backfillActivityLocationsJob,
+  GEOLOCATION_JOB_NAMES,
   jellyfinFullSyncWorker,
   jellyfinUsersSyncWorker,
   jellyfinLibrariesSyncWorker,
@@ -102,6 +106,23 @@ async function registerJobHandlers(boss: PgBoss) {
     JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
     { teamSize: 1, teamConcurrency: 1 },
     jellyfinPeopleSyncWorker
+  );
+
+  // Register geolocation jobs
+  await boss.work(
+    GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES,
+    { teamSize: 2, teamConcurrency: 2 },
+    geolocateActivitiesJob
+  );
+  await boss.work(
+    GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
+    { teamSize: 1, teamConcurrency: 1 },
+    calculateFingerprintsJob
+  );
+  await boss.work(
+    GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
+    { teamSize: 1, teamConcurrency: 1 },
+    backfillActivityLocationsJob
   );
 
   console.log("All job handlers registered successfully");
