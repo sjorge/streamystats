@@ -94,6 +94,7 @@ interface AnomalyListProps {
   showUserColumn?: boolean;
   onResolve?: (anomalyId: number, note?: string) => Promise<void>;
   onUnresolve?: (anomalyId: number) => Promise<void>;
+  onResolveAll?: () => Promise<void>;
 }
 
 export function AnomalyList({
@@ -101,12 +102,25 @@ export function AnomalyList({
   showUserColumn = true,
   onResolve,
   onUnresolve,
+  onResolveAll,
 }: AnomalyListProps) {
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedAnomaly, setSelectedAnomaly] = useState<Anomaly | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const unresolvedCount = anomalies.filter((a) => !a.resolved).length;
+
+  const handleResolveAll = async () => {
+    if (!onResolveAll) return;
+    setIsLoading(true);
+    try {
+      await onResolveAll();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const openDetails = (anomaly: Anomaly) => {
     setSelectedAnomaly(anomaly);
@@ -154,11 +168,26 @@ export function AnomalyList({
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle>Security Anomalies</CardTitle>
-          <CardDescription>
-            Unusual activity detected for this account
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Security Anomalies</CardTitle>
+            <CardDescription>
+              Unusual activity detected for this account
+            </CardDescription>
+          </div>
+          {onResolveAll && unresolvedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResolveAll}
+              disabled={isLoading}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              {isLoading
+                ? "Resolving..."
+                : `Mark all as resolved (${unresolvedCount})`}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <Table>

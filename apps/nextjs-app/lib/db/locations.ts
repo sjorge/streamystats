@@ -407,6 +407,32 @@ export async function resolveAnomaly(
 }
 
 /**
+ * Resolve all unresolved anomalies for a server
+ */
+export async function resolveAllAnomalies(
+  serverId: number,
+  options: { resolvedBy?: string; resolutionNote?: string } = {}
+): Promise<number> {
+  const result = await db
+    .update(anomalyEvents)
+    .set({
+      resolved: true,
+      resolvedAt: new Date(),
+      resolvedBy: options.resolvedBy ?? null,
+      resolutionNote: options.resolutionNote ?? "Bulk resolved",
+    })
+    .where(
+      and(
+        eq(anomalyEvents.serverId, serverId),
+        eq(anomalyEvents.resolved, false)
+      )
+    )
+    .returning({ id: anomalyEvents.id });
+
+  return result.length;
+}
+
+/**
  * Unresolve an anomaly
  */
 export async function unresolveAnomaly(

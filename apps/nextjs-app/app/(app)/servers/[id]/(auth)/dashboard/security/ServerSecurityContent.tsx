@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Anomaly } from "@/lib/db/locations";
 import {
+  resolveAllAnomalies,
   resolveAnomaly,
   triggerGeolocationBackfill,
   unresolveAnomaly,
@@ -80,6 +81,13 @@ export function ServerSecurityContent({
     });
   };
 
+  const handleResolveAll = async () => {
+    await resolveAllAnomalies(serverId);
+    startTransition(() => {
+      router.refresh();
+    });
+  };
+
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") {
@@ -115,7 +123,7 @@ export function ServerSecurityContent({
 
   const totalUnresolved = Object.values(stats.unresolvedAnomalies).reduce(
     (a, b) => a + b,
-    0,
+    0
   );
 
   return (
@@ -207,8 +215,8 @@ export function ServerSecurityContent({
               {stats.isBackfillRunning
                 ? "Job Running..."
                 : isBackfilling
-                  ? "Starting..."
-                  : "Run Backfill"}
+                ? "Starting..."
+                : "Run Backfill"}
             </Button>
           </CardContent>
         </Card>
@@ -292,6 +300,7 @@ export function ServerSecurityContent({
             showUserColumn={true}
             onResolve={handleResolve}
             onUnresolve={handleUnresolve}
+            onResolveAll={handleResolveAll}
           />
         </TabsContent>
       </Tabs>
