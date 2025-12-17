@@ -8,7 +8,7 @@ import {
   userFingerprints,
   users,
 } from "@streamystats/database";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 
 export interface LocationPoint {
   latitude: number;
@@ -307,12 +307,19 @@ export async function getUserAnomalies(
  */
 export async function getServerAnomalies(
   serverId: number,
-  options: { resolved?: boolean; severity?: string; limit?: number } = {}
+  options: {
+    resolved?: boolean;
+    severity?: string;
+    userId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  } = {}
 ): Promise<{
   anomalies: Anomaly[];
   severityBreakdown: Record<string, number>;
 }> {
-  const { resolved, severity, limit = 50 } = options;
+  const { resolved, severity, userId, dateFrom, dateTo, limit = 50 } = options;
 
   const conditions = [eq(anomalyEvents.serverId, serverId)];
 
@@ -322,6 +329,18 @@ export async function getServerAnomalies(
 
   if (severity) {
     conditions.push(eq(anomalyEvents.severity, severity));
+  }
+
+  if (userId) {
+    conditions.push(eq(anomalyEvents.userId, userId));
+  }
+
+  if (dateFrom) {
+    conditions.push(gte(anomalyEvents.createdAt, new Date(dateFrom)));
+  }
+
+  if (dateTo) {
+    conditions.push(lte(anomalyEvents.createdAt, new Date(dateTo)));
   }
 
   const whereClause = and(...conditions);
@@ -455,13 +474,37 @@ export async function unresolveAnomaly(
   return result.length > 0;
 }
 
+export interface LocationFilters {
+  userId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 /**
  * Get all unique locations for a server (for map visualization)
  * Aggregates users per location for the popup display
  */
 export async function getServerLocations(
-  serverId: number
+  serverId: number,
+  filters: LocationFilters = {}
 ): Promise<LocationPoint[]> {
+  const conditions = [
+    eq(activities.serverId, serverId),
+    eq(activityLocations.isPrivateIp, false),
+  ];
+
+  if (filters.userId) {
+    conditions.push(eq(activities.userId, filters.userId));
+  }
+
+  if (filters.dateFrom) {
+    conditions.push(gte(activities.date, new Date(filters.dateFrom)));
+  }
+
+  if (filters.dateTo) {
+    conditions.push(lte(activities.date, new Date(filters.dateTo)));
+  }
+
   // Get per-user location data
   const result = await db
     .select({
@@ -478,12 +521,7 @@ export async function getServerLocations(
     .from(activityLocations)
     .innerJoin(activities, eq(activityLocations.activityId, activities.id))
     .leftJoin(users, eq(activities.userId, users.id))
-    .where(
-      and(
-        eq(activities.serverId, serverId),
-        eq(activityLocations.isPrivateIp, false)
-      )
-    )
+    .where(and(...conditions))
     .groupBy(
       activities.userId,
       users.name,

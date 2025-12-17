@@ -95,6 +95,8 @@ interface AnomalyListProps {
   onResolve?: (anomalyId: number, note?: string) => Promise<void>;
   onUnresolve?: (anomalyId: number) => Promise<void>;
   onResolveAll?: () => Promise<void>;
+  hasFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
 export function AnomalyList({
@@ -103,6 +105,8 @@ export function AnomalyList({
   onResolve,
   onUnresolve,
   onResolveAll,
+  hasFilters,
+  onClearFilters,
 }: AnomalyListProps) {
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -159,6 +163,16 @@ export function AnomalyList({
           <div className="text-center">
             <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-2" />
             <p className="text-muted-foreground">No anomalies detected</p>
+            {hasFilters && onClearFilters && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={onClearFilters}
+              >
+                Clear filters
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

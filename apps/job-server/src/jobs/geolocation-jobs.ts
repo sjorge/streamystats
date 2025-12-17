@@ -2,6 +2,7 @@ import {
   db,
   activities,
   activityLocations,
+  sessions,
   userFingerprints,
   anomalyEvents,
   type NewActivityLocation,
@@ -165,6 +166,23 @@ async function checkActivityAnomaly(
     ),
   });
 
+  // Get user's most recent session to check device
+  const recentSession = await db
+    .select({
+      deviceId: sessions.deviceId,
+      deviceName: sessions.deviceName,
+      clientName: sessions.clientName,
+    })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        eq(sessions.serverId, serverId)
+      )
+    )
+    .orderBy(desc(sessions.startTime))
+    .limit(1);
+
   // Get user's most recent geolocated activity (excluding current)
   const recentActivity = await db
     .select({
@@ -264,6 +282,7 @@ async function checkActivityAnomaly(
   // Check fingerprint-based anomalies
   if (fingerprint) {
     const knownCountries = (fingerprint.knownCountries as string[]) || [];
+    const knownCities = (fingerprint.knownCities as string[]) || [];
 
     const isNewCountry =
       geo.countryCode && !knownCountries.includes(geo.countryCode);
@@ -278,6 +297,52 @@ async function checkActivityAnomaly(
         severity: "medium",
         details: {
           description: `First access from ${geo.country}`,
+          currentLocation: {
+            country: geo.country || "",
+            city: geo.city,
+            latitude: geo.latitude,
+            longitude: geo.longitude,
+          },
+        },
+      });
+    } else if (geo.city && !knownCities.includes(geo.city)) {
+      // New city (but known country) = low severity
+      anomalies.push({
+        userId,
+        serverId,
+        activityId,
+        anomalyType: "new_location",
+        severity: "low",
+        details: {
+          description: `First access from ${geo.city}, ${geo.country}`,
+          currentLocation: {
+            country: geo.country || "",
+            city: geo.city,
+            latitude: geo.latitude,
+            longitude: geo.longitude,
+          },
+        },
+      });
+    }
+
+    // Check for new device
+    const knownDeviceIds = (fingerprint.knownDeviceIds as string[]) || [];
+    const latestSession = recentSession[0];
+    if (
+      latestSession?.deviceId &&
+      !knownDeviceIds.includes(latestSession.deviceId)
+    ) {
+      anomalies.push({
+        userId,
+        serverId,
+        activityId,
+        anomalyType: "new_device",
+        severity: "medium",
+        details: {
+          description: `First access from device: ${latestSession.deviceName || latestSession.deviceId}`,
+          deviceId: latestSession.deviceId,
+          deviceName: latestSession.deviceName ?? undefined,
+          clientName: latestSession.clientName ?? undefined,
           currentLocation: {
             country: geo.country || "",
             city: geo.city,
@@ -429,12 +494,26 @@ async function calculateUserFingerprint(
       and(eq(activities.userId, userId), eq(activities.serverId, serverId))
     );
 
-  if (userActivities.length === 0) return;
+  // Get device data from sessions
+  const userSessions = await db
+    .select({
+      deviceId: sessions.deviceId,
+      deviceName: sessions.deviceName,
+      clientName: sessions.clientName,
+    })
+    .from(sessions)
+    .where(
+      and(eq(sessions.userId, userId), eq(sessions.serverId, serverId))
+    );
+
+  if (userActivities.length === 0 && userSessions.length === 0) return;
 
   // Aggregate patterns
   const countrySet = new Set<string>();
   const citySet = new Set<string>();
   const hoursSet = new Set<number>();
+  const deviceIdSet = new Set<string>();
+  const clientSet = new Set<string>();
 
   const locationMap = new Map<
     string,
@@ -443,6 +522,17 @@ async function calculateUserFingerprint(
       city: string | null;
       latitude: number | null;
       longitude: number | null;
+      sessionCount: number;
+      lastSeenAt: string;
+    }
+  >();
+
+  const deviceMap = new Map<
+    string,
+    {
+      deviceId: string;
+      deviceName: string | null;
+      clientName: string | null;
       sessionCount: number;
       lastSeenAt: string;
     }
@@ -484,6 +574,26 @@ async function calculateUserFingerprint(
     }
   }
 
+  // Aggregate device data from sessions
+  for (const session of userSessions) {
+    if (session.deviceId) {
+      deviceIdSet.add(session.deviceId);
+      const existing = deviceMap.get(session.deviceId);
+      if (existing) {
+        existing.sessionCount++;
+      } else {
+        deviceMap.set(session.deviceId, {
+          deviceId: session.deviceId,
+          deviceName: session.deviceName,
+          clientName: session.clientName,
+          sessionCount: 1,
+          lastSeenAt: new Date().toISOString(),
+        });
+      }
+    }
+    if (session.clientName) clientSet.add(session.clientName);
+  }
+
   // Calculate avg activities per day
   const activityDates = new Set(
     userActivities
@@ -498,10 +608,10 @@ async function calculateUserFingerprint(
     serverId,
     knownCountries: Array.from(countrySet),
     knownCities: Array.from(citySet),
-    knownDeviceIds: [],
-    knownClients: [],
+    knownDeviceIds: Array.from(deviceIdSet),
+    knownClients: Array.from(clientSet),
     locationPatterns: Array.from(locationMap.values()),
-    devicePatterns: [],
+    devicePatterns: Array.from(deviceMap.values()),
     typicalHoursUtc: Array.from(hoursSet).sort((a, b) => a - b),
     avgSessionsPerDay,
     totalSessions: userActivities.length,

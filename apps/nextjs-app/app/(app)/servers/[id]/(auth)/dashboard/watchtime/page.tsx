@@ -11,7 +11,7 @@ import {
   getWatchTimePerWeekDay,
 } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
-import { Server } from "@streamystats/database/schema";
+import type { Server } from "@streamystats/database/schema";
 import { addDays } from "date-fns";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -49,7 +49,7 @@ export default async function WatchtimePage({
 
   if (!startDate || !endDate) {
     redirect(
-      `/servers/${server.id}/dashboard/watchtime?startDate=${startDateParam}&endDate=${endDateParam}`,
+      `/servers/${server.id}/dashboard/watchtime?startDate=${startDateParam}&endDate=${endDateParam}`
     );
   }
 

@@ -4,6 +4,7 @@ import { type LocationPoint, UserLocationMap } from "@/components/locations";
 import { AnomalyList } from "@/components/locations/AnomalyList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Card,
   CardContent,
@@ -11,6 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -26,18 +32,20 @@ import {
   triggerGeolocationBackfill,
   unresolveAnomaly,
 } from "@/lib/db/locations";
+import { format, isValid, parseISO } from "date-fns";
 import {
   AlertCircle,
-  AlertTriangle,
+  CalendarIcon,
   Globe,
-  Info,
   MapPin,
   RefreshCw,
   ShieldAlert,
   Users,
+  X,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import type { DateRange } from "react-day-picker";
 
 interface ServerSecurityContentProps {
   serverId: number;
@@ -53,6 +61,7 @@ interface ServerSecurityContentProps {
     unresolvedAnomalies: Record<string, number>;
     isBackfillRunning: boolean;
   };
+  users: { id: string; name: string }[];
 }
 
 export function ServerSecurityContent({
@@ -61,11 +70,65 @@ export function ServerSecurityContent({
   anomalies,
   severityBreakdown,
   stats,
+  users,
 }: ServerSecurityContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isBackfilling, setIsBackfilling] = useState(stats.isBackfillRunning);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  const hasLocationFilters =
+    searchParams.get("userId") ||
+    searchParams.get("dateFrom") ||
+    searchParams.get("dateTo");
+
+  const dateRange = useMemo((): DateRange | undefined => {
+    const fromStr = searchParams.get("dateFrom");
+    const toStr = searchParams.get("dateTo");
+    const from = fromStr ? parseISO(fromStr) : undefined;
+    const to = toStr ? parseISO(toStr) : undefined;
+    if (from && isValid(from) && to && isValid(to)) {
+      return { from, to };
+    }
+    if (from && isValid(from)) {
+      return { from };
+    }
+    return undefined;
+  }, [searchParams]);
+
+  const dateRangeLabel = useMemo(() => {
+    if (!dateRange?.from) return "Date range";
+    if (!dateRange.to) return format(dateRange.from, "MMM dd, yyyy");
+    return `${format(dateRange.from, "MMM dd")} - ${format(
+      dateRange.to,
+      "MMM dd, yyyy"
+    )}`;
+  }, [dateRange]);
+
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (range?.from) {
+      params.set("dateFrom", format(range.from, "yyyy-MM-dd"));
+    } else {
+      params.delete("dateFrom");
+    }
+    if (range?.to) {
+      params.set("dateTo", format(range.to, "yyyy-MM-dd"));
+      setDatePickerOpen(false);
+    } else {
+      params.delete("dateTo");
+    }
+    router.push(`?${params.toString()}`);
+  };
+
+  const clearLocationFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("userId");
+    params.delete("dateFrom");
+    params.delete("dateTo");
+    router.push(`?${params.toString()}`);
+  };
 
   const handleResolve = async (anomalyId: number, note?: string) => {
     await resolveAnomaly(serverId, anomalyId, { resolutionNote: note });
@@ -125,6 +188,10 @@ export function ServerSecurityContent({
     (a, b) => a + b,
     0
   );
+
+  // When filters are applied, show filtered count; otherwise show total unresolved
+  const filteredUnresolvedCount = anomalies.filter((a) => !a.resolved).length;
+  const badgeCount = hasLocationFilters ? filteredUnresolvedCount : totalUnresolved;
 
   return (
     <div className="space-y-6">
@@ -223,27 +290,79 @@ export function ServerSecurityContent({
       )}
 
       <Tabs defaultValue="map" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="map">Location Map</TabsTrigger>
-          <TabsTrigger value="anomalies" className="relative">
-            Anomalies
-            {totalUnresolved > 0 && (
-              <Badge
-                variant="destructive"
-                className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-              >
-                {totalUnresolved}
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <TabsList>
+            <TabsTrigger value="map">Location Map</TabsTrigger>
+            <TabsTrigger value="anomalies" className="relative">
+              Anomalies
+              {badgeCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                >
+                  {badgeCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="map">
+          <div className="flex items-center gap-2">
+            <Select
+              value={searchParams.get("userId") || "all"}
+              onValueChange={(value) => handleFilterChange("userId", value)}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="All users" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All users</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[200px] justify-start">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRangeLabel}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={handleDateRangeSelect}
+                  numberOfMonths={2}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            {hasLocationFilters && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={clearLocationFilters}
+                title="Clear filters"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <TabsContent value="map" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>User Locations</CardTitle>
               <CardDescription>
                 Geographic distribution of all user sessions
+                {hasLocationFilters && " (filtered)"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -301,6 +420,12 @@ export function ServerSecurityContent({
             onResolve={handleResolve}
             onUnresolve={handleUnresolve}
             onResolveAll={handleResolveAll}
+            hasFilters={
+              hasLocationFilters ||
+              !!searchParams.get("resolved") ||
+              !!searchParams.get("severity")
+            }
+            onClearFilters={() => router.push("?")}
           />
         </TabsContent>
       </Tabs>
