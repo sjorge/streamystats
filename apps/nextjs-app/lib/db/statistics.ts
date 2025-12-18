@@ -72,25 +72,28 @@ export async function getMostWatchedItems({
     }))
     .filter((stat) => stat.itemId); // Filter out null itemIds
 
-  // Then get the full item data for each item
-  const results = await Promise.all(
-    sessionStats.map(async (stat) => {
-      const item = await db.query.items.findFirst({
-        where: eq(items.id, stat.itemId!),
-      });
-      return {
-        item: item!,
-        totalPlayCount: stat.totalPlayCount,
-        totalPlayDuration: stat.totalPlayDuration,
-      };
-    }),
-  );
+  // Batch fetch all items in a single query instead of N+1 queries
+  const itemIds = sessionStats.map((stat) => stat.itemId);
+  const itemsData =
+    itemIds.length > 0
+      ? await db.select().from(items).where(inArray(items.id, itemIds))
+      : [];
 
-  const itemsWithStats: ItemWithStats[] = results.map((result) => ({
-    ...result.item,
-    totalPlayCount: Number(result.totalPlayCount),
-    totalPlayDuration: Number(result.totalPlayDuration || 0),
-  }));
+  // Create a map for O(1) lookup
+  const itemsMap = new Map(itemsData.map((item) => [item.id, item]));
+
+  // Combine session stats with item data
+  const itemsWithStats: ItemWithStats[] = sessionStats
+    .map((stat) => {
+      const item = itemsMap.get(stat.itemId);
+      if (!item) return null;
+      return {
+        ...item,
+        totalPlayCount: Number(stat.totalPlayCount),
+        totalPlayDuration: Number(stat.totalPlayDuration || 0),
+      };
+    })
+    .filter((item): item is ItemWithStats => item !== null);
 
   // Group by item type
   const grouped: MostWatchedItems = {

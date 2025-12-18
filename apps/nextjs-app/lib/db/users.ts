@@ -102,23 +102,23 @@ export const getWatchTimePerWeekDay = async ({
     whereConditions.push(lte(sessions.startTime, end));
   }
 
-  const sessionData = await db
+  // Use SQL GROUP BY for aggregation instead of fetching all rows
+  const result = await db
     .select({
-      weekDay: sql<string>`TO_CHAR(${sessions.startTime}, 'Day')`.as("weekDay"),
-      dayOfWeek: sql<number>`EXTRACT(DOW FROM ${sessions.startTime})`.as(
-        "dayOfWeek",
+      weekDay: sql<string>`TRIM(TO_CHAR(${sessions.startTime}, 'Day'))`.as(
+        "weekDay"
       ),
-      playDuration: sessions.playDuration,
+      watchTime: sum(sessions.playDuration).as("watchTime"),
     })
     .from(sessions)
-    .where(and(...whereConditions));
+    .where(and(...whereConditions))
+    .groupBy(sql`TRIM(TO_CHAR(${sessions.startTime}, 'Day'))`);
 
-  // Group and sum manually
+  // Convert to map for easy lookup
   const resultMap: Record<string, number> = {};
-  for (const session of sessionData) {
-    if (session.weekDay && session.playDuration) {
-      const day = session.weekDay.trim();
-      resultMap[day] = (resultMap[day] || 0) + session.playDuration;
+  for (const row of result) {
+    if (row.weekDay) {
+      resultMap[row.weekDay] = Number(row.watchTime || 0);
     }
   }
 
@@ -170,31 +170,21 @@ export const getWatchTimePerHour = async ({
     whereConditions.push(lte(sessions.startTime, end));
   }
 
-  // Get sessions with their hour information
-  const sessionData = await db
+  // Use SQL GROUP BY for aggregation instead of fetching all rows
+  const result = await db
     .select({
       hour: sql<number>`EXTRACT(HOUR FROM ${sessions.startTime})`.as("hour"),
-      playDuration: sessions.playDuration,
+      watchTime: sum(sessions.playDuration).as("watchTime"),
     })
     .from(sessions)
-    .where(and(...whereConditions));
+    .where(and(...whereConditions))
+    .groupBy(sql`EXTRACT(HOUR FROM ${sessions.startTime})`)
+    .orderBy(sql`EXTRACT(HOUR FROM ${sessions.startTime})`);
 
-  // Group and sum manually
-  const hourMap: Record<number, number> = {};
-  for (const session of sessionData) {
-    if (session.hour !== null && session.playDuration) {
-      hourMap[session.hour] =
-        (hourMap[session.hour] || 0) + session.playDuration;
-    }
-  }
-
-  // Convert to array and sort by hour
-  return Object.entries(hourMap)
-    .map(([hour, watchTime]) => ({
-      hour: Number(hour),
-      watchTime: watchTime,
-    }))
-    .sort((a, b) => a.hour - b.hour);
+  return result.map((row) => ({
+    hour: Number(row.hour),
+    watchTime: Number(row.watchTime || 0),
+  }));
 };
 
 export const getTotalWatchTime = async ({

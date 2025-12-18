@@ -269,11 +269,14 @@ exports.items = (0, pg_core_1.pgTable)("items", {
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
     // Soft delete
     deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
-}
+}, 
 // Note: Vector index must be created manually per dimension using:
 // CREATE INDEX items_embedding_idx ON items USING hnsw ((embedding::vector(N)) vector_cosine_ops)
 // WHERE vector_dims(embedding) = N;
-);
+(table) => [
+    (0, pg_core_1.index)("items_server_type_idx").on(table.serverId, table.type),
+    (0, pg_core_1.index)("items_series_id_idx").on(table.seriesId),
+]);
 // Sessions table - user sessions and playback information
 exports.sessions = (0, pg_core_1.pgTable)("sessions", {
     // Primary key and relationships
@@ -351,7 +354,14 @@ exports.sessions = (0, pg_core_1.pgTable)("sessions", {
     // Timestamps
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+    // Performance indexes for common query patterns
+    (0, pg_core_1.index)("sessions_server_user_idx").on(table.serverId, table.userId),
+    (0, pg_core_1.index)("sessions_server_item_idx").on(table.serverId, table.itemId),
+    (0, pg_core_1.index)("sessions_server_created_at_idx").on(table.serverId, table.createdAt),
+    (0, pg_core_1.index)("sessions_server_start_time_idx").on(table.serverId, table.startTime),
+    (0, pg_core_1.index)("sessions_user_start_time_idx").on(table.userId, table.startTime),
+]);
 // Hidden recommendations table - stores user's hidden recommendations
 exports.hiddenRecommendations = (0, pg_core_1.pgTable)("hidden_recommendations", {
     id: (0, pg_core_1.serial)("id").primaryKey(),

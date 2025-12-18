@@ -362,105 +362,124 @@ export const items = pgTable(
 
     // Soft delete
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
-  }
+  },
   // Note: Vector index must be created manually per dimension using:
   // CREATE INDEX items_embedding_idx ON items USING hnsw ((embedding::vector(N)) vector_cosine_ops)
   // WHERE vector_dims(embedding) = N;
+  (table) => [
+    index("items_server_type_idx").on(table.serverId, table.type),
+    index("items_series_id_idx").on(table.seriesId),
+  ]
 );
 
 // Sessions table - user sessions and playback information
-export const sessions = pgTable("sessions", {
-  // Primary key and relationships
-  id: text("id").primaryKey(), // Session ID from Jellyfin or generated UUID
-  serverId: integer("server_id")
-    .notNull()
-    .references(() => servers.id, { onDelete: "cascade" }),
-  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
-  itemId: text("item_id").references(() => items.id, { onDelete: "set null" }),
+export const sessions = pgTable(
+  "sessions",
+  {
+    // Primary key and relationships
+    id: text("id").primaryKey(), // Session ID from Jellyfin or generated UUID
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    itemId: text("item_id").references(() => items.id, {
+      onDelete: "set null",
+    }),
 
-  // User information
-  userName: text("user_name").notNull(),
-  userServerId: text("user_server_id"), // User ID from Jellyfin server
+    // User information
+    userName: text("user_name").notNull(),
+    userServerId: text("user_server_id"), // User ID from Jellyfin server
 
-  // Device information
-  deviceId: text("device_id"),
-  deviceName: text("device_name"),
-  clientName: text("client_name"),
-  applicationVersion: text("application_version"),
-  remoteEndPoint: text("remote_end_point"),
+    // Device information
+    deviceId: text("device_id"),
+    deviceName: text("device_name"),
+    clientName: text("client_name"),
+    applicationVersion: text("application_version"),
+    remoteEndPoint: text("remote_end_point"),
 
-  // Media item information
-  itemName: text("item_name"),
-  seriesId: text("series_id"),
-  seriesName: text("series_name"),
-  seasonId: text("season_id"),
+    // Media item information
+    itemName: text("item_name"),
+    seriesId: text("series_id"),
+    seriesName: text("series_name"),
+    seasonId: text("season_id"),
 
-  // Playback timing
-  playDuration: integer("play_duration"), // in seconds
-  startTime: timestamp("start_time", { withTimezone: true }),
-  endTime: timestamp("end_time", { withTimezone: true }),
-  lastActivityDate: timestamp("last_activity_date", { withTimezone: true }),
-  lastPlaybackCheckIn: timestamp("last_playback_check_in", {
-    withTimezone: true,
-  }),
+    // Playback timing
+    playDuration: integer("play_duration"), // in seconds
+    startTime: timestamp("start_time", { withTimezone: true }),
+    endTime: timestamp("end_time", { withTimezone: true }),
+    lastActivityDate: timestamp("last_activity_date", { withTimezone: true }),
+    lastPlaybackCheckIn: timestamp("last_playback_check_in", {
+      withTimezone: true,
+    }),
 
-  // Playback position and progress
-  runtimeTicks: bigint("runtime_ticks", { mode: "number" }),
-  positionTicks: bigint("position_ticks", { mode: "number" }),
-  percentComplete: doublePrecision("percent_complete"),
+    // Playback position and progress
+    runtimeTicks: bigint("runtime_ticks", { mode: "number" }),
+    positionTicks: bigint("position_ticks", { mode: "number" }),
+    percentComplete: doublePrecision("percent_complete"),
 
-  // Playback state
-  completed: boolean("completed").notNull(),
-  isPaused: boolean("is_paused").notNull(),
-  isMuted: boolean("is_muted").notNull(),
-  isActive: boolean("is_active").notNull(),
+    // Playback state
+    completed: boolean("completed").notNull(),
+    isPaused: boolean("is_paused").notNull(),
+    isMuted: boolean("is_muted").notNull(),
+    isActive: boolean("is_active").notNull(),
 
-  // Audio/Video settings
-  volumeLevel: integer("volume_level"),
-  audioStreamIndex: integer("audio_stream_index"),
-  subtitleStreamIndex: integer("subtitle_stream_index"),
-  playMethod: text("play_method"), // DirectPlay, DirectStream, Transcode
-  mediaSourceId: text("media_source_id"),
-  repeatMode: text("repeat_mode"),
-  playbackOrder: text("playback_order"),
+    // Audio/Video settings
+    volumeLevel: integer("volume_level"),
+    audioStreamIndex: integer("audio_stream_index"),
+    subtitleStreamIndex: integer("subtitle_stream_index"),
+    playMethod: text("play_method"), // DirectPlay, DirectStream, Transcode
+    mediaSourceId: text("media_source_id"),
+    repeatMode: text("repeat_mode"),
+    playbackOrder: text("playback_order"),
 
-  // Media stream information
-  videoCodec: text("video_codec"),
-  audioCodec: text("audio_codec"),
-  resolutionWidth: integer("resolution_width"),
-  resolutionHeight: integer("resolution_height"),
-  videoBitRate: integer("video_bit_rate"),
-  audioBitRate: integer("audio_bit_rate"),
-  audioChannels: integer("audio_channels"),
-  audioSampleRate: integer("audio_sample_rate"),
-  videoRangeType: text("video_range_type"),
+    // Media stream information
+    videoCodec: text("video_codec"),
+    audioCodec: text("audio_codec"),
+    resolutionWidth: integer("resolution_width"),
+    resolutionHeight: integer("resolution_height"),
+    videoBitRate: integer("video_bit_rate"),
+    audioBitRate: integer("audio_bit_rate"),
+    audioChannels: integer("audio_channels"),
+    audioSampleRate: integer("audio_sample_rate"),
+    videoRangeType: text("video_range_type"),
 
-  // Transcoding information
-  isTranscoded: boolean("is_transcoded").notNull().default(false),
-  transcodingWidth: integer("transcoding_width"),
-  transcodingHeight: integer("transcoding_height"),
-  transcodingVideoCodec: text("transcoding_video_codec"),
-  transcodingAudioCodec: text("transcoding_audio_codec"),
-  transcodingContainer: text("transcoding_container"),
-  transcodingIsVideoDirect: boolean("transcoding_is_video_direct"),
-  transcodingIsAudioDirect: boolean("transcoding_is_audio_direct"),
-  transcodingBitrate: integer("transcoding_bitrate"),
-  transcodingCompletionPercentage: doublePrecision(
-    "transcoding_completion_percentage"
-  ),
-  transcodingAudioChannels: integer("transcoding_audio_channels"),
-  transcodingHardwareAccelerationType: text(
-    "transcoding_hardware_acceleration_type"
-  ),
-  transcodeReasons: text("transcode_reasons").array(),
+    // Transcoding information
+    isTranscoded: boolean("is_transcoded").notNull().default(false),
+    transcodingWidth: integer("transcoding_width"),
+    transcodingHeight: integer("transcoding_height"),
+    transcodingVideoCodec: text("transcoding_video_codec"),
+    transcodingAudioCodec: text("transcoding_audio_codec"),
+    transcodingContainer: text("transcoding_container"),
+    transcodingIsVideoDirect: boolean("transcoding_is_video_direct"),
+    transcodingIsAudioDirect: boolean("transcoding_is_audio_direct"),
+    transcodingBitrate: integer("transcoding_bitrate"),
+    transcodingCompletionPercentage: doublePrecision(
+      "transcoding_completion_percentage"
+    ),
+    transcodingAudioChannels: integer("transcoding_audio_channels"),
+    transcodingHardwareAccelerationType: text(
+      "transcoding_hardware_acceleration_type"
+    ),
+    transcodeReasons: text("transcode_reasons").array(),
 
-  // Hybrid approach - complete session data
-  rawData: jsonb("raw_data").notNull(), // Full Jellyfin session data
+    // Hybrid approach - complete session data
+    rawData: jsonb("raw_data").notNull(), // Full Jellyfin session data
 
-  // Timestamps
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Performance indexes for common query patterns
+    index("sessions_server_user_idx").on(table.serverId, table.userId),
+    index("sessions_server_item_idx").on(table.serverId, table.itemId),
+    index("sessions_server_created_at_idx").on(table.serverId, table.createdAt),
+    index("sessions_server_start_time_idx").on(table.serverId, table.startTime),
+    index("sessions_user_start_time_idx").on(table.userId, table.startTime),
+  ]
+);
 
 // Hidden recommendations table - stores user's hidden recommendations
 export const hiddenRecommendations = pgTable("hidden_recommendations", {
