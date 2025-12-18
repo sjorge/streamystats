@@ -32,9 +32,64 @@ interface PlaybackReportingData {
   durationSeconds?: number;
 }
 
+// Helper to get a value from multiple possible keys, returning undefined if none found
+function getValue(
+  record: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+// Helper to build PlaybackReportingData with only defined properties
+function buildPlaybackData(
+  timestamp: string,
+  record: Record<string, unknown>,
+  durationSeconds?: number
+): PlaybackReportingData {
+  const data: PlaybackReportingData = { timestamp };
+
+  const userId = getValue(record, "userId", "user_id", "UserId");
+  if (userId) data.userId = userId;
+
+  const itemId = getValue(record, "itemId", "item_id", "ItemId");
+  if (itemId) data.itemId = itemId;
+
+  const itemType = getValue(record, "itemType", "item_type", "Type");
+  if (itemType) data.itemType = itemType;
+
+  const itemName = getValue(record, "itemName", "item_name", "Name");
+  if (itemName) data.itemName = itemName;
+
+  const playMethod = getValue(
+    record,
+    "playMethod",
+    "play_method",
+    "PlayMethod"
+  );
+  if (playMethod) data.playMethod = playMethod;
+
+  const clientName = getValue(record, "clientName", "client_name", "Client");
+  if (clientName) data.clientName = clientName;
+
+  const deviceName = getValue(record, "deviceName", "device_name", "Device");
+  if (deviceName) data.deviceName = deviceName;
+
+  if (durationSeconds !== undefined && !Number.isNaN(durationSeconds)) {
+    data.durationSeconds = durationSeconds;
+  }
+
+  return data;
+}
+
 export async function importFromPlaybackReporting(
   prevState: ImportState,
-  formData: FormData,
+  formData: FormData
 ): Promise<ImportState> {
   console.info("Starting Playback Reporting import process");
 
@@ -44,7 +99,7 @@ export async function importFromPlaybackReporting(
     error?: string;
   } {
     console.info(
-      `Validating playback reporting data with ${data.length} records`,
+      `Validating playback reporting data with ${data.length} records`
     );
 
     if (!Array.isArray(data)) {
@@ -67,8 +122,8 @@ export async function importFromPlaybackReporting(
 
     console.info(
       `Validating sample of ${sampleSize} records for required fields: ${requiredFields.join(
-        ", ",
-      )}`,
+        ", "
+      )}`
     );
 
     for (let i = 0; i < sampleSize; i++) {
@@ -209,7 +264,7 @@ export async function importFromPlaybackReporting(
 
     // Process import
     console.info(
-      `Starting import of ${data.length} sessions for server ${serverIdNum}`,
+      `Starting import of ${data.length} sessions for server ${serverIdNum}`
     );
     let importedCount = 0;
     const totalCount = data.length;
@@ -220,13 +275,13 @@ export async function importFromPlaybackReporting(
       try {
         const imported = await importPlaybackReportingSession(
           playbackData,
-          serverIdNum,
+          serverIdNum
         );
         if (imported) {
           importedCount++;
           if (importedCount % 100 === 0) {
             console.info(
-              `Import progress: ${importedCount}/${totalCount} sessions imported`,
+              `Import progress: ${importedCount}/${totalCount} sessions imported`
             );
           }
         } else {
@@ -293,7 +348,7 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
       skippedLines++;
       console.warn(
         `Skipping line ${i + 1}: insufficient columns (${columns.length}/9)`,
-        { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
+        { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") }
       );
       continue;
     }
@@ -311,29 +366,27 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
         durationSecondsStr,
       ] = columns;
 
-      const durationSeconds = Number.parseInt(durationSecondsStr, 10);
-      if (Number.isNaN(durationSeconds)) {
+      const parsedDuration = Number.parseInt(durationSecondsStr, 10);
+      if (Number.isNaN(parsedDuration)) {
         skippedLines++;
         console.warn(
           `Skipping line ${i + 1}: invalid duration "${durationSecondsStr}"`,
-          { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
+          { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") }
         );
         continue;
       }
 
-      data.push({
-        timestamp: timestamp.trim(),
-        userId: userId.trim() || undefined,
-        itemId: itemId.trim() || undefined,
-        itemType: itemType.trim() || undefined,
-        itemName: itemName.trim() || undefined,
-        playMethod: playMethod.trim() || undefined,
-        clientName: clientName.trim() || undefined,
-        deviceName: deviceName.trim() || undefined,
-        durationSeconds: Number.isNaN(durationSeconds)
-          ? undefined
-          : durationSeconds,
-      });
+      const record: Record<string, unknown> = {
+        userId,
+        itemId,
+        itemType,
+        itemName,
+        playMethod,
+        clientName,
+        deviceName,
+      };
+
+      data.push(buildPlaybackData(timestamp.trim(), record, parsedDuration));
     } catch (error) {
       skippedLines++;
       console.warn(`Error parsing line ${i + 1}:`, {
@@ -344,13 +397,13 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
   }
 
   console.info(
-    `TSV parsing completed: ${data.length} valid records, ${skippedLines} skipped lines`,
+    `TSV parsing completed: ${data.length} valid records, ${skippedLines} skipped lines`
   );
   return data;
 }
 
 function parsePlaybackReportingJson(
-  jsonData: unknown,
+  jsonData: unknown
 ): PlaybackReportingData[] {
   console.info("Starting JSON parsing", {
     dataType: typeof jsonData,
@@ -367,50 +420,19 @@ function parsePlaybackReportingJson(
 
       const record = item as Record<string, unknown>;
       try {
+        const timestamp =
+          getValue(record, "timestamp", "date", "time") ||
+          new Date().toISOString();
+
         const durationValue =
-          (record.durationSeconds as string | undefined) ||
-          (record.duration_seconds as string | undefined) ||
-          (record.Duration as string | undefined) ||
+          getValue(record, "durationSeconds", "duration_seconds", "Duration") ||
           "0";
         const parsedDuration = Number.parseInt(durationValue, 10);
+        const durationSeconds = Number.isNaN(parsedDuration)
+          ? undefined
+          : parsedDuration;
 
-        return {
-          timestamp:
-            (record.timestamp as string | undefined) ||
-            (record.date as string | undefined) ||
-            (record.time as string | undefined),
-          userId:
-            (record.userId as string | undefined) ||
-            (record.user_id as string | undefined) ||
-            (record.UserId as string | undefined),
-          itemId:
-            (record.itemId as string | undefined) ||
-            (record.item_id as string | undefined) ||
-            (record.ItemId as string | undefined),
-          itemType:
-            (record.itemType as string | undefined) ||
-            (record.item_type as string | undefined) ||
-            (record.Type as string | undefined),
-          itemName:
-            (record.itemName as string | undefined) ||
-            (record.item_name as string | undefined) ||
-            (record.Name as string | undefined),
-          playMethod:
-            (record.playMethod as string | undefined) ||
-            (record.play_method as string | undefined) ||
-            (record.PlayMethod as string | undefined),
-          clientName:
-            (record.clientName as string | undefined) ||
-            (record.client_name as string | undefined) ||
-            (record.Client as string | undefined),
-          deviceName:
-            (record.deviceName as string | undefined) ||
-            (record.device_name as string | undefined) ||
-            (record.Device as string | undefined),
-          durationSeconds: Number.isNaN(parsedDuration)
-            ? undefined
-            : parsedDuration,
-        };
+        return buildPlaybackData(timestamp, record, durationSeconds);
       } catch (error) {
         console.error(`Error parsing JSON item at index ${index}:`, {
           error: error instanceof Error ? error.message : "Unknown error",
@@ -422,20 +444,32 @@ function parsePlaybackReportingJson(
   }
 
   // If it's not an array, try to extract from a nested structure
-  if (jsonData.sessions || jsonData.data) {
-    console.info("Found nested data structure, extracting sessions/data");
-    return parsePlaybackReportingJson(jsonData.sessions || jsonData.data);
+  if (
+    typeof jsonData === "object" &&
+    jsonData !== null &&
+    !Array.isArray(jsonData)
+  ) {
+    const obj = jsonData as Record<string, unknown>;
+    if (obj.sessions || obj.data) {
+      console.info("Found nested data structure, extracting sessions/data");
+      return parsePlaybackReportingJson(obj.sessions || obj.data);
+    }
   }
 
   console.error("Unrecognized JSON format", {
-    jsonData: typeof jsonData === "object" ? Object.keys(jsonData) : jsonData,
+    jsonData:
+      typeof jsonData === "object" &&
+      jsonData !== null &&
+      !Array.isArray(jsonData)
+        ? Object.keys(jsonData)
+        : jsonData,
   });
   throw new Error("Unrecognized JSON format");
 }
 
 async function importPlaybackReportingSession(
   playbackData: PlaybackReportingData,
-  serverId: number,
+  serverId: number
 ): Promise<boolean> {
   // Only validate timestamp as required - allow missing users or items
   if (!playbackData.timestamp) {
@@ -453,7 +487,7 @@ async function importPlaybackReportingSession(
   } catch (error) {
     console.warn(
       `Skipping session: invalid timestamp "${playbackData.timestamp}"`,
-      { playbackData, error },
+      { playbackData, error }
     );
     return false;
   }
@@ -476,7 +510,7 @@ async function importPlaybackReportingSession(
 
         if (existingItem.length === 0) {
           missingReferences.push(
-            `itemId '${playbackData.itemId}' not found in items table - setting to null`,
+            `itemId '${playbackData.itemId}' not found in items table - setting to null`
           );
           finalItemId = null; // Set to null instead of failing
           console.warn("Item reference not found, setting to null:", {
@@ -493,7 +527,7 @@ async function importPlaybackReportingSession(
         missingReferences.push(
           `Failed to verify itemId '${playbackData.itemId}', setting to null: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`,
+          }`
         );
         finalItemId = null; // Set to null on error
       }
@@ -510,7 +544,7 @@ async function importPlaybackReportingSession(
 
         if (existingUser.length === 0) {
           missingReferences.push(
-            `userId '${playbackData.userId}' not found in users table - setting to null`,
+            `userId '${playbackData.userId}' not found in users table - setting to null`
           );
           finalUserId = null; // Set to null instead of failing
           console.warn("User reference not found, setting to null:", {
@@ -532,7 +566,7 @@ async function importPlaybackReportingSession(
         missingReferences.push(
           `Failed to verify userId '${playbackData.userId}', setting to null: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`,
+          }`
         );
         finalUserId = null; // Set to null on error
       }
@@ -553,7 +587,7 @@ async function importPlaybackReportingSession(
 
     // Calculate end time based on duration
     const endTime = new Date(
-      sessionTime.getTime() + (playbackData.durationSeconds || 0) * 1000,
+      sessionTime.getTime() + (playbackData.durationSeconds || 0) * 1000
     );
 
     // Determine if transcoding based on play method
@@ -567,14 +601,14 @@ async function importPlaybackReportingSession(
       if (videoCodecIdx !== -1) {
         videoCodec = playMethod.substring(
           videoCodecIdx + 2, // Skip "v:"
-          playMethod.indexOf(" ", videoCodecIdx),
+          playMethod.indexOf(" ", videoCodecIdx)
         );
       }
       const audioCodecIdx = playMethod.indexOf("a:");
       if (audioCodecIdx !== -1) {
         audioCodec = playMethod.substring(
           audioCodecIdx + 2, // Skip "a:"
-          playMethod.indexOf(")", audioCodecIdx),
+          playMethod.indexOf(")", audioCodecIdx)
         );
       }
     }

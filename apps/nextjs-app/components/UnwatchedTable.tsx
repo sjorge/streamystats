@@ -85,7 +85,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchDebounce(search);
-      if (page !== 1) setPage(1); // Reset to page 1 when search changes
+      setPage(1); // Reset to page 1 when search changes
     }, 300);
 
     return () => clearTimeout(timer);
@@ -109,7 +109,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
         >
           1
         </PaginationLink>
-      </PaginationItem>,
+      </PaginationItem>
     );
 
     // If there are too many pages, use ellipsis
@@ -121,7 +121,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
         items.push(
           <PaginationItem key="ellipsis-start">
             <PaginationEllipsis />
-          </PaginationItem>,
+          </PaginationItem>
         );
       }
 
@@ -138,7 +138,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
             >
               {i}
             </PaginationLink>
-          </PaginationItem>,
+          </PaginationItem>
         );
       }
 
@@ -146,7 +146,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
         items.push(
           <PaginationItem key="ellipsis-end">
             <PaginationEllipsis />
-          </PaginationItem>,
+          </PaginationItem>
         );
       }
     } else {
@@ -164,7 +164,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
             >
               {i}
             </PaginationLink>
-          </PaginationItem>,
+          </PaginationItem>
         );
       }
     }
@@ -183,7 +183,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
           >
             {totalPages}
           </PaginationLink>
-        </PaginationItem>,
+        </PaginationItem>
       );
     }
 
@@ -257,7 +257,9 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
                     {new Date(item.date_created).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    {formatMinutes(item.runtime_ticks / 600000000)}
+                    {item.runtime_ticks
+                      ? formatMinutes(item.runtime_ticks / 600000000)
+                      : "Unknown"}
                   </TableCell>
                 </TableRow>
               ))

@@ -9,7 +9,7 @@ import type {
 
 export async function importFromLegacy(
   prevState: LegacyImportState,
-  formData: FormData,
+  formData: FormData
 ): Promise<LegacyImportState> {
   try {
     const serverId = formData.get("serverId");
@@ -72,7 +72,7 @@ export async function importFromLegacy(
       } catch (error) {
         console.error(
           `Failed to import legacy session ${legacySession.id}:`,
-          error,
+          error
         );
         errorCount++;
         // Continue with other sessions
@@ -96,7 +96,7 @@ export async function importFromLegacy(
 
 async function importLegacySession(
   legacySession: LegacySessionData,
-  serverId: number,
+  serverId: number
 ): Promise<boolean> {
   // Validate required fields
   if (
@@ -287,21 +287,33 @@ function validateLegacyData(data: unknown): {
     }
 
     // Validate date format
-    if (session.start_time && Number.isNaN(Date.parse(session.start_time))) {
+    if (
+      session.start_time &&
+      typeof session.start_time === "string" &&
+      Number.isNaN(Date.parse(session.start_time))
+    ) {
       return {
         isValid: false,
         error: `Invalid date format for start_time at index ${i}`,
       };
     }
 
-    if (session.end_time && Number.isNaN(Date.parse(session.end_time))) {
+    if (
+      session.end_time &&
+      typeof session.end_time === "string" &&
+      Number.isNaN(Date.parse(session.end_time))
+    ) {
       return {
         isValid: false,
         error: `Invalid date format for end_time at index ${i}`,
       };
     }
 
-    if (session.inserted_at && Number.isNaN(Date.parse(session.inserted_at))) {
+    if (
+      session.inserted_at &&
+      typeof session.inserted_at === "string" &&
+      Number.isNaN(Date.parse(session.inserted_at))
+    ) {
       return {
         isValid: false,
         error: `Invalid date format for inserted_at at index ${i}`,
