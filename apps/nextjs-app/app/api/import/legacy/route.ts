@@ -11,8 +11,6 @@ import { NextResponse } from "next/server";
 import { parser } from "stream-json";
 // @ts-ignore - stream-json doesn't have types
 import { streamArray } from "stream-json/streamers/StreamArray";
-
-export const dynamic = "force-dynamic";
 import { v4 as uuidv4 } from "uuid";
 
 export const runtime = "nodejs";

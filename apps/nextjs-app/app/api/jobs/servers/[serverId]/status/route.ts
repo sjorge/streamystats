@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { requireAdmin } from "@/lib/api-auth";
 
 export async function GET(

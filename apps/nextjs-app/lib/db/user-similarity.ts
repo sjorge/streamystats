@@ -1,3 +1,5 @@
+"use cache";
+
 import { type User, db, items, sessions, users } from "@streamystats/database";
 import {
   and,
@@ -10,11 +12,8 @@ import {
   sql,
   sum,
 } from "drizzle-orm";
+import { cacheLife, cacheTag } from "next/cache";
 import { getUsers } from "./users";
-
-import { unstable_cache } from "next/cache";
-
-const CACHE_TTL = 60 * 60 * 24; // 1 day
 
 // Helper for cosine similarity in memory
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
@@ -62,123 +61,115 @@ interface UserTopItemsResult {
   items: ItemInfo[];
 }
 
-const getUserTopItemsWithEmbeddings = async (
+async function getUserTopItemsWithEmbeddings(
   serverId: number,
   userId: string,
   startDate?: Date,
   endDate?: Date,
-): Promise<UserTopItemsResult> => {
-  return unstable_cache(
-    async () => {
-      const whereConditions = [
-        eq(sessions.serverId, serverId),
-        eq(sessions.userId, userId),
-        isNotNull(sessions.playDuration),
-      ];
+): Promise<UserTopItemsResult> {
+  "use cache";
+  cacheLife("days");
+  cacheTag(
+    `user-top-items-${serverId}-${userId}${startDate ? `-${startDate.toISOString()}` : ""}${endDate ? `-${endDate.toISOString()}` : ""}`,
+  );
 
-      if (startDate) {
-        whereConditions.push(gte(sessions.startTime, startDate));
-      }
-      if (endDate) {
-        whereConditions.push(lte(sessions.startTime, endDate));
-      }
+  const whereConditions = [
+    eq(sessions.serverId, serverId),
+    eq(sessions.userId, userId),
+    isNotNull(sessions.playDuration),
+  ];
 
-      // Helper to get top items of a specific type
-      const getTopItemsByType = async (
-        type: "Movie" | "Series",
-      ): Promise<ItemInfo[]> => {
-        if (type === "Series") {
-          const topSeries = await db
-            .select({
-              id: sessions.seriesId,
-              duration: sum(sessions.playDuration),
-            })
-            .from(sessions)
-            .innerJoin(items, eq(sessions.itemId, items.id))
-            .where(and(...whereConditions, isNotNull(sessions.seriesId)))
-            .groupBy(sessions.seriesId)
-            .orderBy(desc(sum(sessions.playDuration)))
-            .limit(50);
+  if (startDate) {
+    whereConditions.push(gte(sessions.startTime, startDate));
+  }
+  if (endDate) {
+    whereConditions.push(lte(sessions.startTime, endDate));
+  }
 
-          if (topSeries.length === 0) return [];
+  // Helper to get top items of a specific type
+  const getTopItemsByType = async (
+    type: "Movie" | "Series",
+  ): Promise<ItemInfo[]> => {
+    if (type === "Series") {
+      const topSeries = await db
+        .select({
+          id: sessions.seriesId,
+          duration: sum(sessions.playDuration),
+        })
+        .from(sessions)
+        .innerJoin(items, eq(sessions.itemId, items.id))
+        .where(and(...whereConditions, isNotNull(sessions.seriesId)))
+        .groupBy(sessions.seriesId)
+        .orderBy(desc(sum(sessions.playDuration)))
+        .limit(50);
 
-          const seriesIds = topSeries
-            .map((s) => s.id)
-            .filter((id) => id !== null) as string[];
+      if (topSeries.length === 0) return [];
 
-          const seriesItems = await db
-            .select({
-              id: items.id,
-              name: items.name,
-              type: items.type,
-              embedding: items.embedding,
-              genres: items.genres,
-            })
-            .from(items)
-            .where(
-              and(inArray(items.id, seriesIds), isNotNull(items.embedding)),
-            );
+      const seriesIds = topSeries
+        .map((s) => s.id)
+        .filter((id) => id !== null) as string[];
 
-          return seriesItems;
-        }
-        // Movies
-        const topMovies = await db
-          .select({
-            id: sessions.itemId,
-            duration: sum(sessions.playDuration),
-          })
-          .from(sessions)
-          .innerJoin(items, eq(sessions.itemId, items.id))
-          .where(and(...whereConditions, eq(items.type, "Movie")))
-          .groupBy(sessions.itemId)
-          .orderBy(desc(sum(sessions.playDuration)))
-          .limit(50);
+      const seriesItems = await db
+        .select({
+          id: items.id,
+          name: items.name,
+          type: items.type,
+          embedding: items.embedding,
+          genres: items.genres,
+        })
+        .from(items)
+        .where(and(inArray(items.id, seriesIds), isNotNull(items.embedding)));
 
-        if (topMovies.length === 0) return [];
+      return seriesItems;
+    }
+    // Movies
+    const topMovies = await db
+      .select({
+        id: sessions.itemId,
+        duration: sum(sessions.playDuration),
+      })
+      .from(sessions)
+      .innerJoin(items, eq(sessions.itemId, items.id))
+      .where(and(...whereConditions, eq(items.type, "Movie")))
+      .groupBy(sessions.itemId)
+      .orderBy(desc(sum(sessions.playDuration)))
+      .limit(50);
 
-        const movieIds = topMovies
-          .map((m) => m.id)
-          .filter((id) => id !== null) as string[];
+    if (topMovies.length === 0) return [];
 
-        const movieItems = await db
-          .select({
-            id: items.id,
-            name: items.name,
-            type: items.type,
-            embedding: items.embedding,
-            genres: items.genres,
-          })
-          .from(items)
-          .where(and(inArray(items.id, movieIds), isNotNull(items.embedding)));
+    const movieIds = topMovies
+      .map((m) => m.id)
+      .filter((id) => id !== null) as string[];
 
-        return movieItems;
-      };
+    const movieItems = await db
+      .select({
+        id: items.id,
+        name: items.name,
+        type: items.type,
+        embedding: items.embedding,
+        genres: items.genres,
+      })
+      .from(items)
+      .where(and(inArray(items.id, movieIds), isNotNull(items.embedding)));
 
-      const [movieItems, seriesItems] = await Promise.all([
-        getTopItemsByType("Movie"),
-        getTopItemsByType("Series"),
-      ]);
+    return movieItems;
+  };
 
-      const allItems = [...movieItems, ...seriesItems];
-      const allEmbeddings = allItems
-        .map((item) => item.embedding)
-        .filter((e) => e !== null) as number[][];
+  const [movieItems, seriesItems] = await Promise.all([
+    getTopItemsByType("Movie"),
+    getTopItemsByType("Series"),
+  ]);
 
-      return {
-        embedding: averageEmbeddings(allEmbeddings),
-        items: allItems,
-      };
-    },
-    [
-      "user-top-items-with-embeddings",
-      String(serverId),
-      userId,
-      startDate ? startDate.toISOString() : "all-time",
-      endDate ? endDate.toISOString() : "all-time",
-    ],
-    { revalidate: CACHE_TTL },
-  )();
-};
+  const allItems = [...movieItems, ...seriesItems];
+  const allEmbeddings = allItems
+    .map((item) => item.embedding)
+    .filter((e) => e !== null) as number[][];
+
+  return {
+    embedding: averageEmbeddings(allEmbeddings),
+    items: allItems,
+  };
+}
 
 export interface SimilarItemPair {
   itemA: { id: string; name: string };
@@ -250,134 +241,132 @@ const findSimilarItemPairs = (
   return pairs;
 };
 
-export const getSimilarUsers = async (
+export async function getSimilarUsers(
   serverId: string | number,
   targetUserId: string,
-): Promise<UserSimilarityResult> => {
-  return unstable_cache(
-    async () => {
-      const serverIdNum = Number(serverId);
-      const allUsers = await getUsers({ serverId: serverIdNum });
+): Promise<UserSimilarityResult> {
+  "use cache";
+  cacheLife("days");
+  cacheTag(`similar-users-${serverId}-${targetUserId}`);
 
-      // Filter out the target user from the list of candidates (we compare against them)
-      const otherUsers = allUsers.filter((u) => u.id !== targetUserId);
-      if (otherUsers.length === 0) {
-        return { overall: [], thisMonth: [] };
-      }
+  const serverIdNum = Number(serverId);
+  const allUsers = await getUsers({ serverId: serverIdNum });
 
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth() + 1,
-        0,
-        23,
-        59,
-        59,
-      );
+  // Filter out the target user from the list of candidates (we compare against them)
+  const otherUsers = allUsers.filter((u) => u.id !== targetUserId);
+  if (otherUsers.length === 0) {
+    return { overall: [], thisMonth: [] };
+  }
 
-      // 1. Calculate target user embeddings
-      const [targetOverall, targetMonth] = await Promise.all([
-        getUserTopItemsWithEmbeddings(serverIdNum, targetUserId),
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+  );
+
+  // 1. Calculate target user embeddings
+  const [targetOverall, targetMonth] = await Promise.all([
+    getUserTopItemsWithEmbeddings(serverIdNum, targetUserId),
+    getUserTopItemsWithEmbeddings(
+      serverIdNum,
+      targetUserId,
+      startOfMonth,
+      endOfMonth,
+    ),
+  ]);
+
+  // 2. Calculate other users embeddings (for both timeframes)
+  const userEmbeddings = await Promise.all(
+    otherUsers.map(async (user) => {
+      const [overall, month] = await Promise.all([
+        getUserTopItemsWithEmbeddings(serverIdNum, user.id),
         getUserTopItemsWithEmbeddings(
           serverIdNum,
-          targetUserId,
+          user.id,
           startOfMonth,
           endOfMonth,
         ),
       ]);
+      return {
+        user,
+        overall,
+        month,
+      };
+    }),
+  );
 
-      // 2. Calculate other users embeddings (for both timeframes)
-      const userEmbeddings = await Promise.all(
-        otherUsers.map(async (user) => {
-          const [overall, month] = await Promise.all([
-            getUserTopItemsWithEmbeddings(serverIdNum, user.id),
-            getUserTopItemsWithEmbeddings(
-              serverIdNum,
-              user.id,
-              startOfMonth,
-              endOfMonth,
-            ),
-          ]);
-          return {
-            user,
-            overall,
-            month,
-          };
-        }),
+  // 3. Compute similarities
+  const overallMatches: SimilarUser[] = [];
+  const monthMatches: SimilarUser[] = [];
+
+  for (const entry of userEmbeddings) {
+    if (targetOverall.embedding && entry.overall.embedding) {
+      const sim = cosineSimilarity(
+        targetOverall.embedding,
+        entry.overall.embedding,
       );
 
-      // 3. Compute similarities
-      const overallMatches: SimilarUser[] = [];
-      const monthMatches: SimilarUser[] = [];
+      // Find common items
+      const commonItems = targetOverall.items
+        .filter((tItem) =>
+          entry.overall.items.some((uItem) => uItem.id === tItem.id),
+        )
+        .map(({ id, name }) => ({ id, name }));
 
-      for (const entry of userEmbeddings) {
-        if (targetOverall.embedding && entry.overall.embedding) {
-          const sim = cosineSimilarity(
-            targetOverall.embedding,
-            entry.overall.embedding,
-          );
+      // Find similar pairs
+      const similarPairs = findSimilarItemPairs(
+        targetOverall.items,
+        entry.overall.items,
+      );
 
-          // Find common items
-          const commonItems = targetOverall.items
-            .filter((tItem) =>
-              entry.overall.items.some((uItem) => uItem.id === tItem.id),
-            )
-            .map(({ id, name }) => ({ id, name }));
+      overallMatches.push({
+        user: entry.user,
+        similarity: sim,
+        commonItems,
+        similarPairs,
+      });
+    }
 
-          // Find similar pairs
-          const similarPairs = findSimilarItemPairs(
-            targetOverall.items,
-            entry.overall.items,
-          );
+    if (targetMonth.embedding && entry.month.embedding) {
+      const sim = cosineSimilarity(
+        targetMonth.embedding,
+        entry.month.embedding,
+      );
 
-          overallMatches.push({
-            user: entry.user,
-            similarity: sim,
-            commonItems,
-            similarPairs,
-          });
-        }
+      // Find common items
+      const commonItems = targetMonth.items
+        .filter((tItem) =>
+          entry.month.items.some((uItem) => uItem.id === tItem.id),
+        )
+        .map(({ id, name }) => ({ id, name }));
 
-        if (targetMonth.embedding && entry.month.embedding) {
-          const sim = cosineSimilarity(
-            targetMonth.embedding,
-            entry.month.embedding,
-          );
+      // Find similar pairs
+      const similarPairs = findSimilarItemPairs(
+        targetMonth.items,
+        entry.month.items,
+      );
 
-          // Find common items
-          const commonItems = targetMonth.items
-            .filter((tItem) =>
-              entry.month.items.some((uItem) => uItem.id === tItem.id),
-            )
-            .map(({ id, name }) => ({ id, name }));
+      monthMatches.push({
+        user: entry.user,
+        similarity: sim,
+        commonItems,
+        similarPairs,
+      });
+    }
+  }
 
-          // Find similar pairs
-          const similarPairs = findSimilarItemPairs(
-            targetMonth.items,
-            entry.month.items,
-          );
-
-          monthMatches.push({
-            user: entry.user,
-            similarity: sim,
-            commonItems,
-            similarPairs,
-          });
-        }
-      }
-
-      // 4. Sort and return top 5
-      return {
-        overall: overallMatches
-          .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 5),
-        thisMonth: monthMatches
-          .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 5),
-      };
-    },
-    ["get-similar-users", String(serverId), targetUserId],
-    { revalidate: CACHE_TTL },
-  )();
-};
+  // 4. Sort and return top 5
+  return {
+    overall: overallMatches
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5),
+    thisMonth: monthMatches
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5),
+  };
+}

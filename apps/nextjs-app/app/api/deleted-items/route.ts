@@ -30,7 +30,6 @@ import type { NextRequest } from "next/server";
  *   - 404: If server not found.
  *   - 500: On server error.
  */
-export const dynamic = "force-dynamic";
 
 /**
  * Find a server by name (case-insensitive)

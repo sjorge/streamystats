@@ -1,7 +1,5 @@
 import { createServer, getServers } from "@/lib/server";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   try {
     const servers = await getServers();

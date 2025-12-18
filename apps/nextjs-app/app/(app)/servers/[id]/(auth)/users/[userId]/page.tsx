@@ -3,10 +3,10 @@ import { PageTitle } from "@/components/PageTitle";
 import { AnomalyBadge } from "@/components/locations";
 import { Button } from "@/components/ui/button";
 import {
-  getUserHistory,
   getUniqueClientNames,
   getUniqueDeviceNames,
   getUniquePlayMethods,
+  getUserHistory,
 } from "@/lib/db/history";
 import { getUserAnomalies } from "@/lib/db/locations";
 import { getServer } from "@/lib/db/server";

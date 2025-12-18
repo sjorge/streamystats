@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 export async function GET(request: Request) {
   const jobServerUrl =
     process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"

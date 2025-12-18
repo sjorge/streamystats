@@ -1,4 +1,5 @@
 "use server";
+"use cache";
 
 import { db } from "@streamystats/database";
 import {
@@ -19,7 +20,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
-import { revalidateTag, unstable_cache } from "next/cache";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import { getMe } from "./users";
 
 const enableDebug = false;
@@ -124,27 +125,47 @@ const stripEmbedding = (
   return card;
 };
 
-const CACHE_TTL = 60 * 60 * 1; // 1 hour
+export async function getSimilarSeries(
+  serverId: string | number,
+  userId?: string,
+  limit = 20,
+): Promise<SeriesRecommendationItem[]> {
+  "use cache";
+  cacheLife("hours");
 
-const getSimilarSeriesUncached = async (
-  serverId: number,
-  userId: string | undefined,
-  limit: number,
-): Promise<SeriesRecommendationItem[]> => {
+  const serverIdNum = Number(serverId);
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const currentUser = await getMe();
+    if (currentUser && currentUser.serverId === serverIdNum) {
+      targetUserId = currentUser.id;
+      debugLog(`🔍 Using current user: ${targetUserId}`);
+    } else {
+      debugLog("❌ No valid user found for series recommendations");
+      return [];
+    }
+  }
+
+  cacheTag(
+    `series-recommendations-${serverIdNum}`,
+    `series-recommendations-${serverIdNum}-${targetUserId}`,
+  );
+
   try {
     debugLog(
-      `\n🚀 Starting series recommendation process for server ${serverId}, user ${
-        userId || "anonymous"
+      `\n🚀 Starting series recommendation process for server ${serverIdNum}, user ${
+        targetUserId || "anonymous"
       }, limit ${limit}`,
     );
 
     let recommendations: SeriesRecommendationItem[] = [];
 
-    if (userId) {
+    if (targetUserId) {
       debugLog("\n📺 Getting user-specific series recommendations...");
       recommendations = await getUserSpecificSeriesRecommendations(
-        serverId,
-        userId,
+        serverIdNum,
+        targetUserId,
         limit,
       );
       debugLog(
@@ -158,9 +179,9 @@ const getSimilarSeriesUncached = async (
         `\n🔥 Need ${remainingLimit} more series recommendations, getting popular series...`,
       );
       const popularRecommendations = await getPopularSeriesRecommendations(
-        serverId,
+        serverIdNum,
         remainingLimit,
-        userId,
+        targetUserId,
       );
       debugLog(
         `✅ Got ${popularRecommendations.length} popular series recommendations`,
@@ -176,46 +197,7 @@ const getSimilarSeriesUncached = async (
     debugLog("❌ Error getting similar series:", error);
     return [];
   }
-};
-
-const getCachedSimilarSeries = (
-  serverId: number,
-  userId: string,
-  limit: number,
-) =>
-  unstable_cache(
-    () => getSimilarSeriesUncached(serverId, userId, limit),
-    ["similar-series", String(serverId), userId, String(limit)],
-    {
-      revalidate: CACHE_TTL,
-      tags: [
-        `series-recommendations-${serverId}`,
-        `series-recommendations-${serverId}-${userId}`,
-      ],
-    },
-  )();
-
-export const getSimilarSeries = async (
-  serverId: string | number,
-  userId?: string,
-  limit = 20,
-): Promise<SeriesRecommendationItem[]> => {
-  const serverIdNum = Number(serverId);
-
-  let targetUserId = userId;
-  if (!targetUserId) {
-    const currentUser = await getMe();
-    if (currentUser && currentUser.serverId === serverIdNum) {
-      targetUserId = currentUser.id;
-      debugLog(`🔍 Using current user: ${targetUserId}`);
-    } else {
-      debugLog("❌ No valid user found for series recommendations");
-      return [];
-    }
-  }
-
-  return getCachedSimilarSeries(serverIdNum, targetUserId, limit);
-};
+}
 
 export const revalidateSeriesRecommendations = async (
   serverId: number,

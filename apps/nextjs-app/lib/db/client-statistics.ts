@@ -1,9 +1,9 @@
 // Client statistics types and functions
 "use cache";
 
-import { cacheLife, cacheTag } from "next/cache";
 import { db, sessions, users } from "@streamystats/database";
 import { and, count, eq, gte, isNotNull, lte, sql, sum } from "drizzle-orm";
+import { cacheLife, cacheTag } from "next/cache";
 
 export interface ClientStat {
   clientName: string;
@@ -56,7 +56,7 @@ export async function getClientStatistics(
   serverId: number,
   startDate?: string,
   endDate?: string,
-  userId?: string
+  userId?: string,
 ): Promise<ClientStatisticsResponse> {
   "use cache";
   cacheLife("days");

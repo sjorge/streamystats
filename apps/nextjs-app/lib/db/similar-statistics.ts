@@ -1,4 +1,5 @@
 "use server";
+"use cache";
 
 import { db } from "@streamystats/database";
 import {
@@ -21,7 +22,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
-import { revalidateTag, unstable_cache } from "next/cache";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
 import { getMe } from "./users";
 
 const debugLog = (..._args: unknown[]) => {};
@@ -119,29 +120,49 @@ const stripEmbedding = (
   return card;
 };
 
-const CACHE_TTL = 60 * 60 * 1; // 1 hour
-
-const getSimilarStatisticsUncached = async (
-  serverId: number,
-  userId: string | undefined,
-  limit: number,
+export async function getSimilarStatistics(
+  serverId: string | number,
+  userId?: string,
+  limit = 20,
   timeWindow?: RecommendationTimeWindow,
-): Promise<RecommendationItem[]> => {
+): Promise<RecommendationItem[]> {
+  "use cache";
+  cacheLife("hours");
+
+  const serverIdNum = Number(serverId);
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const currentUser = await getMe();
+    if (currentUser && currentUser.serverId === serverIdNum) {
+      targetUserId = currentUser.id;
+      debugLog(`🔍 Using current user: ${targetUserId}`);
+    } else {
+      debugLog("❌ No valid user found for recommendations");
+      return [];
+    }
+  }
+
+  cacheTag(
+    `recommendations-${serverIdNum}`,
+    `recommendations-${serverIdNum}-${targetUserId}`,
+  );
+
   try {
     debugLog(
-      `\n🚀 Starting recommendation process for server ${serverId}, user ${
-        userId || "anonymous"
+      `\n🚀 Starting recommendation process for server ${serverIdNum}, user ${
+        targetUserId || "anonymous"
       }, limit ${limit}`,
     );
 
     let recommendations: RecommendationItem[] = [];
 
-    if (userId) {
+    if (targetUserId) {
       // Get user-specific recommendations
       debugLog("\n📊 Getting user-specific recommendations...");
       recommendations = await getUserSpecificRecommendations(
-        serverId,
-        userId,
+        serverIdNum,
+        targetUserId,
         limit,
         timeWindow,
       );
@@ -157,9 +178,9 @@ const getSimilarStatisticsUncached = async (
         `\n🔥 Need ${remainingLimit} more recommendations, getting popular items...`,
       );
       const popularRecommendations = await getPopularRecommendations(
-        serverId,
+        serverIdNum,
         remainingLimit,
-        userId,
+        targetUserId,
       );
       debugLog(
         `✅ Got ${popularRecommendations.length} popular recommendations`,
@@ -175,60 +196,7 @@ const getSimilarStatisticsUncached = async (
     debugLog("❌ Error getting similar statistics:", error);
     return [];
   }
-};
-
-const getCachedSimilarStatistics = (
-  serverId: number,
-  userId: string,
-  limit: number,
-  timeWindow?: RecommendationTimeWindow,
-) =>
-  unstable_cache(
-    () => getSimilarStatisticsUncached(serverId, userId, limit, timeWindow),
-    [
-      "similar-statistics",
-      String(serverId),
-      userId,
-      String(limit),
-      timeWindow?.start ? timeWindow.start.toISOString() : "start:all",
-      timeWindow?.end ? timeWindow.end.toISOString() : "end:all",
-    ],
-    {
-      revalidate: CACHE_TTL,
-      tags: [
-        `recommendations-${serverId}`,
-        `recommendations-${serverId}-${userId}`,
-      ],
-    },
-  )();
-
-export const getSimilarStatistics = async (
-  serverId: string | number,
-  userId?: string,
-  limit = 20,
-  timeWindow?: RecommendationTimeWindow,
-): Promise<RecommendationItem[]> => {
-  const serverIdNum = Number(serverId);
-
-  let targetUserId = userId;
-  if (!targetUserId) {
-    const currentUser = await getMe();
-    if (currentUser && currentUser.serverId === serverIdNum) {
-      targetUserId = currentUser.id;
-      debugLog(`🔍 Using current user: ${targetUserId}`);
-    } else {
-      debugLog("❌ No valid user found for recommendations");
-      return [];
-    }
-  }
-
-  return getCachedSimilarStatistics(
-    serverIdNum,
-    targetUserId,
-    limit,
-    timeWindow,
-  );
-};
+}
 
 export const revalidateRecommendations = async (
   serverId: number,

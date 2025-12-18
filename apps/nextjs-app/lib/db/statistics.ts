@@ -1,3 +1,5 @@
+"use cache";
+
 import {
   type Item,
   db,
@@ -17,7 +19,7 @@ import {
   sql,
   sum,
 } from "drizzle-orm";
-import { unstable_cache } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 
 interface ItemWithStats extends Item {
   totalPlayCount: number;
@@ -30,15 +32,16 @@ interface MostWatchedItems {
   Series: ItemWithStats[];
 }
 
-const CACHE_TTL = 60 * 60 * 1; // 1 hour
-
-const getMostWatchedItemsImpl = async ({
+export async function getMostWatchedItems({
   serverId,
   userId,
 }: {
   serverId: string | number;
   userId?: string | number;
-}): Promise<MostWatchedItems> => {
+}): Promise<MostWatchedItems> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(`most-watched-${serverId}${userId ? `-${userId}` : ""}`);
   // First get the aggregated session data for Movies and Episodes
   const whereConditions = [
     eq(sessions.serverId, Number(serverId)),
@@ -173,13 +176,7 @@ const getMostWatchedItemsImpl = async ({
   ).slice(0, limit);
 
   return grouped;
-};
-
-export const getMostWatchedItems = unstable_cache(
-  getMostWatchedItemsImpl,
-  ["db-statistics", "getMostWatchedItems"],
-  { revalidate: CACHE_TTL },
-);
+}
 
 export interface WatchTimePerType {
   [key: string]: {
@@ -188,7 +185,7 @@ export interface WatchTimePerType {
   };
 }
 
-const getWatchTimePerTypeImpl = async ({
+export async function getWatchTimePerType({
   serverId,
   startDate,
   endDate,
@@ -198,7 +195,12 @@ const getWatchTimePerTypeImpl = async ({
   startDate: string;
   endDate: string;
   userId?: string | number;
-}): Promise<WatchTimePerType> => {
+}): Promise<WatchTimePerType> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(
+    `watch-time-per-type-${serverId}${userId ? `-${userId}` : ""}-${startDate}-${endDate}`,
+  );
   const whereConditions = [
     eq(sessions.serverId, Number(serverId)),
     gte(sessions.startTime, new Date(startDate)),
@@ -301,13 +303,7 @@ const getWatchTimePerTypeImpl = async ({
   }
 
   return statistics;
-};
-
-export const getWatchTimePerType = unstable_cache(
-  getWatchTimePerTypeImpl,
-  ["db-statistics", "getWatchTimePerType"],
-  { revalidate: CACHE_TTL },
-);
+}
 
 export interface LibraryWatchTime {
   [key: string]: {
@@ -318,7 +314,7 @@ export interface LibraryWatchTime {
   };
 }
 
-const getWatchTimeByLibraryImpl = async ({
+export async function getWatchTimeByLibrary({
   serverId,
   startDate,
   endDate,
@@ -326,7 +322,10 @@ const getWatchTimeByLibraryImpl = async ({
   serverId: string | number;
   startDate: string;
   endDate: string;
-}): Promise<LibraryWatchTime> => {
+}): Promise<LibraryWatchTime> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(`watch-time-by-library-${serverId}-${startDate}-${endDate}`);
   const results = await db
     .select({
       date: sql<string>`DATE(${sessions.startTime})`.as("date"),
@@ -371,13 +370,7 @@ const getWatchTimeByLibraryImpl = async ({
   }
 
   return statistics;
-};
-
-export const getWatchTimeByLibrary = unstable_cache(
-  getWatchTimeByLibraryImpl,
-  ["db-statistics", "getWatchTimeByLibrary"],
-  { revalidate: CACHE_TTL },
-);
+}
 
 export interface MostWatchedDay {
   date: string;

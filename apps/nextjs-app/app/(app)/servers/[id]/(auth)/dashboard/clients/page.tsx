@@ -80,7 +80,7 @@ async function ClientStats({
     server.id,
     startDate,
     endDate,
-    effectiveUserId
+    effectiveUserId,
   );
 
   return (

@@ -12,7 +12,6 @@ import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/StreamArray";
 
 export const runtime = "nodejs"; // IMPORTANT: disables edge runtime
-export const dynamic = "force-dynamic"; // optional – no cache
 
 /** ISO-8601 timestamp */
 type ISODate = string & { __iso: undefined };

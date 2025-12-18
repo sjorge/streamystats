@@ -25,7 +25,6 @@ import type { NextRequest } from "next/server";
  *   - 404: If the item is not found.
  *   - 500: On server error.
  */
-export const dynamic = "force-dynamic";
 
 /**
  * Handles GET requests for fetching item details.

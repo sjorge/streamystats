@@ -13,6 +13,16 @@ const nextConfig = {
 };
 ```
 
+### Important: Route Segment Config Incompatibility
+
+When `cacheComponents: true` is enabled, you **cannot** use `export const dynamic = "force-dynamic"` in route handlers or page components. This will cause a build error:
+
+```
+Route segment config "dynamic" is not compatible with `nextConfig.cacheComponents`. Please remove it.
+```
+
+**Solution**: Remove `export const dynamic = "force-dynamic"` from any route files. API routes and pages will still work correctly without this export when using `use cache`.
+
 ## Usage
 
 ### File-level caching

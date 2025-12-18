@@ -2,8 +2,6 @@ import { getServers } from "@/lib/db/server";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   // The middleware will set this header if there's a server connectivity issue
   const headersList = await headers();
@@ -72,7 +70,7 @@ export async function GET() {
           headers: {
             "x-server-connectivity-error": "true",
           },
-        },
+        }
       );
     }
 
@@ -88,7 +86,7 @@ export async function GET() {
       },
       {
         status: 500,
-      },
+      }
     );
   }
 }

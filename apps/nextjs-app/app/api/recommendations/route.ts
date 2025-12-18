@@ -5,8 +5,6 @@ import { type Server, db, servers } from "@streamystats/database";
 import { ilike } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 
-export const dynamic = "force-dynamic";
-
 type RecommendationType = "Movie" | "Series" | "all";
 type RangePreset = "7d" | "30d" | "90d" | "thisMonth" | "all";
 

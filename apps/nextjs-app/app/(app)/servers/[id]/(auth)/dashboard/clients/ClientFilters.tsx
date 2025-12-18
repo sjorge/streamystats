@@ -77,7 +77,7 @@ export function ClientFilters({
         endDate: formatDateParam(next.to),
       });
     },
-    [updateQueryParams]
+    [updateQueryParams],
   );
 
   const handleDateSelect = React.useCallback(
@@ -90,7 +90,7 @@ export function ClientFilters({
         setDatePickerOpen(false);
       }
     },
-    [commitRangeToUrl]
+    [commitRangeToUrl],
   );
 
   const applyPreset = React.useCallback(
@@ -101,7 +101,7 @@ export function ClientFilters({
       setRange(next);
       commitRangeToUrl(next);
     },
-    [commitRangeToUrl]
+    [commitRangeToUrl],
   );
 
   const apply7d = React.useCallback(() => applyPreset(7), [applyPreset]);
@@ -124,7 +124,7 @@ export function ClientFilters({
         userId: value === "all" ? null : value,
       });
     },
-    [updateQueryParams]
+    [updateQueryParams],
   );
 
   const hasFilters = React.useMemo(() => {
