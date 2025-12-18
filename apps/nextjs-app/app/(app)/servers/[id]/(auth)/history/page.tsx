@@ -3,8 +3,8 @@ import { PageTitle } from "@/components/PageTitle";
 import {
   type HistoryResponse,
   getHistory,
-  getUniqueDeviceNames,
   getUniqueClientNames,
+  getUniqueDeviceNames,
   getUniquePlayMethods,
 } from "@/lib/db/history";
 import { getServer } from "@/lib/db/server";
@@ -51,29 +51,30 @@ export default async function HistoryPage({
     redirect("/setup");
   }
 
-  const [data, users, deviceNames, clientNames, playMethods] = await Promise.all([
-    getHistory(
-      server.id,
-      Number.parseInt(page || "1", 10),
-      50,
-      search,
-      sort_by,
-      sort_order,
-      {
-        startDate,
-        endDate,
-        userId,
-        itemType,
-        deviceName,
-        clientName,
-        playMethod,
-      },
-    ),
-    getUsers({ serverId: server.id }),
-    getUniqueDeviceNames(server.id),
-    getUniqueClientNames(server.id),
-    getUniquePlayMethods(server.id),
-  ]);
+  const [data, users, deviceNames, clientNames, playMethods] =
+    await Promise.all([
+      getHistory(
+        server.id,
+        Number.parseInt(page || "1", 10),
+        50,
+        search,
+        sort_by,
+        sort_order,
+        {
+          startDate,
+          endDate,
+          userId,
+          itemType,
+          deviceName,
+          clientName,
+          playMethod,
+        },
+      ),
+      getUsers({ serverId: server.id }),
+      getUniqueDeviceNames(server.id),
+      getUniqueClientNames(server.id),
+      getUniquePlayMethods(server.id),
+    ]);
 
   // Convert the data to match HistoryTable expectations
   const historyData: HistoryResponse = {

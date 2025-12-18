@@ -38,9 +38,9 @@ import {
 import { useQueryParams } from "@/hooks/useQueryParams";
 import type { WatchTimePerType } from "@/lib/db/statistics";
 import { formatDuration } from "@/lib/utils";
-import { useSearchParams, useParams } from "next/navigation";
-import { Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
+import { Suspense } from "react";
 
 const chartConfig = {
   Episode: {
@@ -143,7 +143,7 @@ function WatchTimeChartView({
         day: "numeric",
       });
     },
-    [bucket]
+    [bucket],
   );
 
   const tooltipFormatter = React.useCallback(
@@ -159,7 +159,7 @@ function WatchTimeChartView({
         </div>
       );
     },
-    []
+    [],
   );
 
   const filteredData = React.useMemo(() => {
@@ -238,10 +238,10 @@ function WatchTimeChartView({
 
       const dateStr = format(date, "yyyy-MM-dd");
       router.push(
-        `/servers/${serverId}/history?startDate=${dateStr}&endDate=${dateStr}`
+        `/servers/${serverId}/history?startDate=${dateStr}&endDate=${dateStr}`,
       );
     },
-    [bucket, router, serverId]
+    [bucket, router, serverId],
   );
 
   return (
@@ -319,7 +319,7 @@ export function WatchTimeGraph({ data, startDate, endDate }: Props) {
   const bucketParam = searchParams.get("bucket");
   const bucket = React.useMemo(
     () => parseBucketParam(bucketParam),
-    [bucketParam]
+    [bucketParam],
   );
 
   const { updateQueryParams, isLoading } = useQueryParams();
@@ -334,7 +334,7 @@ export function WatchTimeGraph({ data, startDate, endDate }: Props) {
       const parsed = parseBucketParam(next);
       updateQueryParams({ bucket: parsed });
     },
-    [updateQueryParams]
+    [updateQueryParams],
   );
 
   const title = React.useMemo(() => {

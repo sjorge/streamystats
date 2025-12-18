@@ -26,6 +26,8 @@ const _map: Record<string, string> = {
   library: "Library",
   dashboard: "Dashboard",
   watchtime: "Watchtime",
+  transcoding: "Transcoding",
+  clients: "Clients",
   chat: "AI Chat",
   ai: "AI Recommendations",
   general: "General",

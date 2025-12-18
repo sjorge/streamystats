@@ -11,6 +11,7 @@ import {
   Clock,
   Library,
   MessageSquare,
+  Monitor,
   Settings,
   Shield,
   TrendingUp,
@@ -59,6 +60,11 @@ const dashboard_items = [
     title: "Transcoding",
     url: "/dashboard/transcoding",
     icon: Activity,
+  },
+  {
+    title: "Clients",
+    url: "/dashboard/clients",
+    icon: Monitor,
   },
 ];
 

@@ -27,6 +27,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -43,10 +44,9 @@ import type { Server } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
+import { useEffect } from "react";
 import { useDebounce } from "use-debounce";
 import { HistoryFilters } from "./HistoryFilters";
-import { Input } from "@/components/ui/input";
-import { useEffect } from "react";
 
 export interface HistoryTableProps {
   data: HistoryResponse;
@@ -324,14 +324,14 @@ export function HistoryTable({
   ];
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
   const [columnVisibility, setColumnVisibility, isLoadingVisibility] =
     usePersistantState<VisibilityState>(
       `history-column-visibility-${server.id}`,
       {
         user_name: !hideUserColumn,
-      }
+      },
     );
 
   // Handle pagination with URL query params
@@ -425,7 +425,7 @@ export function HistoryTable({
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   );
@@ -444,7 +444,7 @@ export function HistoryTable({
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}

@@ -9,7 +9,7 @@ import type {
 
 export async function importFromLegacy(
   prevState: LegacyImportState,
-  formData: FormData
+  formData: FormData,
 ): Promise<LegacyImportState> {
   try {
     const serverId = formData.get("serverId");
@@ -72,7 +72,7 @@ export async function importFromLegacy(
       } catch (error) {
         console.error(
           `Failed to import legacy session ${legacySession.id}:`,
-          error
+          error,
         );
         errorCount++;
         // Continue with other sessions
@@ -96,7 +96,7 @@ export async function importFromLegacy(
 
 async function importLegacySession(
   legacySession: LegacySessionData,
-  serverId: number
+  serverId: number,
 ): Promise<boolean> {
   // Validate required fields
   if (

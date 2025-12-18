@@ -133,7 +133,7 @@ interface JellystatsSession {
 
 export async function importFromJellystats(
   prevState: ImportState,
-  formData: FormData
+  formData: FormData,
 ): Promise<ImportState> {
   try {
     const serverId = formData.get("serverId");
@@ -227,10 +227,10 @@ export async function importFromJellystats(
 
         // Extract media info
         const videoStream = session.MediaStreams?.find(
-          (s) => s.Type === "Video"
+          (s) => s.Type === "Video",
         );
         const audioStream = session.MediaStreams?.find(
-          (s) => s.Type === "Audio"
+          (s) => s.Type === "Audio",
         );
 
         // Determine if transcoding occurred

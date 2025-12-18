@@ -50,7 +50,7 @@ function getValue(
 function buildPlaybackData(
   timestamp: string,
   record: Record<string, unknown>,
-  durationSeconds?: number
+  durationSeconds?: number,
 ): PlaybackReportingData {
   const data: PlaybackReportingData = { timestamp };
 
@@ -70,7 +70,7 @@ function buildPlaybackData(
     record,
     "playMethod",
     "play_method",
-    "PlayMethod"
+    "PlayMethod",
   );
   if (playMethod) data.playMethod = playMethod;
 
@@ -89,7 +89,7 @@ function buildPlaybackData(
 
 export async function importFromPlaybackReporting(
   prevState: ImportState,
-  formData: FormData
+  formData: FormData,
 ): Promise<ImportState> {
   console.info("Starting Playback Reporting import process");
 
@@ -99,7 +99,7 @@ export async function importFromPlaybackReporting(
     error?: string;
   } {
     console.info(
-      `Validating playback reporting data with ${data.length} records`
+      `Validating playback reporting data with ${data.length} records`,
     );
 
     if (!Array.isArray(data)) {
@@ -122,8 +122,8 @@ export async function importFromPlaybackReporting(
 
     console.info(
       `Validating sample of ${sampleSize} records for required fields: ${requiredFields.join(
-        ", "
-      )}`
+        ", ",
+      )}`,
     );
 
     for (let i = 0; i < sampleSize; i++) {
@@ -264,7 +264,7 @@ export async function importFromPlaybackReporting(
 
     // Process import
     console.info(
-      `Starting import of ${data.length} sessions for server ${serverIdNum}`
+      `Starting import of ${data.length} sessions for server ${serverIdNum}`,
     );
     let importedCount = 0;
     const totalCount = data.length;
@@ -275,13 +275,13 @@ export async function importFromPlaybackReporting(
       try {
         const imported = await importPlaybackReportingSession(
           playbackData,
-          serverIdNum
+          serverIdNum,
         );
         if (imported) {
           importedCount++;
           if (importedCount % 100 === 0) {
             console.info(
-              `Import progress: ${importedCount}/${totalCount} sessions imported`
+              `Import progress: ${importedCount}/${totalCount} sessions imported`,
             );
           }
         } else {
@@ -348,7 +348,7 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
       skippedLines++;
       console.warn(
         `Skipping line ${i + 1}: insufficient columns (${columns.length}/9)`,
-        { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") }
+        { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
       );
       continue;
     }
@@ -371,7 +371,7 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
         skippedLines++;
         console.warn(
           `Skipping line ${i + 1}: invalid duration "${durationSecondsStr}"`,
-          { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") }
+          { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
         );
         continue;
       }
@@ -397,13 +397,13 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
   }
 
   console.info(
-    `TSV parsing completed: ${data.length} valid records, ${skippedLines} skipped lines`
+    `TSV parsing completed: ${data.length} valid records, ${skippedLines} skipped lines`,
   );
   return data;
 }
 
 function parsePlaybackReportingJson(
-  jsonData: unknown
+  jsonData: unknown,
 ): PlaybackReportingData[] {
   console.info("Starting JSON parsing", {
     dataType: typeof jsonData,
@@ -469,7 +469,7 @@ function parsePlaybackReportingJson(
 
 async function importPlaybackReportingSession(
   playbackData: PlaybackReportingData,
-  serverId: number
+  serverId: number,
 ): Promise<boolean> {
   // Only validate timestamp as required - allow missing users or items
   if (!playbackData.timestamp) {
@@ -487,7 +487,7 @@ async function importPlaybackReportingSession(
   } catch (error) {
     console.warn(
       `Skipping session: invalid timestamp "${playbackData.timestamp}"`,
-      { playbackData, error }
+      { playbackData, error },
     );
     return false;
   }
@@ -510,7 +510,7 @@ async function importPlaybackReportingSession(
 
         if (existingItem.length === 0) {
           missingReferences.push(
-            `itemId '${playbackData.itemId}' not found in items table - setting to null`
+            `itemId '${playbackData.itemId}' not found in items table - setting to null`,
           );
           finalItemId = null; // Set to null instead of failing
           console.warn("Item reference not found, setting to null:", {
@@ -527,7 +527,7 @@ async function importPlaybackReportingSession(
         missingReferences.push(
           `Failed to verify itemId '${playbackData.itemId}', setting to null: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`
+          }`,
         );
         finalItemId = null; // Set to null on error
       }
@@ -544,7 +544,7 @@ async function importPlaybackReportingSession(
 
         if (existingUser.length === 0) {
           missingReferences.push(
-            `userId '${playbackData.userId}' not found in users table - setting to null`
+            `userId '${playbackData.userId}' not found in users table - setting to null`,
           );
           finalUserId = null; // Set to null instead of failing
           console.warn("User reference not found, setting to null:", {
@@ -566,7 +566,7 @@ async function importPlaybackReportingSession(
         missingReferences.push(
           `Failed to verify userId '${playbackData.userId}', setting to null: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`
+          }`,
         );
         finalUserId = null; // Set to null on error
       }
@@ -587,7 +587,7 @@ async function importPlaybackReportingSession(
 
     // Calculate end time based on duration
     const endTime = new Date(
-      sessionTime.getTime() + (playbackData.durationSeconds || 0) * 1000
+      sessionTime.getTime() + (playbackData.durationSeconds || 0) * 1000,
     );
 
     // Determine if transcoding based on play method
@@ -601,14 +601,14 @@ async function importPlaybackReportingSession(
       if (videoCodecIdx !== -1) {
         videoCodec = playMethod.substring(
           videoCodecIdx + 2, // Skip "v:"
-          playMethod.indexOf(" ", videoCodecIdx)
+          playMethod.indexOf(" ", videoCodecIdx),
         );
       }
       const audioCodecIdx = playMethod.indexOf("a:");
       if (audioCodecIdx !== -1) {
         audioCodec = playMethod.substring(
           audioCodecIdx + 2, // Skip "a:"
-          playMethod.indexOf(")", audioCodecIdx)
+          playMethod.indexOf(")", audioCodecIdx),
         );
       }
     }
