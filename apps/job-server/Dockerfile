@@ -29,8 +29,8 @@ RUN bun build ./src/index.ts --compile --minify --outfile server
 # Production runtime stage - Debian Slim (glibc compatible)
 FROM debian:stable-slim AS runner
 
-# Install minimal dependencies (wget for healthcheck)
-RUN apt-get update && apt-get install -y wget ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install minimal dependencies (wget/curl for healthcheck)
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 
 WORKDIR /app
@@ -49,6 +49,6 @@ ENV HOST=0.0.0.0
 EXPOSE 3005
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3005/health || exit 1
+  CMD curl -f http://127.0.0.1:3005/health || exit 1
 
 CMD ["./server"]
