@@ -2,7 +2,12 @@ import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { AnomalyBadge } from "@/components/locations";
 import { Button } from "@/components/ui/button";
-import { getUserHistory } from "@/lib/db/history";
+import {
+  getUserHistory,
+  getUniqueClientNames,
+  getUniqueDeviceNames,
+  getUniquePlayMethods,
+} from "@/lib/db/history";
 import { getUserAnomalies } from "@/lib/db/locations";
 import { getServer } from "@/lib/db/server";
 import { getMostWatchedItems } from "@/lib/db/statistics";
@@ -10,6 +15,7 @@ import {
   getUserById,
   getUserGenreStats,
   getUserWatchStats,
+  getUsers,
   getWatchTimePerWeekDay,
   isUserAdmin,
 } from "@/lib/db/users";
@@ -64,6 +70,10 @@ export default async function User({
     genreStats,
     mostWatched,
     anomalyData,
+    users,
+    deviceNames,
+    clientNames,
+    playMethods,
   ] = await Promise.all([
     getUserWatchStats({ serverId: server.id, userId: user.id }),
     getWatchTimePerWeekDay({
@@ -80,6 +90,10 @@ export default async function User({
     getUserGenreStats({ userId: user.id, serverId: server.id }),
     getMostWatchedItems({ serverId: server.id, userId: user.id }),
     getUserAnomalies(server.id, user.id, { resolved: false, limit: 1 }),
+    getUsers({ serverId: server.id }),
+    getUniqueDeviceNames(server.id),
+    getUniqueClientNames(server.id),
+    getUniquePlayMethods(server.id),
   ]);
 
   return (
@@ -143,7 +157,15 @@ export default async function User({
       <div className="mt-6">
         <UserSimilarity serverId={server.id} userId={user.id} />
       </div>
-      <HistoryTable server={server} data={userHistory} hideUserColumn={true} />
+      <HistoryTable
+        server={server}
+        data={userHistory}
+        hideUserColumn={true}
+        users={users.map((u) => ({ id: u.id, name: u.name }))}
+        deviceNames={deviceNames}
+        clientNames={clientNames}
+        playMethods={playMethods}
+      />
     </Container>
   );
 }
