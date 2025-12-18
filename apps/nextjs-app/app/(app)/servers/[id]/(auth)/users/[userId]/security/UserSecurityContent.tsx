@@ -1,6 +1,10 @@
 "use client";
 
-import { type LocationPoint, UserLocationMap } from "@/components/locations";
+import {
+  ActivityHeatmap,
+  type LocationPoint,
+  UserLocationMap,
+} from "@/components/locations";
 import { AnomalyList } from "@/components/locations/AnomalyList";
 import { LocationTimeline } from "@/components/locations/LocationTimeline";
 import { Badge } from "@/components/ui/badge";
@@ -18,14 +22,7 @@ import type {
   UserFingerprint,
 } from "@/lib/db/locations";
 import { resolveAnomaly, unresolveAnomaly } from "@/lib/db/locations";
-import {
-  Clock,
-  Fingerprint,
-  Globe,
-  MapPin,
-  Monitor,
-  Smartphone,
-} from "lucide-react";
+import { Fingerprint, Globe, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -37,6 +34,7 @@ interface UserSecurityContentProps {
   fingerprint: UserFingerprint | null;
   anomalies: Anomaly[];
   unresolvedCount: number;
+  weekHistogram: Record<number, number>;
 }
 
 export function UserSecurityContent({
@@ -47,6 +45,7 @@ export function UserSecurityContent({
   fingerprint,
   anomalies,
   unresolvedCount,
+  weekHistogram,
 }: UserSecurityContentProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -164,57 +163,26 @@ export function UserSecurityContent({
           </Card>
         )}
 
-        {fingerprint && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Active Hours (UTC)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {fingerprint.typicalHoursUtc.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <div
-                        key={`hour-${i.toString()}`}
-                        className={`w-6 h-6 rounded text-xs flex items-center justify-center ${
-                          fingerprint.typicalHoursUtc.includes(i)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {i}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No activity data yet
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+        <ActivityHeatmap
+          allTimeHistogram={fingerprint?.hourHistogram || {}}
+          weekHistogram={weekHistogram}
+        />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Known Clients</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {fingerprint.knownClients.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {fingerprint.knownClients.map((client) => (
-                      <Badge key={client} variant="secondary">
-                        {client}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No client data yet
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+        {fingerprint && fingerprint.knownClients.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Known Clients</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {fingerprint.knownClients.map((client) => (
+                  <Badge key={client} variant="secondary">
+                    {client}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {anomalies.length > 0 && (

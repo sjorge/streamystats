@@ -405,8 +405,10 @@ exports.userFingerprints = (0, pg_core_1.pgTable)("user_fingerprints", {
     devicePatterns: (0, pg_core_1.jsonb)("device_patterns")
         .$type()
         .default([]),
-    // Behavioral patterns
-    typicalHoursUtc: (0, pg_core_1.jsonb)("typical_hours_utc").$type().default([]),
+    // Behavioral patterns - hourly activity histogram (hour 0-23 -> session count)
+    hourHistogram: (0, pg_core_1.jsonb)("hour_histogram")
+        .$type()
+        .default({}),
     avgSessionsPerDay: (0, pg_core_1.doublePrecision)("avg_sessions_per_day"),
     totalSessions: (0, pg_core_1.integer)("total_sessions").default(0),
     lastCalculatedAt: (0, pg_core_1.timestamp)("last_calculated_at", { withTimezone: true }),

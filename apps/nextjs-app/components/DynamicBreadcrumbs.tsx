@@ -1,9 +1,10 @@
 "use client";
 
+import { getUserById } from "@/lib/db/users";
 import { basePath } from "@/lib/utils";
-import { House, Slash } from "lucide-react";
+import { House } from "lucide-react";
 import { useParams, usePathname } from "next/navigation";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,24 +13,7 @@ import {
   BreadcrumbSeparator,
 } from "./ui/breadcrumb";
 
-const dynamicSegments = [
-  "users",
-  "items",
-  "library",
-  "history",
-  "dashboard",
-  "settings",
-  "activities",
-];
-
-const subSegments = [
-  "backup-and-import",
-  "database-backup-restore",
-  "jellystats-import",
-  "playback-reporting-import",
-];
-
-const _map = {
+const _map: Record<string, string> = {
   "backup-and-import": "Backup & Import",
   "database-backup-restore": "Database Backup & Restore",
   "jellystats-import": "Jellystats Import",
@@ -45,18 +29,48 @@ const _map = {
   chat: "AI Chat",
   ai: "AI Recommendations",
   general: "General",
+  security: "Security",
 };
 
 export const DynamicBreadcrumbs: React.FC = () => {
   const params = useParams();
-
   const { id } = params as { id: string };
-
   const pathname = usePathname();
+  const [dynamicLabels, setDynamicLabels] = useState<Record<string, string>>(
+    {},
+  );
+
   const pathSegments = pathname
     .split("/")
     .filter((segment) => segment)
     .slice(2);
+
+  useEffect(() => {
+    const fetchDynamicLabels = async () => {
+      const labels: Record<string, string> = {};
+      for (let i = 0; i < pathSegments.length; i++) {
+        const segment = pathSegments[i];
+        const prevSegment = pathSegments[i - 1];
+
+        // Fetch user name if previous segment is "users"
+        if (prevSegment === "users" && !_map[segment]) {
+          const user = await getUserById({ userId: segment, serverId: id });
+          if (user?.name) {
+            labels[segment] = user.name;
+          }
+        }
+      }
+      if (Object.keys(labels).length > 0) {
+        setDynamicLabels(labels);
+      }
+    };
+
+    fetchDynamicLabels();
+  }, [pathname, id, pathSegments.join("/")]);
+
+  const getLabel = (segment: string): string => {
+    return dynamicLabels[segment] || _map[segment] || segment;
+  };
 
   return (
     <Breadcrumb>
@@ -74,9 +88,7 @@ export const DynamicBreadcrumbs: React.FC = () => {
             <React.Fragment key={url}>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink href={url}>
-                  {_map[segment as keyof typeof _map] || segment}
-                </BreadcrumbLink>
+                <BreadcrumbLink href={url}>{getLabel(segment)}</BreadcrumbLink>
               </BreadcrumbItem>
             </React.Fragment>
           );

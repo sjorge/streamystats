@@ -29,6 +29,7 @@ import { useSecurityEvents } from "@/hooks/useSecurityEvents";
 import type { Anomaly } from "@/lib/db/locations";
 import {
   resolveAllAnomalies,
+  resolveAnomaliesByIds,
   resolveAnomaly,
   triggerGeolocationBackfill,
   unresolveAnomaly,
@@ -63,6 +64,9 @@ interface ServerSecurityContentProps {
     isBackfillRunning: boolean;
   };
   users: { id: string; name: string }[];
+  totalAnomalies: number;
+  currentPage: number;
+  pageSize: number;
 }
 
 export function ServerSecurityContent({
@@ -72,6 +76,9 @@ export function ServerSecurityContent({
   severityBreakdown,
   stats,
   users,
+  totalAnomalies,
+  currentPage,
+  pageSize,
 }: ServerSecurityContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -154,6 +161,25 @@ export function ServerSecurityContent({
     startTransition(() => {
       router.refresh();
     });
+  };
+
+  const handleResolveAllOnPage = async () => {
+    const unresolvedIds = anomalies.filter((a) => !a.resolved).map((a) => a.id);
+    if (unresolvedIds.length === 0) return;
+    await resolveAnomaliesByIds(serverId, unresolvedIds);
+    startTransition(() => {
+      router.refresh();
+    });
+  };
+
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page === 1) {
+      params.delete("page");
+    } else {
+      params.set("page", page.toString());
+    }
+    router.push(`?${params.toString()}`);
   };
 
   const handleFilterChange = (key: string, value: string) => {
@@ -427,12 +453,17 @@ export function ServerSecurityContent({
             onResolve={handleResolve}
             onUnresolve={handleUnresolve}
             onResolveAll={handleResolveAll}
+            onResolveAllOnPage={handleResolveAllOnPage}
             hasFilters={
               hasLocationFilters ||
               !!searchParams.get("resolved") ||
               !!searchParams.get("severity")
             }
             onClearFilters={() => router.push("?")}
+            totalCount={totalAnomalies}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
           />
         </TabsContent>
       </Tabs>

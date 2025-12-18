@@ -522,7 +522,7 @@ async function calculateUserFingerprint(
   // Aggregate patterns
   const countrySet = new Set<string>();
   const citySet = new Set<string>();
-  const hoursSet = new Set<number>();
+  const hourHistogram: Record<number, number> = {};
   const deviceIdSet = new Set<string>();
   const clientSet = new Set<string>();
 
@@ -579,9 +579,10 @@ async function calculateUserFingerprint(
 
     if (activity.city) citySet.add(activity.city);
 
-    // Time patterns
+    // Time patterns - build histogram with counts
     if (activity.date) {
-      hoursSet.add(activity.date.getUTCHours());
+      const hour = activity.date.getUTCHours();
+      hourHistogram[hour] = (hourHistogram[hour] || 0) + 1;
     }
   }
 
@@ -623,7 +624,7 @@ async function calculateUserFingerprint(
     knownClients: Array.from(clientSet),
     locationPatterns: Array.from(locationMap.values()),
     devicePatterns: Array.from(deviceMap.values()),
-    typicalHoursUtc: Array.from(hoursSet).sort((a, b) => a - b),
+    hourHistogram,
     avgSessionsPerDay,
     totalSessions: userActivities.length,
     lastCalculatedAt: new Date(),
@@ -642,7 +643,7 @@ async function calculateUserFingerprint(
         knownClients: fingerprintData.knownClients,
         locationPatterns: fingerprintData.locationPatterns,
         devicePatterns: fingerprintData.devicePatterns,
-        typicalHoursUtc: fingerprintData.typicalHoursUtc,
+        hourHistogram: fingerprintData.hourHistogram,
         avgSessionsPerDay: fingerprintData.avgSessionsPerDay,
         totalSessions: fingerprintData.totalSessions,
         lastCalculatedAt: fingerprintData.lastCalculatedAt,

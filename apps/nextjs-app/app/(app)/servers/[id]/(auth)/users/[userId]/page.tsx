@@ -11,6 +11,7 @@ import {
   getUserGenreStats,
   getUserWatchStats,
   getWatchTimePerWeekDay,
+  isUserAdmin,
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { showAdminStatistics } from "@/utils/adminTools";
@@ -49,7 +50,10 @@ export default async function User({
     redirect("/");
   }
 
-  const showAdminStats = await showAdminStatistics();
+  const [showAdminStats, isAdmin] = await Promise.all([
+    showAdminStatistics(),
+    isUserAdmin(),
+  ]);
 
   // Get additional user statistics and history
   const currentPage = Number.parseInt(page);
@@ -82,18 +86,20 @@ export default async function User({
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
       <div className="flex items-center justify-between">
         <PageTitle title={user.name || "N/A"} />
-        <Link href={`/servers/${server.id}/users/${user.id}/security`}>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Shield className="h-4 w-4" />
-            Security
-            {anomalyData.unresolvedCount > 0 && (
-              <AnomalyBadge
-                count={anomalyData.unresolvedCount}
-                showTooltip={false}
-              />
-            )}
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href={`/servers/${server.id}/users/${user.id}/security`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Shield className="h-4 w-4" />
+              Security
+              {anomalyData.unresolvedCount > 0 && (
+                <AnomalyBadge
+                  count={anomalyData.unresolvedCount}
+                  showTooltip={false}
+                />
+              )}
+            </Button>
+          </Link>
+        )}
       </div>
       <div className="flex flex-col gap-4">
         <UserBadges user={user} />

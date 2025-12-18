@@ -4270,12 +4270,12 @@ export declare const userFingerprints: import("drizzle-orm/pg-core").PgTableWith
                 lastSeenAt: string;
             }[];
         }>;
-        typicalHoursUtc: import("drizzle-orm/pg-core").PgColumn<{
-            name: "typical_hours_utc";
+        hourHistogram: import("drizzle-orm/pg-core").PgColumn<{
+            name: "hour_histogram";
             tableName: "user_fingerprints";
             dataType: "json";
             columnType: "PgJsonb";
-            data: number[];
+            data: Record<number, number>;
             driverParam: unknown;
             notNull: false;
             hasDefault: true;
@@ -4287,7 +4287,7 @@ export declare const userFingerprints: import("drizzle-orm/pg-core").PgTableWith
             identity: undefined;
             generated: undefined;
         }, {}, {
-            $type: number[];
+            $type: Record<number, number>;
         }>;
         avgSessionsPerDay: import("drizzle-orm/pg-core").PgColumn<{
             name: "avg_sessions_per_day";

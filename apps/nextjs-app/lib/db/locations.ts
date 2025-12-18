@@ -105,7 +105,7 @@ export interface UserFingerprint {
     sessionCount: number;
     lastSeenAt: string;
   }>;
-  typicalHoursUtc: number[];
+  hourHistogram: Record<number, number>;
   avgSessionsPerDay: number | null;
   totalSessions: number | null;
   lastCalculatedAt: string | null;
@@ -238,11 +238,48 @@ export async function getUserFingerprint(
       (result.locationPatterns as UserFingerprint["locationPatterns"]) || [],
     devicePatterns:
       (result.devicePatterns as UserFingerprint["devicePatterns"]) || [],
-    typicalHoursUtc: (result.typicalHoursUtc as number[]) || [],
+    hourHistogram: (result.hourHistogram as Record<number, number>) || {},
     avgSessionsPerDay: result.avgSessionsPerDay,
     totalSessions: result.totalSessions,
     lastCalculatedAt: result.lastCalculatedAt?.toISOString() ?? null,
   };
+}
+
+/**
+ * Get hourly activity histogram for a user within a date range
+ */
+export async function getUserHourHistogram(
+  serverId: number,
+  userId: string,
+  startDate?: Date,
+  endDate?: Date,
+): Promise<Record<number, number>> {
+  const conditions = [
+    eq(activities.userId, userId),
+    eq(activities.serverId, serverId),
+  ];
+
+  if (startDate) {
+    conditions.push(gte(activities.date, startDate));
+  }
+  if (endDate) {
+    conditions.push(lte(activities.date, endDate));
+  }
+
+  const result = await db
+    .select({
+      hour: sql<number>`EXTRACT(HOUR FROM ${activities.date})`.as("hour"),
+      count: count(),
+    })
+    .from(activities)
+    .where(and(...conditions))
+    .groupBy(sql`EXTRACT(HOUR FROM ${activities.date})`);
+
+  const histogram: Record<number, number> = {};
+  for (const row of result) {
+    histogram[row.hour] = row.count;
+  }
+  return histogram;
 }
 
 /**
@@ -314,12 +351,22 @@ export async function getServerAnomalies(
     dateFrom?: string;
     dateTo?: string;
     limit?: number;
+    offset?: number;
   } = {},
 ): Promise<{
   anomalies: Anomaly[];
   severityBreakdown: Record<string, number>;
+  total: number;
 }> {
-  const { resolved, severity, userId, dateFrom, dateTo, limit = 50 } = options;
+  const {
+    resolved,
+    severity,
+    userId,
+    dateFrom,
+    dateTo,
+    limit = 50,
+    offset = 0,
+  } = options;
 
   const conditions = [eq(anomalyEvents.serverId, serverId)];
 
@@ -345,40 +392,43 @@ export async function getServerAnomalies(
 
   const whereClause = and(...conditions);
 
-  const anomalies = await db
-    .select({
-      id: anomalyEvents.id,
-      userId: anomalyEvents.userId,
-      activityId: anomalyEvents.activityId,
-      anomalyType: anomalyEvents.anomalyType,
-      severity: anomalyEvents.severity,
-      details: anomalyEvents.details,
-      resolved: anomalyEvents.resolved,
-      resolvedAt: anomalyEvents.resolvedAt,
-      resolvedBy: anomalyEvents.resolvedBy,
-      resolutionNote: anomalyEvents.resolutionNote,
-      createdAt: anomalyEvents.createdAt,
-      userName: users.name,
-    })
-    .from(anomalyEvents)
-    .leftJoin(users, eq(anomalyEvents.userId, users.id))
-    .where(whereClause)
-    .orderBy(desc(anomalyEvents.createdAt))
-    .limit(limit);
-
-  const severityBreakdown = await db
-    .select({
-      severity: anomalyEvents.severity,
-      count: count(),
-    })
-    .from(anomalyEvents)
-    .where(
-      and(
-        eq(anomalyEvents.serverId, serverId),
-        eq(anomalyEvents.resolved, false),
-      ),
-    )
-    .groupBy(anomalyEvents.severity);
+  const [anomalies, totalResult, severityBreakdown] = await Promise.all([
+    db
+      .select({
+        id: anomalyEvents.id,
+        userId: anomalyEvents.userId,
+        activityId: anomalyEvents.activityId,
+        anomalyType: anomalyEvents.anomalyType,
+        severity: anomalyEvents.severity,
+        details: anomalyEvents.details,
+        resolved: anomalyEvents.resolved,
+        resolvedAt: anomalyEvents.resolvedAt,
+        resolvedBy: anomalyEvents.resolvedBy,
+        resolutionNote: anomalyEvents.resolutionNote,
+        createdAt: anomalyEvents.createdAt,
+        userName: users.name,
+      })
+      .from(anomalyEvents)
+      .leftJoin(users, eq(anomalyEvents.userId, users.id))
+      .where(whereClause)
+      .orderBy(desc(anomalyEvents.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ count: count() }).from(anomalyEvents).where(whereClause),
+    db
+      .select({
+        severity: anomalyEvents.severity,
+        count: count(),
+      })
+      .from(anomalyEvents)
+      .where(
+        and(
+          eq(anomalyEvents.serverId, serverId),
+          eq(anomalyEvents.resolved, false),
+        ),
+      )
+      .groupBy(anomalyEvents.severity),
+  ]);
 
   return {
     anomalies: anomalies.map((a) => ({
@@ -398,7 +448,37 @@ export async function getServerAnomalies(
     severityBreakdown: Object.fromEntries(
       severityBreakdown.map((s) => [s.severity, Number(s.count)]),
     ),
+    total: Number(totalResult[0]?.count || 0),
   };
+}
+
+/**
+ * Resolve specific anomalies by IDs
+ */
+export async function resolveAnomaliesByIds(
+  serverId: number,
+  anomalyIds: number[],
+  options: { resolvedBy?: string; resolutionNote?: string } = {},
+): Promise<number> {
+  if (anomalyIds.length === 0) return 0;
+
+  const result = await db
+    .update(anomalyEvents)
+    .set({
+      resolved: true,
+      resolvedAt: new Date(),
+      resolvedBy: options.resolvedBy ?? null,
+      resolutionNote: options.resolutionNote ?? "Bulk resolved",
+    })
+    .where(
+      and(
+        eq(anomalyEvents.serverId, serverId),
+        sql`${anomalyEvents.id} = ANY(${anomalyIds})`,
+      ),
+    )
+    .returning({ id: anomalyEvents.id });
+
+  return result.length;
 }
 
 /**

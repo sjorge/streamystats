@@ -11,6 +11,8 @@ import { BarChart2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ServerSecurityContent } from "./ServerSecurityContent";
 
+const PAGE_SIZE = 50;
+
 export default async function ServerSecurityPage({
   params,
   searchParams,
@@ -22,10 +24,12 @@ export default async function ServerSecurityPage({
     userId?: string;
     dateFrom?: string;
     dateTo?: string;
+    page?: string;
   }>;
 }) {
   const { id } = await params;
-  const { resolved, severity, userId, dateFrom, dateTo } = await searchParams;
+  const { resolved, severity, userId, dateFrom, dateTo, page } =
+    await searchParams;
 
   const [server, isAdmin] = await Promise.all([
     getServer({ serverId: id }),
@@ -40,6 +44,9 @@ export default async function ServerSecurityPage({
     redirect(`/servers/${id}/dashboard`);
   }
 
+  const currentPage = Math.max(1, Number(page) || 1);
+  const offset = (currentPage - 1) * PAGE_SIZE;
+
   const [locations, anomalyData, stats, serverUsers] = await Promise.all([
     getServerLocations(server.id, { userId, dateFrom, dateTo }),
     getServerAnomalies(server.id, {
@@ -49,6 +56,8 @@ export default async function ServerSecurityPage({
       userId,
       dateFrom,
       dateTo,
+      limit: PAGE_SIZE,
+      offset,
     }),
     getServerLocationStats(server.id),
     getUsers({ serverId: server.id }),
@@ -68,6 +77,9 @@ export default async function ServerSecurityPage({
         severityBreakdown={anomalyData.severityBreakdown}
         stats={stats}
         users={serverUsers.map((u) => ({ id: u.id, name: u.name }))}
+        totalAnomalies={anomalyData.total}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
       />
     </Container>
   );

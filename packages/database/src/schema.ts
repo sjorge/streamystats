@@ -505,8 +505,10 @@ export const userFingerprints = pgTable(
       >()
       .default([]),
 
-    // Behavioral patterns
-    typicalHoursUtc: jsonb("typical_hours_utc").$type<number[]>().default([]),
+    // Behavioral patterns - hourly activity histogram (hour 0-23 -> session count)
+    hourHistogram: jsonb("hour_histogram")
+      .$type<Record<number, number>>()
+      .default({}),
     avgSessionsPerDay: doublePrecision("avg_sessions_per_day"),
     totalSessions: integer("total_sessions").default(0),
 

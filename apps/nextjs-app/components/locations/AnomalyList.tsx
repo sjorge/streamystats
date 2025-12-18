@@ -35,6 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Eye,
   Globe,
@@ -95,8 +97,13 @@ interface AnomalyListProps {
   onResolve?: (anomalyId: number, note?: string) => Promise<void>;
   onUnresolve?: (anomalyId: number) => Promise<void>;
   onResolveAll?: () => Promise<void>;
+  onResolveAllOnPage?: () => Promise<void>;
   hasFilters?: boolean;
   onClearFilters?: () => void;
+  totalCount?: number;
+  currentPage?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export function AnomalyList({
@@ -105,22 +112,51 @@ export function AnomalyList({
   onResolve,
   onUnresolve,
   onResolveAll,
+  onResolveAllOnPage,
   hasFilters,
   onClearFilters,
+  totalCount,
+  currentPage = 1,
+  pageSize = 50,
+  onPageChange,
 }: AnomalyListProps) {
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [resolveAllDialogOpen, setResolveAllDialogOpen] = useState(false);
   const [selectedAnomaly, setSelectedAnomaly] = useState<Anomaly | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const unresolvedCount = anomalies.filter((a) => !a.resolved).length;
+  const total = totalCount ?? anomalies.length;
+  const totalPages = Math.ceil(total / pageSize);
+  const showResolveAllModal = total > pageSize && onResolveAllOnPage;
 
-  const handleResolveAll = async () => {
+  const handleResolveAllClick = () => {
+    if (showResolveAllModal) {
+      setResolveAllDialogOpen(true);
+    } else {
+      handleResolveAllServer();
+    }
+  };
+
+  const handleResolveAllServer = async () => {
     if (!onResolveAll) return;
     setIsLoading(true);
     try {
       await onResolveAll();
+      setResolveAllDialogOpen(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResolveAllPage = async () => {
+    if (!onResolveAllOnPage) return;
+    setIsLoading(true);
+    try {
+      await onResolveAllOnPage();
+      setResolveAllDialogOpen(false);
     } finally {
       setIsLoading(false);
     }
@@ -186,14 +222,16 @@ export function AnomalyList({
           <div>
             <CardTitle>Security Anomalies</CardTitle>
             <CardDescription>
-              Unusual activity detected for this server
+              {total > 0
+                ? `Showing ${anomalies.length} of ${total} anomalies`
+                : "Unusual activity detected for this server"}
             </CardDescription>
           </div>
           {onResolveAll && unresolvedCount > 0 && (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleResolveAll}
+              onClick={handleResolveAllClick}
               disabled={isLoading}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -318,8 +356,78 @@ export function AnomalyList({
               ))}
             </TableBody>
           </Table>
+
+          {totalPages > 1 && onPageChange && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange(currentPage + 1)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={resolveAllDialogOpen}
+        onOpenChange={setResolveAllDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resolve All Anomalies</DialogTitle>
+            <DialogDescription>
+              Choose whether to resolve all anomalies on this page or all
+              anomalies on the server.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <p className="text-sm text-muted-foreground">
+              <strong>This page:</strong> {unresolvedCount} unresolved anomalies
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <strong>All on server:</strong> All unresolved anomalies will be
+              marked as resolved
+            </p>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setResolveAllDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleResolveAllPage}
+              disabled={isLoading}
+            >
+              {isLoading ? "Resolving..." : "Resolve on this page"}
+            </Button>
+            <Button onClick={handleResolveAllServer} disabled={isLoading}>
+              {isLoading ? "Resolving..." : "Resolve ALL on server"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
         <DialogContent>

@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getUserAnomalies,
   getUserFingerprint,
+  getUserHourHistogram,
   getUserLocationHistory,
   getUserUniqueLocations,
 } from "@/lib/db/locations";
@@ -39,12 +40,21 @@ export default async function UserSecurityPage({
     redirect("/");
   }
 
-  const [locations, locationHistory, fingerprint, anomalyData] =
+  // Calculate start of current week (Monday)
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(now);
+  weekStart.setUTCDate(now.getUTCDate() - daysToMonday);
+  weekStart.setUTCHours(0, 0, 0, 0);
+
+  const [locations, locationHistory, fingerprint, anomalyData, weekHistogram] =
     await Promise.all([
       getUserUniqueLocations(server.id, user.id),
       getUserLocationHistory(server.id, user.id, 20),
       getUserFingerprint(server.id, user.id),
       getUserAnomalies(server.id, user.id),
+      getUserHourHistogram(server.id, user.id, weekStart),
     ]);
 
   return (
@@ -67,6 +77,7 @@ export default async function UserSecurityPage({
         fingerprint={fingerprint}
         anomalies={anomalyData.anomalies}
         unresolvedCount={anomalyData.unresolvedCount}
+        weekHistogram={weekHistogram}
       />
     </Container>
   );
