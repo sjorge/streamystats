@@ -33,12 +33,14 @@ interface UserLocationMapProps {
   locations: LocationPoint[];
   height?: string;
   showLegend?: boolean;
+  mapKey?: string;
 }
 
 export function UserLocationMap({
   locations,
   height = "400px",
   showLegend = true,
+  mapKey,
 }: UserLocationMapProps) {
   // Filter out locations without coordinates
   const validLocations = locations.filter(
@@ -58,7 +60,11 @@ export function UserLocationMap({
 
   return (
     <div style={{ height }} className="rounded-lg overflow-hidden">
-      <MapWithNoSSR locations={validLocations} showLegend={showLegend} />
+      <MapWithNoSSR
+        locations={validLocations}
+        showLegend={showLegend}
+        mapKey={mapKey}
+      />
     </div>
   );
 }
