@@ -143,10 +143,10 @@ export function ActiveSessions({ server }: { server: Server }) {
               sortedSessions.length === 1
                 ? "grid grid-cols-1 gap-4 w-full max-w-full"
                 : sortedSessions.length === 2
-                  ? "grid grid-cols-1 xl:grid-cols-2 gap-4 w-full max-w-full"
-                  : sortedSessions.length === 3
-                    ? "grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4 w-full max-w-full"
-                    : "grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 gap-4 w-full max-w-full"
+                ? "grid grid-cols-1 xl:grid-cols-2 gap-4 w-full max-w-full"
+                : sortedSessions.length === 3
+                ? "grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4 w-full max-w-full"
+                : "grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 gap-4 w-full max-w-full"
             }
           >
             {sortedSessions.map((session) => {
@@ -278,7 +278,7 @@ export function ActiveSessions({ server }: { server: Server }) {
                                     {session.transcodingInfo.bitrate
                                       ? ` - ${(
                                           session.transcodingInfo.bitrate /
-                                            1000000
+                                          1000000
                                         ).toFixed(1)} Mbps`
                                       : ""}
                                     )
@@ -297,9 +297,9 @@ export function ActiveSessions({ server }: { server: Server }) {
                                     </div>
                                     <ul className="list-disc list-inside">
                                       {session.transcodingInfo.transcodeReasons.map(
-                                        (reason: string, index: number) => (
-                                          <li key={index}>{reason}</li>
-                                        ),
+                                        (reason: string) => (
+                                          <li key={reason}>{reason}</li>
+                                        )
                                       )}
                                     </ul>
                                   </div>
