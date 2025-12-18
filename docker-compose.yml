@@ -36,6 +36,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      job-server:
+        condition: service_healthy
     restart: unless-stopped
     logging: *default-logging
     networks:
