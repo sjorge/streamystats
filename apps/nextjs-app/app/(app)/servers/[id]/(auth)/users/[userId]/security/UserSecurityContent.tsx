@@ -158,7 +158,11 @@ export function UserSecurityContent({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <UserLocationMap locations={locations} height="300px" />
+              <UserLocationMap
+                locations={locations}
+                height="300px"
+                mapKey="overview-map"
+              />
             </CardContent>
           </Card>
         )}
@@ -204,7 +208,11 @@ export function UserSecurityContent({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <UserLocationMap locations={locations} height="500px" />
+            <UserLocationMap
+              locations={locations}
+              height="500px"
+              mapKey="map-tab-map"
+            />
           </CardContent>
         </Card>
       </TabsContent>
