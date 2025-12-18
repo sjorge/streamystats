@@ -29,7 +29,30 @@ export default async function DashboardPage({
 }) {
   const { id } = await params;
   const { userActivityStartDate, userActivityEndDate } = await searchParams;
-  const server = await getServer({ serverId: id });
+
+  return (
+    <Container className="relative flex flex-col w-screen md:w-[calc(100vw-256px)]">
+      <Suspense fallback={<Skeleton className="h-48 w-full mb-8" />}>
+        <DashboardContent
+          serverId={id}
+          userActivityStartDate={userActivityStartDate}
+          userActivityEndDate={userActivityEndDate}
+        />
+      </Suspense>
+    </Container>
+  );
+}
+
+async function DashboardContent({
+  serverId,
+  userActivityStartDate,
+  userActivityEndDate,
+}: {
+  serverId: string;
+  userActivityStartDate: string;
+  userActivityEndDate: string;
+}) {
+  const server = await getServer({ serverId });
 
   if (!server) {
     redirect("/not-found");
@@ -38,21 +61,19 @@ export default async function DashboardPage({
   const sas = await showAdminStatistics();
 
   return (
-    <Container className="relative flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <>
       {sas && (
         <div className="mb-8">
           <ActiveSessions server={server} />
         </div>
       )}
       <PageTitle title="General Statistics" />
-      <Suspense fallback={<Skeleton className="h-48 w-full" />}>
-        <GeneralStats
-          server={server}
-          userActivityStartDate={userActivityStartDate}
-          userActivityEndDate={userActivityEndDate}
-        />
-      </Suspense>
-    </Container>
+      <GeneralStats
+        server={server}
+        userActivityStartDate={userActivityStartDate}
+        userActivityEndDate={userActivityEndDate}
+      />
+    </>
   );
 }
 
