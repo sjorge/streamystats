@@ -1,7 +1,14 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
-import { type HistoryResponse, getHistory } from "@/lib/db/history";
+import {
+  type HistoryResponse,
+  getHistory,
+  getUniqueDeviceNames,
+  getUniqueClientNames,
+  getUniquePlayMethods,
+} from "@/lib/db/history";
 import { getServer } from "@/lib/db/server";
+import { getUsers } from "@/lib/db/users";
 import { redirect } from "next/navigation";
 import { HistoryTable } from "./HistoryTable";
 
@@ -15,24 +22,58 @@ export default async function HistoryPage({
     search?: string;
     sort_by?: string;
     sort_order?: string;
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+    itemType?: string;
+    deviceName?: string;
+    clientName?: string;
+    playMethod?: string;
   }>;
 }) {
   const { id } = await params;
-  const { page, search, sort_by, sort_order } = await searchParams;
+  const {
+    page,
+    search,
+    sort_by,
+    sort_order,
+    startDate,
+    endDate,
+    userId,
+    itemType,
+    deviceName,
+    clientName,
+    playMethod,
+  } = await searchParams;
   const server = await getServer({ serverId: id });
 
   if (!server) {
     redirect("/setup");
   }
 
-  const data = await getHistory(
-    server.id,
-    Number.parseInt(page || "1", 10),
-    50,
-    search,
-    sort_by,
-    sort_order,
-  );
+  const [data, users, deviceNames, clientNames, playMethods] = await Promise.all([
+    getHistory(
+      server.id,
+      Number.parseInt(page || "1", 10),
+      50,
+      search,
+      sort_by,
+      sort_order,
+      {
+        startDate,
+        endDate,
+        userId,
+        itemType,
+        deviceName,
+        clientName,
+        playMethod,
+      },
+    ),
+    getUsers({ serverId: server.id }),
+    getUniqueDeviceNames(server.id),
+    getUniqueClientNames(server.id),
+    getUniquePlayMethods(server.id),
+  ]);
 
   // Convert the data to match HistoryTable expectations
   const historyData: HistoryResponse = {
@@ -46,7 +87,14 @@ export default async function HistoryPage({
   return (
     <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
       <PageTitle title="History" subtitle="View playback history." />
-      <HistoryTable data={historyData} server={server} />
+      <HistoryTable
+        data={historyData}
+        server={server}
+        users={users}
+        deviceNames={deviceNames}
+        clientNames={clientNames}
+        playMethods={playMethods}
+      />
     </Container>
   );
 }

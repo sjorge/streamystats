@@ -38,8 +38,9 @@ import {
 import { useQueryParams } from "@/hooks/useQueryParams";
 import type { WatchTimePerType } from "@/lib/db/statistics";
 import { formatDuration } from "@/lib/utils";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useParams } from "next/navigation";
 import { Suspense } from "react";
+import { useRouter } from "nextjs-toploader/app";
 
 const chartConfig = {
   Episode: {
@@ -97,12 +98,15 @@ function WatchTimeChartView({
   startDate,
   endDate,
   bucket,
+  serverId,
 }: {
   data: WatchTimePerType;
   startDate: string;
   endDate: string;
   bucket: WatchtimeBucket;
+  serverId: string;
 }) {
+  const router = useRouter();
   const rangeStart = React.useMemo(() => {
     const d = startOfDay(new Date(startDate));
     if (Number.isNaN(d.getTime())) {
@@ -139,7 +143,7 @@ function WatchTimeChartView({
         day: "numeric",
       });
     },
-    [bucket],
+    [bucket]
   );
 
   const tooltipFormatter = React.useCallback(
@@ -155,7 +159,7 @@ function WatchTimeChartView({
         </div>
       );
     },
-    [],
+    []
   );
 
   const filteredData = React.useMemo(() => {
@@ -219,13 +223,34 @@ function WatchTimeChartView({
     return result;
   }, [data, rangeStart, rangeEnd, bucket]);
 
+  const handleClick = React.useCallback(
+    (data: unknown) => {
+      if (bucket !== "day") return;
+
+      const eventData = data as {
+        activePayload?: Array<{ payload?: { date: string } }>;
+      } | null;
+      const payload = eventData?.activePayload?.[0]?.payload;
+      if (!payload?.date) return;
+
+      const date = parseISO(payload.date);
+      if (Number.isNaN(date.getTime())) return;
+
+      const dateStr = format(date, "yyyy-MM-dd");
+      router.push(
+        `/servers/${serverId}/history?startDate=${dateStr}&endDate=${dateStr}`
+      );
+    },
+    [bucket, router, serverId]
+  );
+
   return (
     <ChartContainer
       id="watch-time-graph"
       config={chartConfig}
       className="aspect-auto h-[250px] w-full"
     >
-      <LineChart data={filteredData}>
+      <LineChart data={filteredData} onClick={handleClick}>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
@@ -236,7 +261,7 @@ function WatchTimeChartView({
           tickFormatter={tickFormatter}
         />
         <ChartTooltip
-          cursor={false}
+          cursor={bucket === "day"}
           formatter={tooltipFormatter}
           content={<ChartTooltipContent indicator="dashed" />}
         />
@@ -289,10 +314,12 @@ function LoadingChart() {
 
 export function WatchTimeGraph({ data, startDate, endDate }: Props) {
   const searchParams = useSearchParams();
+  const params = useParams();
+  const serverId = params.id as string;
   const bucketParam = searchParams.get("bucket");
   const bucket = React.useMemo(
     () => parseBucketParam(bucketParam),
-    [bucketParam],
+    [bucketParam]
   );
 
   const { updateQueryParams, isLoading } = useQueryParams();
@@ -307,7 +334,7 @@ export function WatchTimeGraph({ data, startDate, endDate }: Props) {
       const parsed = parseBucketParam(next);
       updateQueryParams({ bucket: parsed });
     },
-    [updateQueryParams],
+    [updateQueryParams]
   );
 
   const title = React.useMemo(() => {
@@ -363,6 +390,7 @@ export function WatchTimeGraph({ data, startDate, endDate }: Props) {
             startDate={startDate}
             endDate={endDate}
             bucket={bucket}
+            serverId={serverId}
           />
         </Suspense>
       </CardContent>

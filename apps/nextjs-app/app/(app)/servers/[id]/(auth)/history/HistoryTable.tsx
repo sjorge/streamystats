@@ -44,17 +44,28 @@ import { formatDuration } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import { useDebounce } from "use-debounce";
+import { HistoryFilters } from "./HistoryFilters";
+import { Input } from "@/components/ui/input";
+import { useEffect } from "react";
 
 export interface HistoryTableProps {
   data: HistoryResponse;
   server: Server;
   hideUserColumn?: boolean;
+  users: { id: string; name: string }[];
+  deviceNames: string[];
+  clientNames: string[];
+  playMethods: string[];
 }
 
 export function HistoryTable({
   data,
   server,
   hideUserColumn = false,
+  users,
+  deviceNames,
+  clientNames,
+  playMethods,
 }: HistoryTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -71,14 +82,14 @@ export function HistoryTable({
   const [debouncedSearch] = useDebounce(searchInput, 500);
 
   // Update URL when debounced search changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (debouncedSearch !== currentSearch) {
       updateQueryParams({
         search: debouncedSearch || null,
         page: "1", // Reset to first page on search change
       });
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, currentSearch, updateQueryParams]);
 
   // Create sorting state based on URL parameters
   const sorting: SortingState = currentSortBy
@@ -102,9 +113,12 @@ export function HistoryTable({
 
   const columns: ColumnDef<HistoryItem>[] = [
     {
-      accessorKey: "item_name",
+      accessorFn: (row) => row.item?.name || row.session.itemName || "",
+      id: "item_name",
       header: "Item",
       cell: ({ row }) => {
+        const itemName =
+          row.original.item?.name || row.original.session.itemName || "";
         const isDeleted =
           row.original.item?.deletedAt !== null &&
           row.original.item?.deletedAt !== undefined;
@@ -143,7 +157,7 @@ export function HistoryTable({
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <div className="capitalize font-medium transition-colors duration-200 group-hover:text-primary">
-                  {row.getValue("item_name")}
+                  {itemName}
                 </div>
                 {isDeleted && (
                   <Badge variant="destructive" className="text-xs px-1.5 py-0">
@@ -310,14 +324,14 @@ export function HistoryTable({
   ];
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
+    []
   );
   const [columnVisibility, setColumnVisibility, isLoadingVisibility] =
     usePersistantState<VisibilityState>(
       `history-column-visibility-${server.id}`,
       {
         user_name: !hideUserColumn,
-      },
+      }
     );
 
   // Handle pagination with URL query params
@@ -328,12 +342,12 @@ export function HistoryTable({
   };
 
   // Update column visibility when hideUserColumn prop changes
-  React.useEffect(() => {
+  useEffect(() => {
     setColumnVisibility((prev) => ({
       ...prev,
       user_name: !hideUserColumn,
     }));
-  }, [hideUserColumn]);
+  }, [hideUserColumn, setColumnVisibility]);
 
   const table = useReactTable({
     data: data.data || [],
@@ -355,7 +369,23 @@ export function HistoryTable({
 
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
+      <div className="flex flex-col">
+        <HistoryFilters
+          users={users}
+          deviceNames={deviceNames}
+          clientNames={clientNames}
+          playMethods={playMethods}
+        />
+      </div>
+      <div className="flex items-center pb-4">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search items or users..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
@@ -395,7 +425,7 @@ export function HistoryTable({
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext(),
+                            header.getContext()
                           )}
                     </TableHead>
                   );
@@ -414,7 +444,7 @@ export function HistoryTable({
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext(),
+                        cell.getContext()
                       )}
                     </TableCell>
                   ))}

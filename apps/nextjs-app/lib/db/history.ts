@@ -55,6 +55,15 @@ export const getHistory = async (
   search?: string,
   sortBy?: string,
   sortOrder?: string,
+  filters?: {
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+    itemType?: string;
+    deviceName?: string;
+    clientName?: string;
+    playMethod?: string;
+  },
 ): Promise<HistoryResponse> => {
   const offset = (page - 1) * perPage;
 
@@ -65,13 +74,59 @@ export const getHistory = async (
     isNotNull(sessions.userId),
   ];
 
+  // Add date range filters
+  if (filters?.startDate) {
+    const start = new Date(filters.startDate);
+    start.setHours(0, 0, 0, 0);
+    conditions.push(gte(sessions.createdAt, start));
+  }
+
+  if (filters?.endDate) {
+    const end = new Date(filters.endDate);
+    end.setHours(23, 59, 59, 999);
+    conditions.push(lte(sessions.createdAt, end));
+  }
+
+  // Add user filter
+  if (filters?.userId) {
+    conditions.push(eq(sessions.userId, filters.userId));
+  }
+
+  // Add device name filter
+  if (filters?.deviceName) {
+    conditions.push(eq(sessions.deviceName, filters.deviceName));
+  }
+
+  // Add client name filter
+  if (filters?.clientName) {
+    conditions.push(eq(sessions.clientName, filters.clientName));
+  }
+
+  // Add play method filter
+  if (filters?.playMethod) {
+    conditions.push(eq(sessions.playMethod, filters.playMethod));
+  }
+
   // Add search filter if provided
   if (search?.trim()) {
+    const searchTerm = `%${search.trim()}%`;
     conditions.push(
-      sql`(${sessions.itemName} ILIKE ${`%${search.trim()}%`} OR ${
-        sessions.userName
-      } ILIKE ${`%${search.trim()}%`})`,
+      or(
+        ilike(sessions.itemName, searchTerm),
+        ilike(sessions.userName, searchTerm),
+        ilike(items.name, searchTerm),
+        ilike(items.seriesName, searchTerm),
+      )!,
     );
+  }
+
+  // Add item type filter if provided (requires items join)
+  if (filters?.itemType && filters.itemType !== "all") {
+    if (filters.itemType === "Series") {
+      conditions.push(eq(items.type, "Episode"));
+    } else {
+      conditions.push(eq(items.type, filters.itemType));
+    }
   }
 
   // Build the query to get session data with joined item and user information
@@ -371,4 +426,73 @@ export const getHistoryByFilters = async ({
     item: row.items,
     user: row.users,
   }));
+};
+
+/**
+ * Get unique device names for a server
+ */
+export const getUniqueDeviceNames = async (
+  serverId: number,
+): Promise<string[]> => {
+  const result = await db
+    .selectDistinct({ deviceName: sessions.deviceName })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.serverId, serverId),
+        isNotNull(sessions.deviceName),
+        isNotNull(sessions.itemId),
+      ),
+    )
+    .orderBy(sessions.deviceName);
+
+  return result
+    .map((r) => r.deviceName)
+    .filter((name): name is string => name !== null);
+};
+
+/**
+ * Get unique client names for a server
+ */
+export const getUniqueClientNames = async (
+  serverId: number,
+): Promise<string[]> => {
+  const result = await db
+    .selectDistinct({ clientName: sessions.clientName })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.serverId, serverId),
+        isNotNull(sessions.clientName),
+        isNotNull(sessions.itemId),
+      ),
+    )
+    .orderBy(sessions.clientName);
+
+  return result
+    .map((r) => r.clientName)
+    .filter((name): name is string => name !== null);
+};
+
+/**
+ * Get unique play methods for a server
+ */
+export const getUniquePlayMethods = async (
+  serverId: number,
+): Promise<string[]> => {
+  const result = await db
+    .selectDistinct({ playMethod: sessions.playMethod })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.serverId, serverId),
+        isNotNull(sessions.playMethod),
+        isNotNull(sessions.itemId),
+      ),
+    )
+    .orderBy(sessions.playMethod);
+
+  return result
+    .map((r) => r.playMethod)
+    .filter((method): method is string => method !== null);
 };
