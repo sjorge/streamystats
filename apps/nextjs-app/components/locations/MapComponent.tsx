@@ -69,7 +69,7 @@ function FitBoundsComponent({ locations }: FitBoundsComponentProps) {
     if (locations.length === 0) return;
 
     const bounds = L.latLngBounds(
-      locations.map((loc) => [loc.latitude, loc.longitude] as [number, number]),
+      locations.map((loc) => [loc.latitude, loc.longitude] as [number, number])
     );
 
     map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
@@ -97,7 +97,8 @@ function formatDate(dateString: string): string {
 export default function MapComponent({
   locations,
   showLegend = true,
-}: MapComponentProps) {
+  mapKey,
+}: MapComponentProps & { mapKey?: string }) {
   // Calculate center from locations
   const center: [number, number] =
     locations.length > 0
@@ -109,9 +110,14 @@ export default function MapComponent({
         ]
       : [20, 0];
 
+  const containerId = mapKey
+    ? `map-container-${mapKey}`
+    : `map-container-${Math.random().toString(36).substring(7)}`;
+
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full" id={containerId}>
       <MapContainer
+        key={mapKey || containerId}
         center={center}
         zoom={2}
         className="h-full w-full"
