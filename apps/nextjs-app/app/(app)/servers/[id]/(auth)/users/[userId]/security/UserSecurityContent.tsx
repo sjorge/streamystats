@@ -24,7 +24,7 @@ import type {
 import { resolveAnomaly, unresolveAnomaly } from "@/lib/db/locations";
 import { Fingerprint, Globe, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 
 interface UserSecurityContentProps {
   serverId: number;

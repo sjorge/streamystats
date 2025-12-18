@@ -4,7 +4,7 @@ import { getUserById } from "@/lib/db/users";
 import { basePath } from "@/lib/utils";
 import { House } from "lucide-react";
 import { useParams, usePathname } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -30,6 +30,8 @@ const _map: Record<string, string> = {
   ai: "AI Recommendations",
   general: "General",
   security: "Security",
+  anomalies: "Anomalies",
+  map: "Map",
 };
 
 export const DynamicBreadcrumbs: React.FC = () => {
@@ -39,34 +41,56 @@ export const DynamicBreadcrumbs: React.FC = () => {
   const [dynamicLabels, setDynamicLabels] = useState<Record<string, string>>(
     {}
   );
+  const fetchedRef = useRef<Set<string>>(new Set());
 
-  const pathSegments = pathname
-    .split("/")
-    .filter((segment) => segment)
-    .slice(2);
+  const pathSegments = useMemo(
+    () =>
+      pathname
+        .split("/")
+        .filter((segment) => segment)
+        .slice(2),
+    [pathname]
+  );
 
   useEffect(() => {
-    const fetchDynamicLabels = async () => {
-      const labels: Record<string, string> = {};
-      for (let i = 0; i < pathSegments.length; i++) {
-        const segment = pathSegments[i];
-        const prevSegment = pathSegments[i - 1];
+    let cancelled = false;
 
-        // Fetch user name if previous segment is "users"
-        if (prevSegment === "users" && !_map[segment]) {
-          const user = await getUserById({ userId: segment, serverId: id });
-          if (user?.name) {
-            labels[segment] = user.name;
+    const fetchDynamicLabels = async () => {
+      const segments = pathname
+        .split("/")
+        .filter((segment) => segment)
+        .slice(2);
+
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const prevSegment = segments[i - 1];
+
+        // Fetch user name if previous segment is "users" and not already fetched
+        if (
+          prevSegment === "users" &&
+          !_map[segment] &&
+          !fetchedRef.current.has(segment)
+        ) {
+          fetchedRef.current.add(segment);
+
+          try {
+            const user = await getUserById({ userId: segment, serverId: id });
+            if (!cancelled && user?.name) {
+              setDynamicLabels((prev) => ({ ...prev, [segment]: user.name }));
+            }
+          } catch {
+            // Ignore errors
           }
         }
-      }
-      if (Object.keys(labels).length > 0) {
-        setDynamicLabels(labels);
       }
     };
 
     fetchDynamicLabels();
-  }, [id, pathSegments]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, pathname]);
 
   const getLabel = (segment: string): string => {
     return dynamicLabels[segment] || _map[segment] || segment;

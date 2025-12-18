@@ -2,15 +2,6 @@ import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
   getUserAnomalies,
   getUserFingerprint,
   getUserHourHistogram,
@@ -20,7 +11,6 @@ import {
 import { getServer } from "@/lib/db/server";
 import { getUserById } from "@/lib/db/users";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import { UserSecurityContent } from "./UserSecurityContent";
 
 export default async function UserSecurityPage({
