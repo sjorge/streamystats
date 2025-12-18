@@ -1,6 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-Always use conventional commit messages when creating GitHub pull requests (PRs) or creating commit messages. Examples: feat:, fix:, chore:. 

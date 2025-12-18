@@ -1,6 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-Don't run the phoenix server to troubleshoot. Assume the server is running elsewhere. Compiling, migrating or any other command that runs and terminates it self is fine.

@@ -1,0 +1,125 @@
+"use client";
+
+import { getUserById } from "@/lib/db/users";
+import { basePath } from "@/lib/utils";
+import { House } from "lucide-react";
+import { useParams, usePathname } from "next/navigation";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "./ui/breadcrumb";
+
+const _map: Record<string, string> = {
+  "backup-and-import": "Backup & Import",
+  "database-backup-restore": "Database Backup & Restore",
+  "jellystats-import": "Jellystats Import",
+  "playback-reporting-import": "Playback Reporting Import",
+  settings: "Settings",
+  activities: "Activities",
+  history: "History",
+  items: "Items",
+  users: "Users",
+  library: "Library",
+  dashboard: "Dashboard",
+  watchtime: "Watchtime",
+  transcoding: "Transcoding",
+  clients: "Clients",
+  chat: "AI Chat",
+  ai: "AI Recommendations",
+  general: "General",
+  security: "Security",
+  anomalies: "Anomalies",
+  map: "Map",
+};
+
+export const DynamicBreadcrumbs: React.FC = () => {
+  const params = useParams();
+  const { id } = params as { id: string };
+  const pathname = usePathname();
+  const [dynamicLabels, setDynamicLabels] = useState<Record<string, string>>(
+    {},
+  );
+  const fetchedRef = useRef<Set<string>>(new Set());
+
+  const pathSegments = useMemo(
+    () =>
+      pathname
+        .split("/")
+        .filter((segment) => segment)
+        .slice(2),
+    [pathname],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchDynamicLabels = async () => {
+      const segments = pathname
+        .split("/")
+        .filter((segment) => segment)
+        .slice(2);
+
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const prevSegment = segments[i - 1];
+
+        // Fetch user name if previous segment is "users" and not already fetched
+        if (
+          prevSegment === "users" &&
+          !_map[segment] &&
+          !fetchedRef.current.has(segment)
+        ) {
+          fetchedRef.current.add(segment);
+
+          try {
+            const user = await getUserById({ userId: segment, serverId: id });
+            if (!cancelled && user?.name) {
+              setDynamicLabels((prev) => ({ ...prev, [segment]: user.name }));
+            }
+          } catch {
+            // Ignore errors
+          }
+        }
+      }
+    };
+
+    fetchDynamicLabels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, pathname]);
+
+  const getLabel = (segment: string): string => {
+    return dynamicLabels[segment] || _map[segment] || segment;
+  };
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink href={`${basePath}/servers/${id}/dashboard`}>
+            <House className="h-4 w-4 ml-1" />
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        {pathSegments.map((segment, index) => {
+          const url = `${basePath}/servers/${id}/${pathSegments
+            .slice(0, index + 1)
+            .join("/")}`;
+          return (
+            <React.Fragment key={url}>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink href={url}>{getLabel(segment)}</BreadcrumbLink>
+              </BreadcrumbItem>
+            </React.Fragment>
+          );
+        })}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+};

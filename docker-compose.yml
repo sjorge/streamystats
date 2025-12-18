@@ -1,46 +1,91 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
-  app:
-    image: fredrikburmester/streamystats-nextjs:edge
+  migrate:
+    image: docker.io/fredrikburmester/streamystats-v2-migrate:${VERSION:-latest}
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vectorchord:5432/${POSTGRES_DB:-streamystats}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-streamystats}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-postgres}
+    depends_on:
+      vectorchord:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+    networks:
+      - app-network
+
+  nextjs-app:
+    image: docker.io/fredrikburmester/streamystats-v2-nextjs:${VERSION:-latest}
     ports:
       - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vectorchord:5432/${POSTGRES_DB:-streamystats}
+      - JOB_SERVER_URL=http://job-server:3005
+      - HOSTNAME=0.0.0.0
+      - SESSION_SECRET=${SESSION_SECRET}
     depends_on:
-      - phoenix
+      vectorchord:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      job-server:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
     networks:
-      - backend
-    environment:
-      API_URL: "http://phoenix:4000/api"
-      TZ: "Europe/Stockholm"
+      - app-network
 
-  phoenix:
-    image: fredrikburmester/streamystats-phoenix:edge
+  job-server:
+    image: docker.io/fredrikburmester/streamystats-v2-job-server:${VERSION:-latest}
     environment:
-      DATABASE_URL: "ecto://postgres:postgres@db/streamystat"
-      SECRET_KEY_BASE: "r0NgGxu5ETTDgF5G7mJsMevMbAF7y4w0IJlCRjzxHqSjbcrPqTQTzajOH0ne0sHH"
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-    ports:
-      - "4000:4000"
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vectorchord:5432/${POSTGRES_DB:-streamystats}
+      - PORT=3005
+      - HOST=0.0.0.0
     depends_on:
-      - db
+      vectorchord:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    logging: *default-logging
     networks:
-      - backend
+      - app-network
 
-  db:
-    image: pgvector/pgvector:pg16
+  vectorchord:
+    image: tensorchord/vchord-postgres:pg17-v0.4.1
+    command: ["postgres", "-c", "log_checkpoints=off"]
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      PGDATA: /var/lib/postgresql/data/pgdata
-    restart: always
-    networks:
-      - backend
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-streamystats}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - vectorchord_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-streamystats}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app-network
 
 volumes:
-  pgdata:
+  vectorchord_data:
 
 networks:
-  backend:
+  app-network:

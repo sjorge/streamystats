@@ -1,0 +1,1 @@
+ALTER TABLE "servers" ADD CONSTRAINT "servers_url_unique" UNIQUE("url");

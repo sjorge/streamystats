@@ -1,6 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-Don't ever start the nextjs server. You are free to build but not start or run dev server.

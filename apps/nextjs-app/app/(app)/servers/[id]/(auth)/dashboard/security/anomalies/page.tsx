@@ -1,0 +1,57 @@
+import { getServerAnomalies } from "@/lib/db/locations";
+import { getServer } from "@/lib/db/server";
+import { redirect } from "next/navigation";
+import { AnomaliesContent } from "./AnomaliesContent";
+
+const PAGE_SIZE = 50;
+
+export default async function AnomaliesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    resolved?: string;
+    severity?: string;
+    userId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: string;
+  }>;
+}) {
+  const { id } = await params;
+  const { resolved, severity, userId, dateFrom, dateTo, page } =
+    await searchParams;
+
+  const server = await getServer({ serverId: id });
+  if (!server) {
+    redirect("/");
+  }
+
+  const currentPage = Math.max(1, Number(page) || 1);
+  const offset = (currentPage - 1) * PAGE_SIZE;
+
+  const anomalyData = await getServerAnomalies(server.id, {
+    resolved:
+      resolved === "true" ? true : resolved === "false" ? false : undefined,
+    severity,
+    userId,
+    dateFrom,
+    dateTo,
+    limit: PAGE_SIZE,
+    offset,
+  });
+
+  const hasFilters = !!(userId || dateFrom || dateTo);
+
+  return (
+    <AnomaliesContent
+      serverId={server.id}
+      anomalies={anomalyData.anomalies}
+      totalAnomalies={anomalyData.total}
+      currentPage={currentPage}
+      pageSize={PAGE_SIZE}
+      hasLocationFilters={hasFilters}
+    />
+  );
+}

@@ -1,0 +1,55 @@
+{
+  "name": "streamystats",
+  "version": "2.12.0",
+  "description": "StreamyStats - Jellyfin analytics platform",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run dev:all",
+    "build": "bun run build:all",
+    "start": "bun run start:all",
+    "dev:job-server": "cd apps/job-server && bun run dev",
+    "dev:nextjs": "cd apps/nextjs-app && bun run dev",
+    "dev:all": "bun run dev:job-server & bun run dev:nextjs",
+    "start:job-server": "cd apps/job-server && bun run start",
+    "start:nextjs": "cd apps/nextjs-app && bun run start",
+    "start:all": "bun run start:job-server & bun run start:nextjs",
+    "build:database": "cd packages/database && bun run build",
+    "build:nextjs": "cd apps/nextjs-app && bun run build --experimental-build-mode compile",
+    "build:all": "bun run build:database && bun run build:nextjs",
+    "docker:build": "./build-and-push.sh",
+    "db:generate": "cd packages/database && bun run db:generate",
+    "db:migrate": "cd packages/database && bun run db:migrate",
+    "db:studio": "cd packages/database && bun run db:studio",
+    "lint": "cd apps/nextjs-app && bun run lint",
+    "lint:fix": "cd apps/nextjs-app && bun run lint:fix",
+    "install:bun": "bun install"
+  },
+  "keywords": [
+    "jellyfin",
+    "analytics",
+    "typescript",
+    "nextjs",
+    "postgres",
+    "drizzle"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "drizzle-orm": "0.45.1",
+    "@types/react": "19.1.5",
+    "@types/react-dom": "19.1.5"
+  },
+  "trustedDependencies": [
+    "sharp",
+    "esbuild",
+    "@biomejs/biome"
+  ]
+}

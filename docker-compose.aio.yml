@@ -1,0 +1,38 @@
+# All-in-One Docker Compose for StreamyStats
+# Single container with PostgreSQL + Job Server + Next.js
+#
+# Usage:
+#   docker compose -f docker-compose.aio.yml up -d
+#
+# Or with docker run:
+#   docker run -d \
+#     --name streamystats \
+#     -p 3000:3000 \
+#     -v streamystats_data:/var/lib/postgresql/data \
+#     -e SESSION_SECRET="your-secret-here" \
+#     fredrikburmester/streamystats-v2-aio:latest
+
+services:
+  streamystats:
+    image: docker.io/fredrikburmester/streamystats-v2-aio:${VERSION:-latest}
+    ports:
+      - "3000:3000"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-streamystats}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@localhost:5432/${POSTGRES_DB:-streamystats}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - NODE_ENV=production
+    volumes:
+      - streamystats_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  streamystats_data:
+

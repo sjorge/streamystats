@@ -1,0 +1,111 @@
+name: Manual Docker Build & Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Docker image tag (e.g., v2.6.0)"
+        required: true
+        type: string
+      push_to_registry:
+        description: "Push images to registry"
+        required: true
+        type: boolean
+        default: true
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - streamystats-v2-nextjs
+          - streamystats-v2-job-server
+          - streamystats-v2-migrate
+        include:
+          - part: streamystats-v2-nextjs
+            folder: .
+            dockerfile: apps/nextjs-app/Dockerfile
+          - part: streamystats-v2-job-server
+            folder: .
+            dockerfile: apps/job-server/Dockerfile
+          - part: streamystats-v2-migrate
+            folder: .
+            dockerfile: migration.Dockerfile
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: ${{ inputs.push_to_registry }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAMESPACE }}/${{ matrix.part }}
+          tags: |
+            type=raw,value=${{ inputs.tag }}
+            type=raw,value=latest
+
+      - name: Build and push ${{ matrix.part }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.folder }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ inputs.tag }}
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
+          push: ${{ inputs.push_to_registry }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Image digest
+        run: echo "Built image ${{ env.IMAGE_NAMESPACE }}/${{ matrix.part }}:${{ inputs.tag }}"
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: always()
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## 🚀 Manual Docker Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`${{ inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** \`${{ env.IMAGE_NAMESPACE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Push to Registry:** \`${{ inputs.push_to_registry }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Built Images:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.IMAGE_NAMESPACE }}/streamystats-v2-nextjs:${{ inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.IMAGE_NAMESPACE }}/streamystats-v2-job-server:${{ inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.IMAGE_NAMESPACE }}/streamystats-v2-migrate:${{ inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Usage:" >> $GITHUB_STEP_SUMMARY
+          echo "Update your \`docker-compose.yml\` with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "export VERSION=${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker-compose up -d" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

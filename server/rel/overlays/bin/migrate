@@ -1,5 +1,0 @@
-#!/bin/sh
-set -eu
-
-cd -P -- "$(dirname -- "$0")"
-exec ./streamystat_server eval StreamystatServer.Release.migrate
