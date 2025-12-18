@@ -13,12 +13,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { WatchTimePerHour as IWatchTimePerHour } from "@/lib/db/users";
+import type { WatchTimePerHour as IWatchTimePerHour } from "@/lib/db/users";
 import { utcHourToLocalHour } from "@/lib/timezone";
 import { formatDuration } from "@/lib/utils";
 

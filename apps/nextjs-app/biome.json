@@ -20,7 +20,7 @@
     "enabled": true,
     "rules": {
       "style": {
-        "useImportType": "off",
+        "useImportType": "warn",
         "noNonNullAssertion": "off"
       },
       "recommended": true,

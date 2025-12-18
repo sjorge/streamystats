@@ -1,7 +1,7 @@
 "use server";
 
 import { shouldUseSecureCookies } from "@/lib/secure-cookies";
-import { JWTPayload, SignJWT, jwtVerify } from "jose";
+import { type JWTPayload, SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
 const SECRET = new TextEncoder().encode(

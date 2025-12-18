@@ -1,5 +1,5 @@
 import { fetch } from "@/lib/utils";
-import { Item, User } from "@streamystats/database/schema";
+import type { Item, User } from "@streamystats/database/schema";
 import { toast } from "sonner";
 
 export type ActiveSession = {

@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/api-auth";
-import { ActiveSession } from "@/lib/db/active-sessions";
+import type { ActiveSession } from "@/lib/db/active-sessions";
 import { getServer } from "@/lib/db/server";
 import { db, items, users } from "@streamystats/database";
 import { eq } from "drizzle-orm";

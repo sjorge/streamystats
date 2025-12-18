@@ -5,7 +5,7 @@ import { getServer } from "@/lib/db/server";
 import { getTranscodingStatistics } from "@/lib/db/transcoding-statistics";
 import { getMe } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
-import { Server } from "@streamystats/database";
+import type { Server } from "@streamystats/database";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { TranscodingStatistics } from "../TranscodingStatistics";

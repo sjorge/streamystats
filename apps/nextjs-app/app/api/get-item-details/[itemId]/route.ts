@@ -1,7 +1,7 @@
 import { requireApiKey } from "@/lib/api-auth";
 import { getItemDetails } from "@/lib/db/items";
 import { getServer } from "@/lib/db/server";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
 /**
  * API Route: GET /api/get-item-details/[itemId]?serverId=123

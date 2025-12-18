@@ -1,8 +1,8 @@
 import "server-only";
 import {
-  Item,
-  Session,
-  User,
+  type Item,
+  type Session,
+  type User,
   db,
   items,
   sessions,

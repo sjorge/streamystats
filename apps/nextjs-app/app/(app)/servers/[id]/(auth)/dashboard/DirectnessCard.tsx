@@ -13,12 +13,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { DirectnessStat } from "@/lib/db/transcoding-statistics";
+import type { DirectnessStat } from "@/lib/db/transcoding-statistics";
 import { InfoIcon } from "lucide-react";
 import {
   Bar,

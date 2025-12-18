@@ -1,15 +1,15 @@
 import {
-  Item,
-  Session,
-  User,
+  type Item,
+  type Session,
+  type User,
   db,
   items,
   sessions,
   users,
 } from "@streamystats/database";
 import {
-  AnyColumn,
-  SQL,
+  type AnyColumn,
+  type SQL,
   and,
   asc,
   desc,

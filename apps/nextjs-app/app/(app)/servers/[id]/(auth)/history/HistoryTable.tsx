@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/table";
 import { usePersistantState } from "@/hooks/usePersistantState";
 import { useQueryParams } from "@/hooks/useQueryParams";
-import { HistoryItem, HistoryResponse } from "@/lib/db/history";
+import type { HistoryItem, HistoryResponse } from "@/lib/db/history";
 import { formatLocalDate } from "@/lib/timezone";
 import type { Server } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";

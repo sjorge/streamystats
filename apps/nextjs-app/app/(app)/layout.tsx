@@ -2,7 +2,7 @@
 
 import { VersionBadge } from "@/components/VersionBadge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 
 type Props = PropsWithChildren;
 

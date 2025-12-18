@@ -1,4 +1,4 @@
-import { User, db, items, sessions, users } from "@streamystats/database";
+import { type User, db, items, sessions, users } from "@streamystats/database";
 import {
   and,
   desc,

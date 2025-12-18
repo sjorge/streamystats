@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateUS, formatDuration } from "@/lib/utils";
-import { Item } from "@streamystats/database/schema";
+import type { Item } from "@streamystats/database/schema";
 import {
   BarChart3,
   Percent,

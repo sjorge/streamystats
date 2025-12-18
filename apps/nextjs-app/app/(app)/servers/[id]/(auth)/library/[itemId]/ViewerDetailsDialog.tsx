@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ItemUserStats } from "@/lib/db/items";
+import type { ItemUserStats } from "@/lib/db/items";
 import { formatDateUS, formatDuration } from "@/lib/utils";
 import { ArrowUpDown, Loader2, Search, Users, X } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";

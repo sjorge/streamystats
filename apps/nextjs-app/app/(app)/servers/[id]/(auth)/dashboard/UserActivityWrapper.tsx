@@ -1,7 +1,7 @@
 import { getDefaultStartDate, setEndDateToEndOfDay } from "@/dates";
 import { getUserActivityPerDay } from "@/lib/db/users";
-import { Server } from "@streamystats/database";
-import * as React from "react";
+import type { Server } from "@streamystats/database";
+import type * as React from "react";
 import { UserActivityChart } from "./UserActivityChart";
 
 interface Props {

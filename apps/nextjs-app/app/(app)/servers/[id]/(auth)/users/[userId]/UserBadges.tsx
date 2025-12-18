@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import type { User } from "@/lib/types";
-import React from "react";
+import type React from "react";
 
 interface UserBadgesProps {
   user: User;

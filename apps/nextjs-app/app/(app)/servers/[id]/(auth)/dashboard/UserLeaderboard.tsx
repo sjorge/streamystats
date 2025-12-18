@@ -1,5 +1,5 @@
 import { getTotalWatchTimeForUsers, getUsers } from "@/lib/db/users";
-import { Server, User } from "@streamystats/database/schema";
+import type { Server, User } from "@streamystats/database/schema";
 import { UserLeaderboardTable } from "./UserLeaderBoardTable";
 
 interface Props {

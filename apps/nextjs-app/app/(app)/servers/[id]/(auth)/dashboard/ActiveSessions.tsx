@@ -16,8 +16,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ActiveSession, getActiveSessions } from "@/lib/db/active-sessions";
-import { Server } from "@streamystats/database/schema";
+import {
+  type ActiveSession,
+  getActiveSessions,
+} from "@/lib/db/active-sessions";
+import type { Server } from "@streamystats/database/schema";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {

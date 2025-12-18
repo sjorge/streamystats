@@ -2,7 +2,7 @@
 
 import { db } from "@streamystats/database";
 import {
-  Item,
+  type Item,
   hiddenRecommendations,
   items,
   sessions,

@@ -1,8 +1,8 @@
 "use server";
 
-import { Server } from "@streamystats/database";
-import { NextRequest } from "next/server";
-import { SessionUser, getSession } from "./session";
+import type { Server } from "@streamystats/database";
+import type { NextRequest } from "next/server";
+import { type SessionUser, getSession } from "./session";
 
 /**
  * Validates API key from Authorization header against the actual Jellyfin server

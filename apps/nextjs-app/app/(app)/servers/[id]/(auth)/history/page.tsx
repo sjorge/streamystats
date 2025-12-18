@@ -1,6 +1,6 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
-import { HistoryResponse, getHistory } from "@/lib/db/history";
+import { type HistoryResponse, getHistory } from "@/lib/db/history";
 import { getServer } from "@/lib/db/server";
 import { redirect } from "next/navigation";
 import { HistoryTable } from "./HistoryTable";

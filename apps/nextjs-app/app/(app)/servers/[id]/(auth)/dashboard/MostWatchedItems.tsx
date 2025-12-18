@@ -12,7 +12,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { usePersistantState } from "@/hooks/usePersistantState";
 import { formatDuration } from "@/lib/utils";
-import { Item, Server } from "@streamystats/database/schema";
+import type { Item, Server } from "@streamystats/database/schema";
 import { Settings } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";

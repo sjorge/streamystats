@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { usePersistantState } from "@/hooks/usePersistantState";
 import { formatDuration } from "@/lib/utils";
-import { Server, User } from "@streamystats/database";
+import type { Server, User } from "@streamystats/database";
 import { Clock, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";

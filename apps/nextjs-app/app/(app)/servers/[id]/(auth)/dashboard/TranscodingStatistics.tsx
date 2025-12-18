@@ -1,6 +1,6 @@
 "use client";
 
-import { TranscodingStatisticsResponse } from "@/lib/db/transcoding-statistics";
+import type { TranscodingStatisticsResponse } from "@/lib/db/transcoding-statistics";
 import { BitrateDistributionCard } from "./BitrateDistributionCard";
 import { CodecUsageCard } from "./CodecUsageCard";
 import { ContainerFormatCard } from "./ContainerFormatCard";

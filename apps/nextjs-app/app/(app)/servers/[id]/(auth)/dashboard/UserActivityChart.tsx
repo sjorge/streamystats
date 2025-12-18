@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -41,7 +41,7 @@ import {
   setEndDateToEndOfDay,
 } from "@/dates";
 import { useQueryParams } from "@/hooks/useQueryParams";
-import { UserActivityPerDay } from "@/lib/db/users";
+import type { UserActivityPerDay } from "@/lib/db/users";
 import { UsersIcon } from "lucide-react";
 
 const chartConfig = {

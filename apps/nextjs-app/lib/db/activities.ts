@@ -1,8 +1,8 @@
 import { db } from "@streamystats/database";
 import { activities } from "@streamystats/database/schema";
 import {
-  AnyColumn,
-  SQL,
+  type AnyColumn,
+  type SQL,
   and,
   asc,
   count,

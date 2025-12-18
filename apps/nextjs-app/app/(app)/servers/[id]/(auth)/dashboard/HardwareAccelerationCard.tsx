@@ -10,12 +10,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { CategoryStat } from "@/lib/db/transcoding-statistics";
+import type { CategoryStat } from "@/lib/db/transcoding-statistics";
 import { ZapIcon } from "lucide-react";
 import React from "react";
 import {

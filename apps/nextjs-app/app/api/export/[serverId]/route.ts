@@ -2,7 +2,7 @@ import { requireAdmin } from "@/lib/api-auth";
 import { getServer } from "@/lib/db/server";
 import { db, sessions } from "@streamystats/database";
 import { eq } from "drizzle-orm";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

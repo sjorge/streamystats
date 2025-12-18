@@ -2,9 +2,9 @@
 
 import { db } from "@streamystats/database";
 import { type NewSession, sessions } from "@streamystats/database/schema";
-import {
-  type LegacyImportState,
-  type LegacySessionData,
+import type {
+  LegacyImportState,
+  LegacySessionData,
 } from "./types/legacy-import";
 
 export async function importFromLegacy(

@@ -13,12 +13,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { NumericStat } from "@/lib/db/transcoding-statistics";
+import type { NumericStat } from "@/lib/db/transcoding-statistics";
 import { InfoIcon } from "lucide-react";
 import React from "react";
 import {

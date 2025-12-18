@@ -12,7 +12,7 @@ import { getServer, getServers } from "@/lib/db/server";
 import { getMe, isUserAdmin } from "@/lib/db/users";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { PropsWithChildren, Suspense } from "react";
+import { type PropsWithChildren, Suspense } from "react";
 
 interface Props extends PropsWithChildren {
   params: Promise<{ id: string }>;

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  ImportState,
+  type ImportState,
   importFromPlaybackReporting,
 } from "@/lib/importPlaybackReporting";
 import {

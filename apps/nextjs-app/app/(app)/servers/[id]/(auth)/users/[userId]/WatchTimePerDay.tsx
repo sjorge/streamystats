@@ -16,12 +16,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { WatchTimePerWeekDay } from "@/lib/db/users";
+import type { WatchTimePerWeekDay } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { useMemo } from "react";
 

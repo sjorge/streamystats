@@ -10,8 +10,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Server } from "@streamystats/database";
-import { EyeOffIcon, Link2, LucideIcon, TrendingUp } from "lucide-react";
+import type { Server } from "@streamystats/database";
+import { EyeOffIcon, Link2, type LucideIcon, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";

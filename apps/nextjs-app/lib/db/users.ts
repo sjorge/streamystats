@@ -1,6 +1,6 @@
 "use server";
 
-import { User, db, items, sessions, users } from "@streamystats/database";
+import { type User, db, items, sessions, users } from "@streamystats/database";
 import { and, eq, gte, inArray, isNotNull, lte, sql, sum } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { destroySession, getSession } from "../session";

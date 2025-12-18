@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  UpdateServerConnectionResult,
+  type UpdateServerConnectionResult,
   updateServerConnection,
 } from "@/lib/db/server";
 import { shouldUseSecureCookies } from "@/lib/secure-cookies";

@@ -1,7 +1,7 @@
 "use client";
 
 import { logout } from "@/lib/db/users";
-import { User } from "@streamystats/database";
+import type { User } from "@streamystats/database";
 import { ChevronsUpDown, Loader2, LogOut } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
