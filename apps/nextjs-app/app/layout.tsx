@@ -5,6 +5,7 @@ import "./globals.css";
 import { ServerConnectivityMonitor } from "@/components/ServerConnectivityMonitor";
 import { Toaster } from "@/components/ui/sonner";
 import NextTopLoader from "nextjs-toploader";
+import { Suspense } from "react";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -37,7 +38,9 @@ export default function RootLayout({
         <NextTopLoader color="#1C4ED8" />
         {children}
         <Toaster richColors expand />
-        <ServerConnectivityMonitor />
+        <Suspense fallback={null}>
+          <ServerConnectivityMonitor />
+        </Suspense>
       </body>
     </html>
   );

@@ -9,7 +9,6 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getServer, getServers } from "@/lib/db/server";
 import { getMe, isUserAdmin } from "@/lib/db/users";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { type PropsWithChildren, Suspense } from "react";
 
@@ -17,7 +16,8 @@ interface Props extends PropsWithChildren {
   params: Promise<{ id: string }>;
 }
 
-async function SideBarContent({ serverId }: { serverId: string }) {
+async function SideBarContent({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const [servers, me, isAdmin] = await Promise.all([
     getServers(),
     getMe(),
@@ -25,7 +25,7 @@ async function SideBarContent({ serverId }: { serverId: string }) {
   ]);
 
   if (!me) {
-    redirect(`/servers/${serverId}/login`);
+    redirect(`/servers/${id}/login`);
   }
 
   return (
@@ -36,8 +36,12 @@ async function SideBarContent({ serverId }: { serverId: string }) {
   );
 }
 
-async function HeaderContent({ serverId }: { serverId: string }) {
-  const [server, me] = await Promise.all([getServer({ serverId }), getMe()]);
+async function HeaderContent({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const [server, me] = await Promise.all([
+    getServer({ serverId: id }),
+    getMe(),
+  ]);
 
   const chatConfigured = !!(server?.chatProvider && server?.chatModel);
 
@@ -74,21 +78,16 @@ function SideBarSkeleton() {
   return <Skeleton className="h-full w-64" />;
 }
 
-export default async function layout({ children, params }: Props) {
-  const { id } = await params;
-  const cookieStore = await cookies();
-  const sidebarCookie = cookieStore.get("sidebar_state")?.value;
-  const defaultSidebarOpen = sidebarCookie ? sidebarCookie === "true" : true;
-
+export default function layout({ children, params }: Props) {
   return (
-    <SidebarProvider defaultOpen={defaultSidebarOpen}>
+    <SidebarProvider>
       <Suspense fallback={<SideBarSkeleton />}>
-        <SideBarContent serverId={id} />
+        <SideBarContent params={params} />
       </Suspense>
       <ErrorBoundary>
         <main>
           <Suspense fallback={<HeaderSkeleton />}>
-            <HeaderContent serverId={id} />
+            <HeaderContent params={params} />
           </Suspense>
           <Suspense fallback={<SuspenseLoading />}>{children}</Suspense>
         </main>
