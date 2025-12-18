@@ -47,7 +47,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Build Next.js with Bun
 WORKDIR /app/apps/nextjs-app
 RUN --mount=type=cache,target=/app/apps/nextjs-app/.next/cache \
-    bun --bun next build
+    bun --bun next build --experimental-build-mode compile
 
 # Production runtime stage
 FROM oven/bun:1.3.4-alpine AS runner
