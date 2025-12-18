@@ -46,6 +46,7 @@ import {
   Navigation,
   XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { AnomalySeverityBadge, AnomalyTypeBadge } from "./AnomalyBadge";
 
@@ -93,6 +94,7 @@ interface Anomaly {
 
 interface AnomalyListProps {
   anomalies: Anomaly[];
+  serverId?: number;
   showUserColumn?: boolean;
   onResolve?: (anomalyId: number, note?: string) => Promise<void>;
   onUnresolve?: (anomalyId: number) => Promise<void>;
@@ -108,6 +110,7 @@ interface AnomalyListProps {
 
 export function AnomalyList({
   anomalies,
+  serverId,
   showUserColumn = true,
   onResolve,
   onUnresolve,
@@ -266,7 +269,16 @@ export function AnomalyList({
                   </TableCell>
                   {showUserColumn && (
                     <TableCell>
-                      {anomaly.userName || anomaly.userId || "Unknown"}
+                      {anomaly.userId && serverId ? (
+                        <Link
+                          href={`/servers/${serverId}/users/${anomaly.userId}/security`}
+                          className="text-primary hover:underline"
+                        >
+                          {anomaly.userName || anomaly.userId}
+                        </Link>
+                      ) : (
+                        anomaly.userName || anomaly.userId || "Unknown"
+                      )}
                     </TableCell>
                   )}
                   <TableCell className="max-w-[300px]">

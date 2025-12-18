@@ -449,6 +449,7 @@ export function ServerSecurityContent({
 
           <AnomalyList
             anomalies={anomalies}
+            serverId={serverId}
             showUserColumn={true}
             onResolve={handleResolve}
             onUnresolve={handleUnresolve}

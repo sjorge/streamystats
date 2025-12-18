@@ -37,7 +37,7 @@ export const DynamicBreadcrumbs: React.FC = () => {
   const { id } = params as { id: string };
   const pathname = usePathname();
   const [dynamicLabels, setDynamicLabels] = useState<Record<string, string>>(
-    {},
+    {}
   );
 
   const pathSegments = pathname
@@ -66,7 +66,7 @@ export const DynamicBreadcrumbs: React.FC = () => {
     };
 
     fetchDynamicLabels();
-  }, [pathname, id, pathSegments.join("/")]);
+  }, [id, pathSegments]);
 
   const getLabel = (segment: string): string => {
     return dynamicLabels[segment] || _map[segment] || segment;
