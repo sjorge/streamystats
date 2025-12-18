@@ -13,8 +13,6 @@ import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/StreamArray";
 import { v4 as uuidv4 } from "uuid";
 
-export const runtime = "nodejs";
-
 export async function POST(req: NextRequest) {
   try {
     // Require admin for data import

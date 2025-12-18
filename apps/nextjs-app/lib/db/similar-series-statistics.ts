@@ -1,5 +1,4 @@
 "use server";
-"use cache";
 
 import { db } from "@streamystats/database";
 import {
@@ -26,12 +25,13 @@ import { getMe } from "./users";
 const enableDebug = false;
 
 // Debug logging helper - only logs in development or when DEBUG_RECOMMENDATIONS is enabled
-const debugLog = (...args: any[]) => {
+const debugLog = (...args: unknown[]) => {
   if (
     (process.env.NODE_ENV === "development" ||
       process.env.DEBUG_RECOMMENDATIONS === "true") &&
     enableDebug
   ) {
+    // eslint-disable-next-line no-console
     console.log(...args);
   }
 };
@@ -119,7 +119,7 @@ const itemCardWithEmbeddingColumns = {
 } as const;
 
 const stripEmbedding = (
-  item: SeriesRecommendationCardItemWithEmbedding,
+  item: SeriesRecommendationCardItemWithEmbedding
 ): SeriesRecommendationCardItem => {
   const { embedding: _embedding, ...card } = item;
   return card;
@@ -128,7 +128,7 @@ const stripEmbedding = (
 export async function getSimilarSeries(
   serverId: string | number,
   userId?: string,
-  limit = 20,
+  limit = 20
 ): Promise<SeriesRecommendationItem[]> {
   "use cache";
   cacheLife("hours");
@@ -149,14 +149,14 @@ export async function getSimilarSeries(
 
   cacheTag(
     `series-recommendations-${serverIdNum}`,
-    `series-recommendations-${serverIdNum}-${targetUserId}`,
+    `series-recommendations-${serverIdNum}-${targetUserId}`
   );
 
   try {
     debugLog(
       `\n🚀 Starting series recommendation process for server ${serverIdNum}, user ${
         targetUserId || "anonymous"
-      }, limit ${limit}`,
+      }, limit ${limit}`
     );
 
     let recommendations: SeriesRecommendationItem[] = [];
@@ -166,31 +166,31 @@ export async function getSimilarSeries(
       recommendations = await getUserSpecificSeriesRecommendations(
         serverIdNum,
         targetUserId,
-        limit,
+        limit
       );
       debugLog(
-        `✅ Got ${recommendations.length} user-specific series recommendations`,
+        `✅ Got ${recommendations.length} user-specific series recommendations`
       );
     }
 
     if (recommendations.length < limit) {
       const remainingLimit = limit - recommendations.length;
       debugLog(
-        `\n🔥 Need ${remainingLimit} more series recommendations, getting popular series...`,
+        `\n🔥 Need ${remainingLimit} more series recommendations, getting popular series...`
       );
       const popularRecommendations = await getPopularSeriesRecommendations(
         serverIdNum,
         remainingLimit,
-        targetUserId,
+        targetUserId
       );
       debugLog(
-        `✅ Got ${popularRecommendations.length} popular series recommendations`,
+        `✅ Got ${popularRecommendations.length} popular series recommendations`
       );
       recommendations = [...recommendations, ...popularRecommendations];
     }
 
     debugLog(
-      `\n🎉 Final result: ${recommendations.length} total series recommendations`,
+      `\n🎉 Final result: ${recommendations.length} total series recommendations`
     );
     return recommendations;
   } catch (error) {
@@ -201,7 +201,7 @@ export async function getSimilarSeries(
 
 export const revalidateSeriesRecommendations = async (
   serverId: number,
-  userId?: string,
+  userId?: string
 ) => {
   revalidateTag(`series-recommendations-${serverId}`, "hours");
   if (userId) {
@@ -212,10 +212,10 @@ export const revalidateSeriesRecommendations = async (
 async function getUserSpecificSeriesRecommendations(
   serverId: number,
   userId: string,
-  limit: number,
+  limit: number
 ): Promise<SeriesRecommendationItem[]> {
   debugLog(
-    `\n🎯 Starting user-specific series recommendations for user ${userId}, server ${serverId}, limit ${limit}`,
+    `\n🎯 Starting user-specific series recommendations for user ${userId}, server ${serverId}, limit ${limit}`
   );
 
   // Get user's watch history for episodes, aggregated by series
@@ -223,10 +223,10 @@ async function getUserSpecificSeriesRecommendations(
     .select({
       seriesId: sessions.seriesId,
       totalPlayDuration: sql<number>`SUM(${sessions.playDuration})`.as(
-        "totalPlayDuration",
+        "totalPlayDuration"
       ),
       episodeCount: sql<number>`COUNT(DISTINCT ${sessions.itemId})`.as(
-        "episodeCount",
+        "episodeCount"
       ),
       lastWatched: sql<Date>`MAX(${sessions.endTime})`.as("lastWatched"),
     })
@@ -236,8 +236,8 @@ async function getUserSpecificSeriesRecommendations(
         eq(sessions.serverId, serverId),
         eq(sessions.userId, userId),
         isNotNull(sessions.seriesId),
-        isNotNull(sessions.playDuration),
-      ),
+        isNotNull(sessions.playDuration)
+      )
     )
     .groupBy(sessions.seriesId)
     .orderBy(sql`MAX(${sessions.endTime}) DESC`);
@@ -246,7 +246,7 @@ async function getUserSpecificSeriesRecommendations(
 
   if (userSeriesWatchHistory.length === 0) {
     debugLog(
-      "❌ No series watch history found, returning empty recommendations",
+      "❌ No series watch history found, returning empty recommendations"
     );
     return [];
   }
@@ -254,7 +254,7 @@ async function getUserSpecificSeriesRecommendations(
   // Get the actual Series items for these seriesIds
   const seriesIds = userSeriesWatchHistory
     .map((w) => w.seriesId)
-    .filter(Boolean) as string[];
+    .filter((id): id is string => !!id);
 
   if (seriesIds.length === 0) {
     debugLog("❌ No valid series IDs found, returning empty recommendations");
@@ -270,19 +270,26 @@ async function getUserSpecificSeriesRecommendations(
         isNull(items.deletedAt),
         eq(items.type, "Series"),
         isNotNull(items.embedding),
-        inArray(items.id, seriesIds),
-      ),
+        inArray(items.id, seriesIds)
+      )
     );
 
   debugLog(
-    `📺 Found ${watchedSeriesItems.length} series items with embeddings`,
+    `📺 Found ${watchedSeriesItems.length} series items with embeddings`
   );
+
+  type WatchedSeriesWithStats = {
+    series: (typeof watchedSeriesItems)[number];
+    totalPlayDuration: number;
+    episodeCount: number;
+    lastWatched: Date;
+  };
 
   // Match series with their watch stats
   const watchedSeriesWithStats = watchedSeriesItems
-    .map((series) => {
+    .map((series): WatchedSeriesWithStats | null => {
       const stats = userSeriesWatchHistory.find(
-        (w) => w.seriesId === series.id,
+        (w) => w.seriesId === series.id
       );
       return stats
         ? {
@@ -293,23 +300,23 @@ async function getUserSpecificSeriesRecommendations(
           }
         : null;
     })
-    .filter(Boolean)
-    .sort((a, b) => b!.lastWatched.getTime() - a!.lastWatched.getTime());
+    .filter((item): item is WatchedSeriesWithStats => item !== null)
+    .sort((a, b) => b.lastWatched.getTime() - a.lastWatched.getTime());
 
   debugLog("🎬 Series with watch stats (top 5):");
   watchedSeriesWithStats.slice(0, 5).forEach((item, index) => {
     debugLog(
-      `  ${index + 1}. "${item!.series.name}" - ${
-        item!.episodeCount
+      `  ${index + 1}. "${item.series.name}" - ${
+        item.episodeCount
       } episodes, ${Math.round(
-        item!.totalPlayDuration / 60,
-      )}min total, last watched: ${item!.lastWatched}`,
+        item.totalPlayDuration / 60
+      )}min total, last watched: ${item.lastWatched}`
     );
   });
 
   if (watchedSeriesWithStats.length === 0) {
     debugLog(
-      "❌ No series with embeddings found, returning empty recommendations",
+      "❌ No series with embeddings found, returning empty recommendations"
     );
     return [];
   }
@@ -323,8 +330,8 @@ async function getUserSpecificSeriesRecommendations(
       .where(
         and(
           eq(hiddenRecommendations.serverId, serverId),
-          eq(hiddenRecommendations.userId, userId),
-        ),
+          eq(hiddenRecommendations.userId, userId)
+        )
       );
   } catch (error) {
     debugLog("Error fetching hidden recommendations:", error);
@@ -332,47 +339,46 @@ async function getUserSpecificSeriesRecommendations(
   }
 
   const hiddenItemIds = hiddenItems.map((h) => h.itemId).filter(Boolean);
-  const watchedSeriesIds = watchedSeriesWithStats.map((w) => w!.series.id);
+  const watchedSeriesIds = watchedSeriesWithStats.map((w) => w.series.id);
   debugLog(`🙈 Found ${hiddenItemIds.length} hidden items`);
 
   // Use top watched series to create recommendations
-  const recommendations: SeriesRecommendationItem[] = [];
 
   // Prioritize recent watches but include some highly watched series
   const recentWatches = watchedSeriesWithStats.slice(0, 5);
   debugLog(`⏰ Recent series watches (${recentWatches.length}):`);
   recentWatches.forEach((item, index) => {
-    debugLog(`  ${index + 1}. "${item!.series.name}"`);
+    debugLog(`  ${index + 1}. "${item.series.name}"`);
   });
 
   // Get top watched series ordered by total play duration
   const topWatchedSeries = watchedSeriesWithStats
-    .sort((a, b) => b!.totalPlayDuration - a!.totalPlayDuration)
+    .sort((a, b) => b.totalPlayDuration - a.totalPlayDuration)
     .slice(0, 10);
 
   debugLog(`🔥 Top watched series by duration (${topWatchedSeries.length}):`);
   topWatchedSeries.forEach((item, index) => {
     debugLog(
-      `  ${index + 1}. "${item!.series.name}" - ${Math.round(
-        item!.totalPlayDuration / 60,
-      )}min total`,
+      `  ${index + 1}. "${item.series.name}" - ${Math.round(
+        item.totalPlayDuration / 60
+      )}min total`
     );
   });
 
   // Combine recent and top watched, remove duplicates, limit to 15
-  const recentIds = new Set(recentWatches.map((item) => item!.series.id));
+  const recentIds = new Set(recentWatches.map((item) => item.series.id));
   const additionalTopWatched = topWatchedSeries.filter(
-    (item) => !recentIds.has(item!.series.id),
+    (item) => !recentIds.has(item.series.id)
   );
 
   const baseSeries = [...recentWatches, ...additionalTopWatched].slice(0, 15);
   debugLog(`📺 Final base series for similarity (${baseSeries.length}):`);
   baseSeries.forEach((item, index) => {
-    const isRecent = recentIds.has(item!.series.id);
+    const isRecent = recentIds.has(item.series.id);
     debugLog(
-      `  ${index + 1}. "${item!.series.name}" (${
+      `  ${index + 1}. "${item.series.name}" (${
         isRecent ? "recent" : "top watched"
-      })`,
+      })`
     );
   });
 
@@ -392,7 +398,7 @@ async function getUserSpecificSeriesRecommendations(
   >();
 
   for (const watchedSeriesItem of baseSeries) {
-    const watchedSeries = watchedSeriesItem!.series;
+    const watchedSeries = watchedSeriesItem.series;
     if (!watchedSeries.embedding) {
       debugLog(`⚠️ Skipping "${watchedSeries.name}" - no embedding`);
       continue;
@@ -403,7 +409,7 @@ async function getUserSpecificSeriesRecommendations(
     // Calculate cosine similarity with other series
     const similarity = sql<number>`1 - (${cosineDistance(
       items.embedding,
-      watchedSeries.embedding,
+      watchedSeries.embedding
     )})`;
 
     const similarSeries = await db
@@ -421,8 +427,8 @@ async function getUserSpecificSeriesRecommendations(
           notInArray(items.id, watchedSeriesIds), // Exclude already watched series
           hiddenItemIds.length > 0
             ? notInArray(items.id, hiddenItemIds)
-            : sql`true`, // Exclude hidden items
-        ),
+            : sql`true` // Exclude hidden items
+        )
       )
       .orderBy(desc(similarity))
       .limit(20);
@@ -431,18 +437,18 @@ async function getUserSpecificSeriesRecommendations(
     similarSeries.slice(0, 5).forEach((result, index) => {
       debugLog(
         `    ${index + 1}. "${result.item.name}" - similarity: ${Number(
-          result.similarity,
-        ).toFixed(3)}`,
+          result.similarity
+        ).toFixed(3)}`
       );
     });
 
     // Filter for good similarity scores
     const qualifiedSimilarSeries = similarSeries.filter(
-      (result) => Number(result.similarity) > 0.45,
+      (result) => Number(result.similarity) > 0.45
     );
 
     debugLog(
-      `  ${qualifiedSimilarSeries.length} series with similarity > 0.45`,
+      `  ${qualifiedSimilarSeries.length} series with similarity > 0.45`
     );
 
     // Add similarities to candidate series
@@ -450,15 +456,17 @@ async function getUserSpecificSeriesRecommendations(
       const seriesId = result.item.id;
       const simScore = Number(result.similarity);
 
-      if (!candidateSeries.has(seriesId)) {
-        candidateSeries.set(seriesId, {
+      let candidate = candidateSeries.get(seriesId);
+
+      if (!candidate) {
+        candidate = {
           item: result.item,
           similarities: [],
           basedOn: [],
-        });
+        };
+        candidateSeries.set(seriesId, candidate);
       }
 
-      const candidate = candidateSeries.get(seriesId)!;
       candidate.similarities.push(simScore);
       candidate.basedOn.push(watchedSeries);
     }
@@ -484,8 +492,8 @@ async function getUserSpecificSeriesRecommendations(
     const type = rec.basedOn.length >= 2 ? "multi-series" : "single-series";
     debugLog(
       `  ${index + 1}. "${rec.item.name}" (similarity: ${rec.similarity.toFixed(
-        3,
-      )}, ${type}) <- ${baseSeriesNames}`,
+        3
+      )}, ${type}) <- ${baseSeriesNames}`
     );
   });
 
@@ -495,12 +503,12 @@ async function getUserSpecificSeriesRecommendations(
 async function getPopularSeriesRecommendations(
   serverId: number,
   limit: number,
-  excludeUserId?: string,
+  excludeUserId?: string
 ): Promise<SeriesRecommendationItem[]> {
   debugLog(
     `\n🔥 Getting popular series recommendations for server ${serverId}, limit ${limit}, excluding user ${
       excludeUserId || "none"
-    }`,
+    }`
   );
 
   // Get series that are popular (most episodes watched) but exclude series already watched by the current user
@@ -515,8 +523,8 @@ async function getPopularSeriesRecommendations(
         and(
           eq(sessions.serverId, serverId),
           eq(sessions.userId, excludeUserId),
-          isNotNull(sessions.seriesId),
-        ),
+          isNotNull(sessions.seriesId)
+        )
       )
       .groupBy(sessions.seriesId);
 
@@ -535,8 +543,8 @@ async function getPopularSeriesRecommendations(
         .where(
           and(
             eq(hiddenRecommendations.serverId, serverId),
-            eq(hiddenRecommendations.userId, excludeUserId),
-          ),
+            eq(hiddenRecommendations.userId, excludeUserId)
+          )
         );
     } catch (error) {
       debugLog("Error fetching hidden recommendations:", error);
@@ -568,8 +576,8 @@ async function getPopularSeriesRecommendations(
         // Exclude user's hidden series if we have a user
         hiddenItemIds.length > 0
           ? notInArray(items.id, hiddenItemIds)
-          : sql`true`,
-      ),
+          : sql`true`
+      )
     )
     .groupBy(items.id)
     .orderBy(desc(count(sessions.id)))
@@ -582,7 +590,7 @@ async function getPopularSeriesRecommendations(
     debugLog(
       `  ${index + 1}. "${item.item.name}" - ${
         item.episodeWatchCount
-      } episode watches`,
+      } episode watches`
     );
   });
   if (popularSeries.length > 5) {
@@ -603,11 +611,13 @@ async function getPopularSeriesRecommendations(
 export const getSimilarSeriesForItem = async (
   serverId: string | number,
   itemId: string,
-  limit = 10,
+  limit = 10
 ): Promise<SeriesRecommendationItem[]> => {
+  "use cache";
+  cacheLife("hours");
   try {
     debugLog(
-      `\n🎯 Getting series similar to specific series ${itemId} in server ${serverId}, limit ${limit}`,
+      `\n🎯 Getting series similar to specific series ${itemId} in server ${serverId}, limit ${limit}`
     );
 
     const serverIdNum = Number(serverId);
@@ -618,7 +628,7 @@ export const getSimilarSeriesForItem = async (
         eq(items.id, itemId),
         eq(items.serverId, serverIdNum),
         eq(items.type, "Series"),
-        isNotNull(items.embedding),
+        isNotNull(items.embedding)
       ),
       columns: itemCardWithEmbeddingColumns,
     });
@@ -633,7 +643,7 @@ export const getSimilarSeriesForItem = async (
     // Calculate cosine similarity with other series
     const similarity = sql<number>`1 - (${cosineDistance(
       items.embedding,
-      targetSeries.embedding,
+      targetSeries.embedding
     )})`;
 
     const similarSeries = await db
@@ -648,8 +658,8 @@ export const getSimilarSeriesForItem = async (
           isNull(items.deletedAt),
           eq(items.type, "Series"),
           isNotNull(items.embedding),
-          sql`${items.id} != ${itemId}`, // Exclude the target series itself
-        ),
+          sql`${items.id} != ${itemId}` // Exclude the target series itself
+        )
       )
       .orderBy(desc(similarity))
       .limit(limit * 2); // Get more to filter for quality
@@ -658,19 +668,19 @@ export const getSimilarSeriesForItem = async (
 
     // Filter for good similarity scores
     const qualifiedSimilarSeries = similarSeries.filter(
-      (result) => Number(result.similarity) > 0.4,
+      (result) => Number(result.similarity) > 0.4
     );
 
     debugLog(
-      `✅ ${qualifiedSimilarSeries.length} series with similarity > 0.4:`,
+      `✅ ${qualifiedSimilarSeries.length} series with similarity > 0.4:`
     );
     qualifiedSimilarSeries
       .slice(0, Math.min(5, limit))
       .forEach((result, index) => {
         debugLog(
           `  ${index + 1}. "${result.item.name}" - similarity: ${Number(
-            result.similarity,
-          ).toFixed(3)}`,
+            result.similarity
+          ).toFixed(3)}`
         );
       });
 
@@ -682,7 +692,7 @@ export const getSimilarSeriesForItem = async (
         similarity: Number(result.similarity),
         basedOn: [
           stripEmbedding(
-            targetSeries as SeriesRecommendationCardItemWithEmbedding,
+            targetSeries as SeriesRecommendationCardItemWithEmbedding
           ),
         ], // Based on the target series
       }));
@@ -697,7 +707,7 @@ export const getSimilarSeriesForItem = async (
 
 export const hideSeriesRecommendation = async (
   serverId: string | number,
-  itemId: string,
+  itemId: string
 ) => {
   try {
     // Get the current user
@@ -719,8 +729,8 @@ export const hideSeriesRecommendation = async (
         and(
           eq(hiddenRecommendations.serverId, serverIdNum),
           eq(hiddenRecommendations.userId, currentUser.id),
-          eq(hiddenRecommendations.itemId, itemId),
-        ),
+          eq(hiddenRecommendations.itemId, itemId)
+        )
       )
       .limit(1);
 

@@ -1,5 +1,4 @@
 "use server";
-"use cache";
 
 import { db } from "@streamystats/database";
 import {
@@ -653,6 +652,8 @@ export const getSimilarItemsForItem = async (
   itemId: string,
   limit = 10,
 ): Promise<RecommendationItem[]> => {
+  "use cache";
+  cacheLife("hours");
   try {
     debugLog(
       `\n🎯 Getting items similar to specific item ${itemId} in server ${serverId}, limit ${limit}`,

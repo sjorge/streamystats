@@ -18,7 +18,7 @@
     "start:nextjs": "cd apps/nextjs-app && bun run start",
     "start:all": "bun run start:job-server & bun run start:nextjs",
     "build:database": "cd packages/database && bun run build",
-    "build:nextjs": "cd apps/nextjs-app && bun run build",
+    "build:nextjs": "cd apps/nextjs-app && bun run build --experimental-build-mode compile",
     "build:all": "bun run build:database && bun run build:nextjs",
     "docker:build": "./build-and-push.sh",
     "db:generate": "cd packages/database && bun run db:generate",

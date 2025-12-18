@@ -70,7 +70,7 @@ export async function GET() {
           headers: {
             "x-server-connectivity-error": "true",
           },
-        }
+        },
       );
     }
 
@@ -86,7 +86,7 @@ export async function GET() {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }

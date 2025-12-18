@@ -11,8 +11,6 @@ import { parser } from "stream-json";
 // @ts-ignore - stream-json doesn't have types
 import { streamArray } from "stream-json/streamers/StreamArray";
 
-export const runtime = "nodejs"; // IMPORTANT: disables edge runtime
-
 /** ISO-8601 timestamp */
 type ISODate = string & { __iso: undefined };
 
