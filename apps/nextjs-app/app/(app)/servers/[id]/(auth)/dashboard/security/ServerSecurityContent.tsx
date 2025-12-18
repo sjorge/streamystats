@@ -114,7 +114,7 @@ export function ServerSecurityContent({
     if (!dateRange.to) return format(dateRange.from, "MMM dd, yyyy");
     return `${format(dateRange.from, "MMM dd")} - ${format(
       dateRange.to,
-      "MMM dd, yyyy",
+      "MMM dd, yyyy"
     )}`;
   }, [dateRange]);
 
@@ -217,7 +217,7 @@ export function ServerSecurityContent({
 
   const totalUnresolved = Object.values(stats.unresolvedAnomalies).reduce(
     (a, b) => a + b,
-    0,
+    0
   );
 
   // When filters are applied, show filtered count; otherwise show total unresolved
@@ -315,14 +315,22 @@ export function ServerSecurityContent({
               {stats.isBackfillRunning
                 ? "Job Running..."
                 : isBackfilling
-                  ? "Starting..."
-                  : "Run Backfill"}
+                ? "Starting..."
+                : "Run Backfill"}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      <Tabs defaultValue="map" className="space-y-4">
+      <Tabs
+        value={searchParams.get("tab") || "map"}
+        onValueChange={(value) => {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("tab", value);
+          router.push(`?${params.toString()}`);
+        }}
+        className="space-y-4"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <TabsList>
             <TabsTrigger value="map">Location Map</TabsTrigger>
