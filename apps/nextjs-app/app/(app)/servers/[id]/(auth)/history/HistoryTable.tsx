@@ -119,132 +119,25 @@ export function HistoryTable({
               }`}
             >
               <Poster
-                item={
-                  {
-                    id: row.original.item?.id,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    serverId: server.id,
-                    libraryId: "",
-                    type: row.original.item?.type,
-                    originalTitle: null,
-                    etag: null,
-                    dateCreated: null,
-                    sortName: null,
-                    productionYear: null,
-                    premiereDate: null,
-                    officialRating: null,
-                    communityRating: null,
-                    runtimeTicks: null,
-                    playAccess: null,
-                    aspectRatio: null,
-                    fileName: null,
-                    genres: null,
-                    parentIndexNumber: null,
-                    indexNumber: row.original.item?.indexNumber ?? null,
-                    isFolder: false,
-                    displayOrder: null,
-                    primaryImageAspectRatio:
-                      row.original.item?.primaryImageAspectRatio ?? null,
-                    mediaType: null,
-                    imageTags: null,
-                    backdropImageTags: row.original.item?.backdropImageTags,
-                    imageBlurHashes: row.original.item?.imageBlurHashes,
-                    locationTypes: null,
-                    mediaStreams: null,
-                    partCount: null,
-                    albumCount: null,
-                    songCount: null,
-                    childCount: null,
-                    seriesName: row.original.item?.seriesName ?? null,
-                    seasonName: row.original.item?.seasonName ?? null,
-                    specialFeatureCount: null,
-                    displayPreferencesId: null,
-                    tags: null,
-                    primaryImageTag: row.original.item?.primaryImageTag ?? null,
-                    logoImageTag: null,
-                    artImageTag: null,
-                    thumbImageTag: null,
-                    primaryImageItemId: null,
-                    artists: null,
-                    artistItems: null,
-                    album: null,
-                    collectionType: null,
-                    displayPreferences: null,
-                    userData: null,
-                    recursiveItemCount: null,
-                    childCountNumber: null,
-                    playlistItemId: null,
-                    parentLogoItemId: null,
-                    parentArtItemId: null,
-                    parentThumbItemId:
-                      row.original.item?.parentThumbItemId ?? null,
-                    parentThumbImageTag:
-                      row.original.item?.parentThumbImageTag ?? null,
-                    parentPrimaryImageItemId: null,
-                    parentPrimaryImageTag: null,
-                    chapters: null,
-                    locationTyoe: null,
-                    isoType: null,
-                    mediaSourceCount: null,
-                    parentBackdropItemId:
-                      row.original.item?.parentBackdropItemId ?? null,
-                    parentBackdropImageTags:
-                      row.original.item?.parentBackdropImageTags,
-                    localTrailerCount: null,
-                    channelId: null,
-                    channelName: null,
-                    overview: null,
-                    taglines: null,
-                    providerIds: null,
-                    parentIndexNumberName: null,
-                    seriesId: null,
-                    seasonId: null,
-                    specialEpisodeNumbers: null,
-                    seriesStudio: null,
-                    seriesPrimaryImageTag:
-                      row.original.item?.seriesPrimaryImageTag ?? null,
-                    seasonPrimaryImageTag: null,
-                    seriesThumbImageTag: null,
-                    seasonThumbImageTag: null,
-                    episodeTitle: null,
-                    episodeFileExtension: null,
-                    trickplay: null,
-                    jellyfinId: row.original.item?.id,
-                    processed: null,
-                    jellyfin_id: row.original.item?.id,
-                    name: row.original.item?.name,
-                    series_name: row.original.item?.seriesName ?? null,
-                    season_name: row.original.item?.seasonName ?? null,
-                    index_number: row.original.item?.indexNumber ?? null,
-                    parent_index_number: null,
-                    primary_image_tag:
-                      row.original.item?.primaryImageTag ?? null,
-                    series_id: null,
-                    series_primary_image_tag:
-                      row.original.item?.seriesPrimaryImageTag ?? null,
-                    backdrop_image_tags: row.original.item?.backdropImageTags,
-                    parent_backdrop_item_id:
-                      row.original.item?.parentBackdropItemId ?? null,
-                    parent_backdrop_image_tags:
-                      row.original.item?.parentBackdropImageTags,
-                    parent_thumb_item_id:
-                      row.original.item?.parentThumbItemId ?? null,
-                    parent_thumb_image_tag:
-                      row.original.item?.parentThumbImageTag ?? null,
-                    primary_image_thumb_tag:
-                      row.original.item?.primaryImageThumbTag ?? null,
-                    primary_image_logo_tag:
-                      row.original.item?.primaryImageLogoTag ?? null,
-                    image_blur_hashes: row.original.item?.imageBlurHashes,
-                    production_year: null,
-                    official_rating: null,
-                    community_rating: null,
-                    runtime_ticks: null,
-                    primary_image_aspect_ratio:
-                      row.original.item?.primaryImageAspectRatio ?? null,
-                  } as any
-                }
+                item={{
+                  id: row.original.item?.id,
+                  name: row.original.item?.name,
+                  type: row.original.item?.type,
+                  primaryImageTag: row.original.item?.primaryImageTag,
+                  primaryImageThumbTag: row.original.item?.primaryImageThumbTag,
+                  primaryImageLogoTag: row.original.item?.primaryImageLogoTag,
+                  backdropImageTags: row.original.item?.backdropImageTags,
+                  seriesId: row.original.item?.seriesId,
+                  seriesPrimaryImageTag:
+                    row.original.item?.seriesPrimaryImageTag,
+                  parentBackdropItemId:
+                    row.original.item?.parentBackdropItemId,
+                  parentBackdropImageTags:
+                    row.original.item?.parentBackdropImageTags,
+                  parentThumbItemId: row.original.item?.parentThumbItemId,
+                  parentThumbImageTag: row.original.item?.parentThumbImageTag,
+                  imageBlurHashes: row.original.item?.imageBlurHashes,
+                }}
                 server={server}
               />
             </div>

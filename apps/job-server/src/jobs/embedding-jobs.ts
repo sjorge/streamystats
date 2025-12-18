@@ -6,6 +6,7 @@ import { TIMEOUT_CONFIG } from "./config";
 import { logJobResult } from "./job-logger";
 import { getJobQueue } from "./queue";
 import { sleep } from "../utils/sleep";
+import type { PgBossJob } from "../types/job-status";
 
 // Embedding configuration passed from job data
 interface EmbeddingConfig {
@@ -13,6 +14,14 @@ interface EmbeddingConfig {
   apiKey?: string;
   model: string;
   dimensions: number;
+}
+
+// Job data for embedding generation
+interface GenerateItemEmbeddingsJobData {
+  serverId: number;
+  provider: "openai-compatible" | "openai" | "ollama";
+  config: EmbeddingConfig;
+  manualStart?: boolean;
 }
 
 // Default config values
@@ -106,19 +115,16 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
 }
 
 // Job: Generate embeddings for media items using different providers
-export async function generateItemEmbeddingsJob(job: any) {
+export async function generateItemEmbeddingsJob(
+  job: PgBossJob<GenerateItemEmbeddingsJobData>,
+) {
   const startTime = Date.now();
   const {
     serverId,
     provider: rawProvider,
     config,
     manualStart = false, // If true, continue until complete even if auto-embeddings is disabled
-  } = job.data as {
-    serverId: number;
-    provider: "openai-compatible" | "openai" | "ollama"; // "openai" is legacy alias
-    config: EmbeddingConfig;
-    manualStart?: boolean;
-  };
+  } = job.data;
 
   // Normalize legacy "openai" provider to "openai-compatible"
   const provider = rawProvider === "openai" ? "openai-compatible" : rawProvider;
@@ -217,15 +223,26 @@ export async function generateItemEmbeddingsJob(job: any) {
       // Add people data if available (actors, directors, etc.)
       if (item.people) {
         try {
+          type PersonData = {
+            Name?: string;
+            Role?: string;
+            Type?: string;
+          };
+
           const peopleData =
             typeof item.people === "string"
-              ? JSON.parse(item.people)
-              : item.people;
+              ? (JSON.parse(item.people) as Record<string, PersonData>)
+              : (item.people as Record<string, PersonData>);
 
           if (peopleData && typeof peopleData === "object") {
             const peopleNames = Object.values(peopleData)
-              .filter((person: any) => person && person.Name)
-              .map((person: any) => {
+              .filter(
+                (person): person is PersonData =>
+                  person !== null &&
+                  typeof person === "object" &&
+                  Boolean(person.Name),
+              )
+              .map((person) => {
                 // Include both name and role for better context
                 const parts = [person.Name];
                 if (person.Role && person.Type === "Actor") {

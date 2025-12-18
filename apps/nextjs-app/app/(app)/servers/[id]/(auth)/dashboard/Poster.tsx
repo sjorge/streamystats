@@ -154,8 +154,7 @@ const PosterComponent = ({
   // Get blur hash for loading state
   useEffect(() => {
     if (item.imageBlurHashes) {
-      // Try to parse image_blur_hashes if it's a string
-      const blurHashes = item.imageBlurHashes as any;
+      const blurHashes = item.imageBlurHashes;
 
       // Try to get blur hash for the preferred image type
       if (

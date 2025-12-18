@@ -17,6 +17,7 @@ import {
   sessions,
   users,
 } from "@streamystats/database";
+import type { Item } from "@streamystats/database/schema";
 import { tool } from "ai";
 import {
   and,
@@ -40,7 +41,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatItem(
-  item: any,
+  item: Item,
   stats?: { playCount?: number; playDuration?: number },
 ) {
   const base = {
@@ -181,8 +182,8 @@ async function embedTextForServer({
   }
 }
 
-function getHolidayHintScore(item: any): number {
-  const haystack = `${item?.name ?? ""}\n${item?.overview ?? ""}`.toLowerCase();
+function getHolidayHintScore(item: Item): number {
+  const haystack = `${item.name ?? ""}\n${item.overview ?? ""}`.toLowerCase();
   const keywords = [
     "christmas",
     "xmas",

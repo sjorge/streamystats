@@ -36,6 +36,51 @@ const vector = customType<{
 });
 import { relations } from "drizzle-orm";
 
+// =============================================================================
+// Shared JSON Types
+// =============================================================================
+
+/**
+ * Image blur hashes from Jellyfin API - nested object structure where:
+ * - First level keys are image types (Primary, Backdrop, Thumb, Logo, etc.)
+ * - Second level keys are image tags (unique identifiers for each image)
+ * - Values are blur hash strings
+ */
+export type ImageBlurHashes = {
+  Primary?: Record<string, string>;
+  Backdrop?: Record<string, string>;
+  Thumb?: Record<string, string>;
+  Logo?: Record<string, string>;
+  Art?: Record<string, string>;
+  Banner?: Record<string, string>;
+  Disc?: Record<string, string>;
+  Box?: Record<string, string>;
+  Screenshot?: Record<string, string>;
+  Menu?: Record<string, string>;
+  Chapter?: Record<string, string>;
+  BoxRear?: Record<string, string>;
+  Profile?: Record<string, string>;
+};
+
+/**
+ * Embedding job result data stored in job_results table
+ */
+export type EmbeddingJobResult = {
+  serverId: number;
+  processed?: number;
+  total?: number;
+  lastHeartbeat?: string;
+  error?: string;
+  cleanedAt?: string;
+  staleDuration?: number;
+  originalJobId?: string;
+  staleSince?: string;
+};
+
+// =============================================================================
+// Tables
+// =============================================================================
+
 // Servers table - main server configurations
 export const servers = pgTable(
   "servers",
@@ -285,8 +330,8 @@ export const items = pgTable(
     backdropImageTags: text("backdrop_image_tags").array(),
     parentBackdropItemId: text("parent_backdrop_item_id"),
     parentBackdropImageTags: text("parent_backdrop_image_tags").array(),
-    imageBlurHashes: jsonb("image_blur_hashes"),
-    imageTags: jsonb("image_tags"),
+    imageBlurHashes: jsonb("image_blur_hashes").$type<ImageBlurHashes>(),
+    imageTags: jsonb("image_tags").$type<Record<string, string>>(),
 
     // Media capabilities and permissions
     canDelete: boolean("can_delete"),

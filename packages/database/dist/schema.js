@@ -20,6 +20,9 @@ const vector = (0, pg_core_1.customType)({
     },
 });
 const drizzle_orm_1 = require("drizzle-orm");
+// =============================================================================
+// Tables
+// =============================================================================
 // Servers table - main server configurations
 exports.servers = (0, pg_core_1.pgTable)("servers", {
     id: (0, pg_core_1.serial)("id").primaryKey(),
@@ -241,8 +244,8 @@ exports.items = (0, pg_core_1.pgTable)("items", {
     backdropImageTags: (0, pg_core_1.text)("backdrop_image_tags").array(),
     parentBackdropItemId: (0, pg_core_1.text)("parent_backdrop_item_id"),
     parentBackdropImageTags: (0, pg_core_1.text)("parent_backdrop_image_tags").array(),
-    imageBlurHashes: (0, pg_core_1.jsonb)("image_blur_hashes"),
-    imageTags: (0, pg_core_1.jsonb)("image_tags"),
+    imageBlurHashes: (0, pg_core_1.jsonb)("image_blur_hashes").$type(),
+    imageTags: (0, pg_core_1.jsonb)("image_tags").$type(),
     // Media capabilities and permissions
     canDelete: (0, pg_core_1.boolean)("can_delete"),
     canDownload: (0, pg_core_1.boolean)("can_download"),

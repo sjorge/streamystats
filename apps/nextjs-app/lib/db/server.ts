@@ -12,7 +12,7 @@ import {
 } from "@streamystats/database";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 
-import { Server } from "@streamystats/database/schema";
+import type { EmbeddingJobResult, Server } from "@streamystats/database/schema";
 
 export const getServers = async (): Promise<Server[]> => {
   return await db.select().from(servers);
@@ -325,7 +325,7 @@ export const cleanupStaleEmbeddingJobs = async (): Promise<number> => {
 
     for (const staleJob of staleJobs) {
       try {
-        const result = staleJob.result as any;
+        const result = staleJob.result as EmbeddingJobResult | null;
         const serverId = result?.serverId;
 
         if (serverId) {
@@ -834,8 +834,10 @@ export const testChatConnection = async ({
         return { success: false, message: "Failed to connect to Ollama" };
       }
 
-      const data = await response.json();
-      const models = data.models?.map((m: any) => m.name) || [];
+      const data = (await response.json()) as {
+        models?: Array<{ name: string }>;
+      };
+      const models = data.models?.map((m) => m.name) || [];
       if (!models.some((m: string) => m.includes(config.model))) {
         return {
           success: false,

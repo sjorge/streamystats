@@ -3,6 +3,11 @@ import axios from "axios";
 import { eq } from "drizzle-orm";
 import { syncUsers, syncLibraries, syncActivities } from "./sync-helpers";
 import { logJobResult } from "./job-logger";
+import type {
+  PgBossJob,
+  SyncServerDataJobData,
+  AddServerJobData,
+} from "../types/job-status";
 
 function log(
   prefix: string,
@@ -18,7 +23,9 @@ function log(
 }
 
 // Job: Sync server data from external media server API
-export async function syncServerDataJob(job: any) {
+export async function syncServerDataJob(
+  job: PgBossJob<SyncServerDataJobData>,
+) {
   const startTime = Date.now();
   const { serverId, endpoint } = job.data;
 
@@ -100,7 +107,7 @@ export async function syncServerDataJob(job: any) {
 }
 
 // Job: Add a new media server
-export async function addServerJob(job: any) {
+export async function addServerJob(job: PgBossJob<AddServerJobData>) {
   const startTime = Date.now();
   const { name, url, apiKey } = job.data;
 

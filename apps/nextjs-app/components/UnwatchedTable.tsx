@@ -249,7 +249,7 @@ export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              data.data.map((item: any) => (
+              data.data.map((item: UnwatchedItem) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell>{item.production_year || "Unknown"}</TableCell>

@@ -3,10 +3,11 @@ import {
   servers,
   sessions,
   users,
-  NewSession,
+  type NewSession,
 } from "@streamystats/database";
+import type { Server } from "@streamystats/database/schema";
 import { JellyfinClient } from "../jellyfin/client";
-import {
+import type {
   JellyfinSession,
   TrackedSession,
   ActiveSessionResponse,
@@ -15,7 +16,10 @@ import { v4 as uuidv4 } from "uuid";
 import { eq } from "drizzle-orm";
 import { formatError } from "../utils/format-error";
 
-function log(prefix: string, data: Record<string, string | number | boolean | null | undefined>): void {
+function log(
+  prefix: string,
+  data: Record<string, string | number | boolean | null | undefined>
+): void {
   const parts = [`[${prefix}]`];
   for (const [key, value] of Object.entries(data)) {
     if (value !== undefined && value !== null) {
@@ -57,7 +61,10 @@ class SessionPoller {
       return;
     }
 
-    log("session-poller", { action: "start", intervalMs: this.config.intervalMs });
+    log("session-poller", {
+      action: "start",
+      intervalMs: this.config.intervalMs,
+    });
 
     // Initial poll
     await this.pollSessions();
@@ -128,7 +135,9 @@ class SessionPoller {
         await this.pollServer(server);
       }
     } catch (error) {
-      console.error(`[session-poller] action=error error=${formatError(error)}`);
+      console.error(
+        `[session-poller] action=error error=${formatError(error)}`
+      );
     }
   }
 
@@ -142,13 +151,17 @@ class SessionPoller {
   /**
    * Poll sessions for a specific server
    */
-  private async pollServer(server: any): Promise<void> {
+  private async pollServer(server: Server): Promise<void> {
     try {
       const client = JellyfinClient.fromServer(server);
       const currentSessions = await client.getSessions();
       await this.processSessions(server, currentSessions);
     } catch (error) {
-      console.error(`[session-poller] action=fetch-error serverId=${server.id} error=${formatError(error)}`);
+      console.error(
+        `[session-poller] action=fetch-error serverId=${
+          server.id
+        } error=${formatError(error)}`
+      );
     }
   }
 
@@ -156,7 +169,7 @@ class SessionPoller {
    * Process sessions for a server
    */
   private async processSessions(
-    server: any,
+    server: Server,
     currentSessions: JellyfinSession[]
   ): Promise<void> {
     const serverKey = `server_${server.id}`;
@@ -267,7 +280,7 @@ class SessionPoller {
    * Handle new sessions
    */
   private async handleNewSessions(
-    server: any,
+    server: Server,
     newSessions: JellyfinSession[]
   ): Promise<Map<string, TrackedSession>> {
     const now = new Date();
@@ -337,13 +350,13 @@ class SessionPoller {
         transcodeReasons: transcodingInfo?.TranscodeReasons,
       };
 
-      log("session", { 
-        action: "new", 
-        serverId: server.id, 
-        user: session.UserName, 
-        content: item.Name, 
-        paused: isPaused, 
-        durationSec: 0 
+      log("session", {
+        action: "new",
+        serverId: server.id,
+        user: session.UserName,
+        content: item.Name,
+        paused: isPaused,
+        durationSec: 0,
       });
 
       tracked.set(sessionKey, trackingRecord);
@@ -356,7 +369,7 @@ class SessionPoller {
    * Handle updated sessions
    */
   private async handleUpdatedSessions(
-    server: any,
+    server: Server,
     updatedSessions: JellyfinSession[],
     trackedSessions: Map<string, TrackedSession>
   ): Promise<Map<string, TrackedSession>> {
@@ -385,14 +398,14 @@ class SessionPoller {
       const durationIncreased = updatedDuration > tracked.playDuration + 10;
 
       if (pauseStateChanged || durationIncreased) {
-        log("session", { 
-          action: "update", 
-          serverId: server.id, 
-          user: tracked.userName, 
-          content: tracked.itemName, 
-          paused: currentPaused, 
-          durationSec: updatedDuration, 
-          position: this.formatTicksAsTime(currentPosition) 
+        log("session", {
+          action: "update",
+          serverId: server.id,
+          user: tracked.userName,
+          content: tracked.itemName,
+          paused: currentPaused,
+          durationSec: updatedDuration,
+          position: this.formatTicksAsTime(currentPosition),
         });
       }
 
@@ -463,7 +476,7 @@ class SessionPoller {
    * Handle ended sessions
    */
   private async handleEndedSessions(
-    server: any,
+    server: Server,
     endedSessions: Array<{ key: string; session: TrackedSession }>,
     trackedSessions: Map<string, TrackedSession>
   ): Promise<Map<string, TrackedSession>> {
@@ -487,14 +500,14 @@ class SessionPoller {
 
         const completed = percentComplete > 90.0;
 
-        log("session", { 
-          action: "ended", 
-          serverId: server.id, 
-          user: tracked.userName, 
-          content: tracked.itemName, 
-          durationSec: finalDuration, 
-          progressPct: Math.round(percentComplete * 10) / 10, 
-          completed 
+        log("session", {
+          action: "ended",
+          serverId: server.id,
+          user: tracked.userName,
+          content: tracked.itemName,
+          durationSec: finalDuration,
+          progressPct: Math.round(percentComplete * 10) / 10,
+          completed,
         });
 
         await this.savePlaybackRecord(
@@ -553,7 +566,7 @@ class SessionPoller {
    * Save playback record to database
    */
   private async savePlaybackRecord(
-    server: any,
+    server: Server,
     tracked: TrackedSession,
     finalDuration: number,
     percentComplete: number,
@@ -599,7 +612,9 @@ class SessionPoller {
         audioStreamIndex: tracked.audioStreamIndex,
         subtitleStreamIndex: tracked.subtitleStreamIndex,
         playMethod: tracked.playMethod,
-        isTranscoded: (tracked.playMethod !== "DirectPlay" && tracked.playMethod !== "DirectStream"),
+        isTranscoded:
+          tracked.playMethod !== "DirectPlay" &&
+          tracked.playMethod !== "DirectStream",
         mediaSourceId: tracked.mediaSourceId,
         repeatMode: tracked.repeatMode,
         playbackOrder: tracked.playbackOrder,
@@ -624,9 +639,17 @@ class SessionPoller {
       };
 
       await db.insert(sessions).values(playbackRecord);
-      log("session", { action: "saved", serverId: server.id, user: tracked.userName });
+      log("session", {
+        action: "saved",
+        serverId: server.id,
+        user: tracked.userName,
+      });
     } catch (error) {
-      console.error(`[session] action=save-error serverId=${server.id} error=${formatError(error)}`);
+      console.error(
+        `[session] action=save-error serverId=${server.id} error=${formatError(
+          error
+        )}`
+      );
     }
   }
 

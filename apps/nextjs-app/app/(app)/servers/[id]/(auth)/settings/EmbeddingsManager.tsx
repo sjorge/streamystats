@@ -32,8 +32,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
-  EmbeddingProgress,
-  EmbeddingProvider,
+  type EmbeddingProgress,
+  type EmbeddingProvider,
   clearEmbeddings,
   getEmbeddingProgress,
   saveEmbeddingConfig,
@@ -130,22 +130,22 @@ function detectPreset(server: Server): PresetKey {
 export function EmbeddingsManager({ server }: { server: Server }) {
   // Preset selection
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>(
-    detectPreset(server),
+    detectPreset(server)
   );
 
   // Embedding config state
   const [baseUrl, setBaseUrl] = useState(
-    server.embeddingBaseUrl || PROVIDER_PRESETS.openai.baseUrl,
+    server.embeddingBaseUrl || PROVIDER_PRESETS.openai.baseUrl
   );
   const [apiKey, setApiKey] = useState(server.embeddingApiKey || "");
   const [model, setModel] = useState(
-    server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel,
+    server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel
   );
   const [dimensions, setDimensions] = useState(
-    server.embeddingDimensions || 1536,
+    server.embeddingDimensions || 1536
   );
   const [provider, setProvider] = useState<EmbeddingProvider>(
-    (server.embeddingProvider as EmbeddingProvider) || "openai-compatible",
+    (server.embeddingProvider as EmbeddingProvider) || "openai-compatible"
   );
 
   // UI state
@@ -155,7 +155,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   const [isClearing, setIsClearing] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [autoEmbeddings, setAutoEmbeddings] = useState(
-    server.autoGenerateEmbeddings || false,
+    server.autoGenerateEmbeddings || false
   );
   const [isUpdatingAutoEmbed, setIsUpdatingAutoEmbed] = useState(false);
   const [actionResult, setActionResult] = useState<{
@@ -376,8 +376,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   // Check if the process is actively running
   const isProcessRunning =
-    (progress as any)?.status === "processing" ||
-    (progress as any)?.status === "starting";
+    progress?.status === "processing" || progress?.status === "starting";
 
   // Helper to get status text
   const getStatusText = (status: string) => {
@@ -563,21 +562,18 @@ export function EmbeddingsManager({ server }: { server: Server }) {
             <h3 className="text-sm font-medium">Movie Embeddings</h3>
             <div className="flex justify-between mb-2">
               <span className="text-sm font-medium">
-                Status: {getStatusText((progress as any)?.status || "idle")}
+                Status: {getStatusText(progress?.status ?? "idle")}
               </span>
               <span className="text-sm text-gray-400">
-                {(progress as any)?.processed || 0} of{" "}
-                {(progress as any)?.total || 0} items embedded
-                {(progress as any)?.total > 0
-                  ? ` (${((progress as any)?.percentage || 0).toFixed(1)}%)`
+                {progress?.processed ?? 0} of {progress?.total ?? 0} items
+                embedded
+                {(progress?.total ?? 0) > 0
+                  ? ` (${(progress?.percentage ?? 0).toFixed(1)}%)`
                   : ""}
               </span>
             </div>
 
-            <Progress
-              value={(progress as any)?.percentage || 0}
-              className="h-2"
-            />
+            <Progress value={progress?.percentage ?? 0} className="h-2" />
 
             <div className="flex gap-2 mt-4">
               <Button

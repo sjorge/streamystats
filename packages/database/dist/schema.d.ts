@@ -1,3 +1,38 @@
+/**
+ * Image blur hashes from Jellyfin API - nested object structure where:
+ * - First level keys are image types (Primary, Backdrop, Thumb, Logo, etc.)
+ * - Second level keys are image tags (unique identifiers for each image)
+ * - Values are blur hash strings
+ */
+export type ImageBlurHashes = {
+    Primary?: Record<string, string>;
+    Backdrop?: Record<string, string>;
+    Thumb?: Record<string, string>;
+    Logo?: Record<string, string>;
+    Art?: Record<string, string>;
+    Banner?: Record<string, string>;
+    Disc?: Record<string, string>;
+    Box?: Record<string, string>;
+    Screenshot?: Record<string, string>;
+    Menu?: Record<string, string>;
+    Chapter?: Record<string, string>;
+    BoxRear?: Record<string, string>;
+    Profile?: Record<string, string>;
+};
+/**
+ * Embedding job result data stored in job_results table
+ */
+export type EmbeddingJobResult = {
+    serverId: number;
+    processed?: number;
+    total?: number;
+    lastHeartbeat?: string;
+    error?: string;
+    cleanedAt?: string;
+    staleDuration?: number;
+    originalJobId?: string;
+    staleSince?: string;
+};
 export declare const servers: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "servers";
     schema: undefined;
@@ -2438,7 +2473,7 @@ export declare const items: import("drizzle-orm/pg-core").PgTableWithColumns<{
             tableName: "items";
             dataType: "json";
             columnType: "PgJsonb";
-            data: unknown;
+            data: ImageBlurHashes;
             driverParam: unknown;
             notNull: false;
             hasDefault: false;
@@ -2449,13 +2484,15 @@ export declare const items: import("drizzle-orm/pg-core").PgTableWithColumns<{
             baseColumn: never;
             identity: undefined;
             generated: undefined;
-        }, {}, {}>;
+        }, {}, {
+            $type: ImageBlurHashes;
+        }>;
         imageTags: import("drizzle-orm/pg-core").PgColumn<{
             name: "image_tags";
             tableName: "items";
             dataType: "json";
             columnType: "PgJsonb";
-            data: unknown;
+            data: Record<string, string>;
             driverParam: unknown;
             notNull: false;
             hasDefault: false;
@@ -2466,7 +2503,9 @@ export declare const items: import("drizzle-orm/pg-core").PgTableWithColumns<{
             baseColumn: never;
             identity: undefined;
             generated: undefined;
-        }, {}, {}>;
+        }, {}, {
+            $type: Record<string, string>;
+        }>;
         canDelete: import("drizzle-orm/pg-core").PgColumn<{
             name: "can_delete";
             tableName: "items";

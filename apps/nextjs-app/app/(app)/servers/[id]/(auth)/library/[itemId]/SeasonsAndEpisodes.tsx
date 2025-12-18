@@ -7,10 +7,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SeasonEpisode } from "@/lib/db/items";
+import type { SeasonEpisode } from "@/lib/db/items";
 import { formatDuration } from "@/lib/utils";
-import { Server } from "@streamystats/database/schema";
-import { Item } from "@streamystats/database/schema";
+import type { Server } from "@streamystats/database/schema";
+import type { Item } from "@streamystats/database/schema";
 import { Calendar, Clock, Play, Tv } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -53,7 +53,7 @@ function EpisodePoster({ episode, server }: { episode: Item; server: Server }) {
 
   const blurHash = useMemo(() => {
     if (!episode.imageBlurHashes) return null;
-    const blurHashes = episode.imageBlurHashes as any;
+    const blurHashes = episode.imageBlurHashes;
 
     if (
       episode.primaryImageTag &&
@@ -187,7 +187,7 @@ export function SeasonsAndEpisodes({
                               <Clock className="w-3 h-3" />
                               <span>
                                 {formatDuration(
-                                  Math.floor(episode.runtimeTicks / 10_000_000),
+                                  Math.floor(episode.runtimeTicks / 10_000_000)
                                 )}
                               </span>
                             </div>
@@ -197,7 +197,7 @@ export function SeasonsAndEpisodes({
                               <Calendar className="w-3 h-3" />
                               <span>
                                 {new Date(
-                                  episode.premiereDate,
+                                  episode.premiereDate
                                 ).toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric",

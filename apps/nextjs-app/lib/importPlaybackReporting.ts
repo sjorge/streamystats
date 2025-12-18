@@ -349,7 +349,9 @@ function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
   return data;
 }
 
-function parsePlaybackReportingJson(jsonData: any): PlaybackReportingData[] {
+function parsePlaybackReportingJson(
+  jsonData: unknown,
+): PlaybackReportingData[] {
   console.info("Starting JSON parsing", {
     dataType: typeof jsonData,
     isArray: Array.isArray(jsonData),
@@ -358,24 +360,53 @@ function parsePlaybackReportingJson(jsonData: any): PlaybackReportingData[] {
   // Handle different JSON formats that might come from Playback Reporting
   if (Array.isArray(jsonData)) {
     console.info(`Processing JSON array with ${jsonData.length} items`);
-    return jsonData.map((item, index) => {
+    return jsonData.map((item: unknown, index) => {
+      if (typeof item !== "object" || item === null) {
+        throw new Error(`Invalid item at index ${index}: not an object`);
+      }
+
+      const record = item as Record<string, unknown>;
       try {
         const durationValue =
-          item.durationSeconds || item.duration_seconds || item.Duration || "0";
+          (record.durationSeconds as string | undefined) ||
+          (record.duration_seconds as string | undefined) ||
+          (record.Duration as string | undefined) ||
+          "0";
         const parsedDuration = Number.parseInt(durationValue, 10);
 
         return {
-          timestamp: item.timestamp || item.date || item.time,
-          userId: item.userId || item.user_id || item.UserId || undefined,
-          itemId: item.itemId || item.item_id || item.ItemId || undefined,
-          itemType: item.itemType || item.item_type || item.Type || undefined,
-          itemName: item.itemName || item.item_name || item.Name || undefined,
+          timestamp:
+            (record.timestamp as string | undefined) ||
+            (record.date as string | undefined) ||
+            (record.time as string | undefined),
+          userId:
+            (record.userId as string | undefined) ||
+            (record.user_id as string | undefined) ||
+            (record.UserId as string | undefined),
+          itemId:
+            (record.itemId as string | undefined) ||
+            (record.item_id as string | undefined) ||
+            (record.ItemId as string | undefined),
+          itemType:
+            (record.itemType as string | undefined) ||
+            (record.item_type as string | undefined) ||
+            (record.Type as string | undefined),
+          itemName:
+            (record.itemName as string | undefined) ||
+            (record.item_name as string | undefined) ||
+            (record.Name as string | undefined),
           playMethod:
-            item.playMethod || item.play_method || item.PlayMethod || undefined,
+            (record.playMethod as string | undefined) ||
+            (record.play_method as string | undefined) ||
+            (record.PlayMethod as string | undefined),
           clientName:
-            item.clientName || item.client_name || item.Client || undefined,
+            (record.clientName as string | undefined) ||
+            (record.client_name as string | undefined) ||
+            (record.Client as string | undefined),
           deviceName:
-            item.deviceName || item.device_name || item.Device || undefined,
+            (record.deviceName as string | undefined) ||
+            (record.device_name as string | undefined) ||
+            (record.Device as string | undefined),
           durationSeconds: Number.isNaN(parsedDuration)
             ? undefined
             : parsedDuration,

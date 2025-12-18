@@ -1057,7 +1057,10 @@ function hasFieldsChanged<T extends Record<string, any>>(
 /**
  * Check if image-related fields have changed
  */
-function hasImageFieldsChanged(existing: any, newItem: any): boolean {
+function hasImageFieldsChanged(
+  existing: Item,
+  newItem: NewItem | Item,
+): boolean {
   const imageFields = [
     "primaryImageTag",
     "seriesPrimaryImageTag",
@@ -1193,13 +1196,15 @@ async function processUpdates(
 
   for (const item of itemsToUpdate) {
     try {
-      // Convert item to update fields
+      // Convert item to update fields using type-safe key assignment
       const updateFields: Partial<NewItem> = {};
       for (const field of trackedFields) {
-        if (field in item) {
-          const value = item[field as keyof NewItem];
+        const key = field as keyof NewItem;
+        if (key in item) {
+          const value = item[key];
           if (value !== undefined) {
-            (updateFields as any)[field] = value;
+            // Using Object.assign for type-safe dynamic key assignment
+            Object.assign(updateFields, { [key]: value });
           }
         }
       }

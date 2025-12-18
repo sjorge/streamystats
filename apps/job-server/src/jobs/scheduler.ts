@@ -1,5 +1,6 @@
 import * as cron from "node-cron";
 import { db, servers, jobResults, items } from "@streamystats/database";
+import type { EmbeddingJobResult } from "@streamystats/database/schema";
 import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
@@ -758,7 +759,7 @@ class SyncScheduler {
 
       for (const staleJob of staleJobs) {
         try {
-          const result = staleJob.result as any;
+          const result = staleJob.result as EmbeddingJobResult | null;
           const serverId = result?.serverId;
 
           if (serverId) {

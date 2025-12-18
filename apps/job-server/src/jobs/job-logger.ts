@@ -1,21 +1,24 @@
-import { db, jobResults, NewJobResult } from "@streamystats/database";
+import { db, jobResults, type NewJobResult } from "@streamystats/database";
 
 // Helper function to log job results
 export async function logJobResult(
   jobId: string,
   jobName: string,
   status: "completed" | "failed" | "processing",
-  result: any,
+  result: Record<string, unknown> | null,
   processingTime: number,
-  error?: any
+  error?: Error | string
 ) {
   try {
+    const errorMessage =
+      error instanceof Error ? error.message : error ? String(error) : null;
+
     const jobResult: NewJobResult = {
       jobId,
       jobName,
       status,
       result: result ? JSON.parse(JSON.stringify(result)) : null,
-      error: error ? error.message || String(error) : null,
+      error: errorMessage,
       processingTime,
     };
 

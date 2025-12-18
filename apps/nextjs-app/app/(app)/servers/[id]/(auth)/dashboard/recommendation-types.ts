@@ -1,3 +1,5 @@
+import type { ImageBlurHashes } from "@streamystats/database/schema";
+
 export type RecommendationCardItem = {
   id?: string | null;
   name?: string | null;
@@ -21,7 +23,7 @@ export type RecommendationCardItem = {
   parentThumbItemId?: string | null;
   parentThumbImageTag?: string | null;
 
-  imageBlurHashes?: unknown;
+  imageBlurHashes?: ImageBlurHashes | null;
 };
 
 export type RecommendationListItem = {

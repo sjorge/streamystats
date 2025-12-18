@@ -21,6 +21,8 @@ import { formatDuration } from "@/lib/utils";
 import {
   ColumnDef,
   ColumnFiltersState,
+  Row,
+  Cell,
   SortingState,
   VisibilityState,
   flexRender,
@@ -418,13 +420,13 @@ const MemoizedTableRow = React.memo(
     server,
     columns,
   }: {
-    row: any;
+    row: Row<ItemWatchStats>;
     server: Server;
     columns: ColumnDef<ItemWatchStats>[];
   }) => {
     return (
       <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-        {row.getVisibleCells().map((cell: any) => (
+        {row.getVisibleCells().map((cell: Cell<ItemWatchStats, unknown>) => (
           <TableCell key={cell.id}>
             {flexRender(cell.column.columnDef.cell, cell.getContext())}
           </TableCell>

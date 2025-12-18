@@ -332,7 +332,7 @@ export async function importFromJellystats(
   }
 }
 
-function validateJellystatsData(data: any): {
+function validateJellystatsData(data: unknown): {
   isValid: boolean;
   error?: string;
 } {
@@ -355,11 +355,15 @@ function validateJellystatsData(data: any): {
   ];
 
   for (let i = 0; i < sampleSize; i++) {
-    const session = data[i];
-
-    if (typeof session !== "object" || session === null) {
-      return { isValid: false, error: `Invalid session object at index ${i}` };
+    const item = data[i];
+    if (typeof item !== "object" || item === null) {
+      return {
+        isValid: false,
+        error: `Item at index ${i} is not an object`,
+      };
     }
+
+    const session = item as Record<string, unknown>;
 
     for (const field of requiredFields) {
       if (!(field in session)) {

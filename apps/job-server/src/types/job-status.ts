@@ -1,4 +1,37 @@
+import type PgBoss from "pg-boss";
+
 export type JobStatus = "processing" | "completed" | "failed";
+
+// Job data types for type-safe job handlers
+export interface SyncServerDataJobData {
+  serverId: number;
+  endpoint: string;
+}
+
+export interface AddServerJobData {
+  serverUrl: string;
+  apiKey: string;
+  name: string;
+  localAddress?: string;
+}
+
+export interface EmbeddingJobData {
+  serverId: number;
+  provider?: string;
+  baseUrl?: string;
+  apiKey?: string;
+  model?: string;
+  dimensions?: number;
+  jobId?: string;
+  batchSize?: number;
+}
+
+export interface ServerIdJobData {
+  serverId: number;
+}
+
+// Generic pg-boss job type with typed data
+export type PgBossJob<T> = PgBoss.Job<T>;
 
 export type ServerJobState =
   | "running"
@@ -35,7 +68,7 @@ export interface JobStatusInfo {
   completedAt?: Date;
   processingTime?: number;
   error?: string | null;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface JobStatusSummary {
