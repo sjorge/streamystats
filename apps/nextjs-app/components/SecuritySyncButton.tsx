@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useJobEvents, type JobEvent } from "@/hooks/useJobEvents";
+import { type JobEvent, useJobEvents } from "@/hooks/useJobEvents";
+import { RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
 
 interface SecuritySyncButtonProps {
   serverId: number;
@@ -30,7 +30,7 @@ export function SecuritySyncButton({ serverId }: SecuritySyncButtonProps) {
         setIsRunning(false);
       }
     },
-    [serverId, router]
+    [serverId, router],
   );
 
   useJobEvents({ onJobEvent: handleJobEvent });
@@ -64,4 +64,3 @@ export function SecuritySyncButton({ serverId }: SecuritySyncButtonProps) {
     </Button>
   );
 }
-

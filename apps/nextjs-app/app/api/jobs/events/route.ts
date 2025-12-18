@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   if (!upstream.ok || !upstream.body) {
     return new Response(
       JSON.stringify({ error: `Upstream error: ${upstream.status}` }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
+      { status: 502, headers: { "Content-Type": "application/json" } },
     );
   }
 

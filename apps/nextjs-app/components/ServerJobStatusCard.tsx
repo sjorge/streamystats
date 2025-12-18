@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useJobEvents, type JobEvent } from "@/hooks/useJobEvents";
+import { type JobEvent, useJobEvents } from "@/hooks/useJobEvents";
 import {
   JOB_NAME_TO_KEY,
   type ServerJobState,
@@ -31,7 +31,7 @@ function getStateBadgeClass(state: ServerJobState): string {
 }
 
 async function fetchServerJobStatus(
-  serverId: number
+  serverId: number,
 ): Promise<ServerJobStatusResponse> {
   const response = await fetch(`/api/jobs/servers/${serverId}/status`);
 
@@ -44,7 +44,7 @@ async function fetchServerJobStatus(
 
 function updateJobFromEvent(
   jobs: ServerJobStatusItem[],
-  event: JobEvent
+  event: JobEvent,
 ): ServerJobStatusItem[] {
   if (!event.jobName) return jobs;
 
@@ -112,7 +112,7 @@ export function ServerJobStatusCard({ serverId }: { serverId: number }) {
 
       setJobs((prev) => updateJobFromEvent(prev, event));
     },
-    [serverId]
+    [serverId],
   );
 
   useJobEvents({ onJobEvent: handleJobEvent });

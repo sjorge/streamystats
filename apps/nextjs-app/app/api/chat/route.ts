@@ -105,7 +105,7 @@ export async function POST(req: Request) {
           error:
             "AI Chat not configured. Please configure it in Settings > AI Chat.",
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -155,7 +155,7 @@ Current user context:
       JSON.stringify({
         error: error instanceof Error ? error.message : "An error occurred",
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 }

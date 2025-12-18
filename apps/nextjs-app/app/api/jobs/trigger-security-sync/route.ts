@@ -9,10 +9,10 @@ export async function POST(request: Request) {
     const { serverId } = body;
 
     if (!serverId) {
-      return new Response(
-        JSON.stringify({ error: "Server ID is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Server ID is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const jobServerUrl =
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -46,8 +46,7 @@ export async function POST(request: Request) {
             ? error.message
             : "Failed to trigger security sync",
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 }
-

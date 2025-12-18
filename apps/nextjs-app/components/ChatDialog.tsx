@@ -173,8 +173,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
       for (const arr of itemArrays) {
         if (Array.isArray(arr)) {
           for (const item of arr) {
-            const itemData =
-              (item as Record<string, unknown>)?.item || item;
+            const itemData = (item as Record<string, unknown>)?.item || item;
             if (itemData?.id && !cache.has(itemData.id as string)) {
               cache.set(itemData.id as string, {
                 id: itemData.id as string,
