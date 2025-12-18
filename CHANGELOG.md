@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.13.0](https://github.com/fredrikburmester/streamystats/compare/v2.12.0...v2.13.0) (2025-12-18)
+
+
+### Features
+
+* add user sub-page handling and admin permission checks for security paths ([0d63d71](https://github.com/fredrikburmester/streamystats/commit/0d63d719c9dcde0303960b36f05719d4b599d53c))
+* aio image and container ([b24da5e](https://github.com/fredrikburmester/streamystats/commit/b24da5e0dfe0c5a2fc586315157e01e2cfa1a90f))
+* better history filters ([37972e9](https://github.com/fredrikburmester/streamystats/commit/37972e9f06b1e889355ab9d0e8d8ee3aed75110e))
+* client stats ([e4db0de](https://github.com/fredrikburmester/streamystats/commit/e4db0de0894f9cc224ec400ae903d0da2aea7f28))
+* **docs:** aio instructions ([d5215ff](https://github.com/fredrikburmester/streamystats/commit/d5215fffe430ac22ab2fe5c718736a5f59b0b9ae))
+* enhance ErrorBoundary with detailed error display and reporting options ([5682bfc](https://github.com/fredrikburmester/streamystats/commit/5682bfcbecd50ba858fdaf0d62d25dcf0edc11cc))
+* implement security dashboard layout and components ([c17c531](https://github.com/fredrikburmester/streamystats/commit/c17c5312f7afe01202b5307fb7773e8afd25c54d))
+* route to user security page ([a443c7a](https://github.com/fredrikburmester/streamystats/commit/a443c7a72ead741f5e4f198bf668136521dab10e))
+* seasonal recomendations ([e839603](https://github.com/fredrikburmester/streamystats/commit/e8396038a0d5acb78387e1f302436406033fb7df))
+* use cache  components ([a79867f](https://github.com/fredrikburmester/streamystats/commit/a79867f8f98256b5ad13b55dcb305c8230c36050))
+
+
+### Bug Fixes
+
+* add indexes for better performance ([4232cf7](https://github.com/fredrikburmester/streamystats/commit/4232cf7ce9160e693474a2d37fe6d6deea268a52))
+* add job-server health check condition in docker-compose ([76a97d1](https://github.com/fredrikburmester/streamystats/commit/76a97d1a8043f0752a1d5c28d983fa19028ece12))
+* add map key to solve Map reused bug ([116c70f](https://github.com/fredrikburmester/streamystats/commit/116c70f990aacbd9bf7b0d98a5963f5615d82df4))
+* add mapKey prop to solve Map reused bug ([ab67027](https://github.com/fredrikburmester/streamystats/commit/ab670277f1dc3fc7b11f8a64c55ceca9a3e8adcc))
+* add prop map key to solve map reused bug ([54c420c](https://github.com/fredrikburmester/streamystats/commit/54c420cbbaa7ef2f131bd33b8aa7c74d7274e1b3))
+* better error page ([3cad946](https://github.com/fredrikburmester/streamystats/commit/3cad946cd04eaf936e24ec5c1fa7f9beabf50aed))
+* build error ([96aae63](https://github.com/fredrikburmester/streamystats/commit/96aae63573b9c827c9d12683f56a634f34ca4850))
+* correct issue URL formatting in global error handling ([b241b67](https://github.com/fredrikburmester/streamystats/commit/b241b678a3b540a8ebc4e54797cd89fa85c5acc5))
+* fetching outside of suspense ([b18ad26](https://github.com/fredrikburmester/streamystats/commit/b18ad26eda58d6e322ef54e11344504a96caf7a8))
+* healthcheck in dockerfiles ([7d10ac7](https://github.com/fredrikburmester/streamystats/commit/7d10ac7ae83b03854d97e96f8353af26ab65f77b))
+* keep tab i query param ([9955ae6](https://github.com/fredrikburmester/streamystats/commit/9955ae6e32d898e6c6f6d6083ab46603e61e34f2))
+* lint ([5e656e9](https://github.com/fredrikburmester/streamystats/commit/5e656e9ce292d8ef98a2af7b983245be13568200))
+* missing geoip file ([2fca30a](https://github.com/fredrikburmester/streamystats/commit/2fca30abd79ad78fe7521337a55fa614d62b8c11))
+* update Dockerfile to use Debian base image and install dependencies with apt-get ([4b11388](https://github.com/fredrikburmester/streamystats/commit/4b11388602cc52ced0e0f2fdae252fecc18a7947))
+
 ## [2.12.0](https://github.com/fredrikburmester/streamystats/compare/v2.11.0...v2.12.0) (2025-12-17)
 
 
