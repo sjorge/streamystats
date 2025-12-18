@@ -18,6 +18,7 @@ jobs:
           - streamystats-v2-nextjs
           - streamystats-v2-job-server
           - streamystats-v2-migrate
+          - streamystats-v2-aio
         include:
           - part: streamystats-v2-nextjs
             folder: .
@@ -28,6 +29,9 @@ jobs:
           - part: streamystats-v2-migrate
             folder: .
             dockerfile: migration.Dockerfile
+          - part: streamystats-v2-aio
+            folder: .
+            dockerfile: Dockerfile.aio
 
     steps:
       - uses: actions/checkout@v4
