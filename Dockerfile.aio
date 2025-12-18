@@ -96,125 +96,15 @@ COPY --from=nextjs-builder /app/apps/nextjs-app/.next/standalone ./
 COPY --from=nextjs-builder /app/apps/nextjs-app/.next/static ./apps/nextjs-app/.next/static
 COPY --from=nextjs-builder /app/apps/nextjs-app/public ./apps/nextjs-app/public
 
-# Create log directory for supervisor
-RUN mkdir -p /var/log/supervisor
+# Create directories
+RUN mkdir -p /var/log/supervisor /app/scripts
 
-# Create supervisord configuration
-RUN cat > /etc/supervisor/conf.d/streamystats.conf << 'SUPERVISOREOF'
-[supervisord]
-nodaemon=true
-user=root
-logfile=/var/log/supervisor/supervisord.log
-pidfile=/var/run/supervisord.pid
-loglevel=info
-
-[program:postgres]
-command=/usr/local/bin/docker-entrypoint.sh postgres -c log_checkpoints=off
-user=postgres
-autostart=true
-autorestart=true
-priority=10
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-
-[program:migrate]
-command=/app/scripts/migrate-wrapper.sh
-directory=/app
-autostart=true
-autorestart=false
-startsecs=0
-startretries=3
-priority=20
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-
-[program:job-server]
-command=/app/scripts/job-server-wrapper.sh
-directory=/app
-environment=NODE_ENV="production",PORT="3005",HOST="0.0.0.0"
-autostart=true
-autorestart=true
-priority=30
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-
-[program:nextjs]
-command=/app/scripts/nextjs-wrapper.sh
-directory=/app/apps/nextjs-app
-environment=NODE_ENV="production",PORT="3000",HOSTNAME="0.0.0.0"
-autostart=true
-autorestart=true
-priority=30
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-SUPERVISOREOF
-
-# Create scripts directory
-RUN mkdir -p /app/scripts
-
-# Create migration wrapper script
-RUN cat > /app/scripts/migrate-wrapper.sh << 'MIGRATEEOF'
-#!/bin/bash
-echo "[AIO] Waiting for PostgreSQL to be ready..."
-until pg_isready -h localhost -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-streamystats} 2>/dev/null; do
-    sleep 1
-done
-echo "[AIO] PostgreSQL is ready. Running migrations..."
-exec /app/migrate-bin
-MIGRATEEOF
-
-# Create job-server wrapper script
-RUN cat > /app/scripts/job-server-wrapper.sh << 'JOBEOF'
-#!/bin/bash
-echo "[AIO] Waiting for PostgreSQL to be ready..."
-until pg_isready -h localhost -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-streamystats} 2>/dev/null; do
-    sleep 1
-done
-# Wait a bit for migrations to complete
-sleep 3
-echo "[AIO] Starting job-server..."
-exec /app/job-server
-JOBEOF
-
-# Create nextjs wrapper script
-RUN cat > /app/scripts/nextjs-wrapper.sh << 'NEXTEOF'
-#!/bin/bash
-echo "[AIO] Waiting for job-server to be ready..."
-until curl -sf http://localhost:3005/health >/dev/null 2>&1; do
-    sleep 1
-done
-echo "[AIO] Starting Next.js..."
-cd /app/apps/nextjs-app
-exec /root/.bun/bin/bun run server.js
-NEXTEOF
-
-# Make scripts executable
-RUN chmod +x /app/scripts/*.sh
-
-# Create entrypoint script
-RUN cat > /app/entrypoint.sh << 'ENTRYPOINTEOF'
-#!/bin/bash
-set -e
-
-# Ensure postgres user owns the data directory
-mkdir -p /var/lib/postgresql/data
-chown -R postgres:postgres /var/lib/postgresql/data
-mkdir -p /var/run/postgresql
-chown -R postgres:postgres /var/run/postgresql
-
-echo "[AIO] Starting StreamyStats All-in-One..."
-exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
-ENTRYPOINTEOF
-
-RUN chmod +x /app/entrypoint.sh
+# Copy configuration and scripts
+COPY docker/aio/supervisord.conf /etc/supervisor/conf.d/streamystats.conf
+COPY --chmod=755 docker/aio/scripts/migrate-wrapper.sh /app/scripts/
+COPY --chmod=755 docker/aio/scripts/job-server-wrapper.sh /app/scripts/
+COPY --chmod=755 docker/aio/scripts/nextjs-wrapper.sh /app/scripts/
+COPY --chmod=755 docker/aio/scripts/entrypoint.sh /app/entrypoint.sh
 
 # Environment variables
 ENV NODE_ENV=production
@@ -238,4 +128,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
   CMD curl -f http://127.0.0.1:3000/api/health && curl -f http://127.0.0.1:3005/health && pg_isready -h localhost || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-
