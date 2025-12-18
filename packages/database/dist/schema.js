@@ -62,6 +62,8 @@ exports.servers = (0, pg_core_1.pgTable)("servers", {
     syncError: (0, pg_core_1.text)("sync_error"),
     lastSyncStarted: (0, pg_core_1.timestamp)("last_sync_started"),
     lastSyncCompleted: (0, pg_core_1.timestamp)("last_sync_completed"),
+    // Holiday/seasonal recommendations settings
+    disabledHolidays: (0, pg_core_1.text)("disabled_holidays").array().default([]),
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
 }, (table) => [(0, pg_core_1.unique)("servers_url_unique").on(table.url)]);
@@ -284,8 +286,12 @@ exports.sessions = (0, pg_core_1.pgTable)("sessions", {
     serverId: (0, pg_core_1.integer)("server_id")
         .notNull()
         .references(() => exports.servers.id, { onDelete: "cascade" }),
-    userId: (0, pg_core_1.text)("user_id").references(() => exports.users.id, { onDelete: "set null" }),
-    itemId: (0, pg_core_1.text)("item_id").references(() => exports.items.id, { onDelete: "set null" }),
+    userId: (0, pg_core_1.text)("user_id").references(() => exports.users.id, {
+        onDelete: "set null",
+    }),
+    itemId: (0, pg_core_1.text)("item_id").references(() => exports.items.id, {
+        onDelete: "set null",
+    }),
     // User information
     userName: (0, pg_core_1.text)("user_name").notNull(),
     userServerId: (0, pg_core_1.text)("user_server_id"), // User ID from Jellyfin server

@@ -126,6 +126,9 @@ export const servers = pgTable(
     lastSyncStarted: timestamp("last_sync_started"),
     lastSyncCompleted: timestamp("last_sync_completed"),
 
+    // Holiday/seasonal recommendations settings
+    disabledHolidays: text("disabled_holidays").array().default([]),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

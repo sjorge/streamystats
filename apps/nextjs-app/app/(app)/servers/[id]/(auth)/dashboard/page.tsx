@@ -2,6 +2,7 @@ import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getServer } from "@/lib/db/server";
+import { getSeasonalRecommendations } from "@/lib/db/seasonal-recommendations";
 import { getSimilarSeries } from "@/lib/db/similar-series-statistics";
 import { getSimilarStatistics } from "@/lib/db/similar-statistics";
 import { getMostWatchedItems } from "@/lib/db/statistics";
@@ -12,6 +13,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ActiveSessions } from "./ActiveSessions";
 import { MostWatchedItems } from "./MostWatchedItems";
+import { SeasonalRecommendations } from "./SeasonalRecommendations";
 import { SimilarSeriesStatistics } from "./SimilarSeriesStatistics";
 import { SimilarMovieStatistics } from "./SimilarStatistics";
 import { UserActivityWrapper } from "./UserActivityWrapper";
@@ -67,7 +69,7 @@ async function DashboardContent({
           <ActiveSessions server={server} />
         </div>
       )}
-      <PageTitle title="General Statistics" />
+      <PageTitle title="Home" />
       <GeneralStats
         server={server}
         userActivityStartDate={userActivityStartDate}
@@ -89,18 +91,23 @@ async function GeneralStats({
   const me = await getMe();
   const sas = await showAdminStatistics();
 
-  const [similarData, similarSeriesData, data] = await Promise.all([
-    getSimilarStatistics(server.id),
-    getSimilarSeries(server.id),
-    getMostWatchedItems({
-      serverId: server.id,
-      userId: sas ? undefined : me?.id,
-    }),
-  ]);
+  const [similarData, similarSeriesData, data, seasonalData] =
+    await Promise.all([
+      getSimilarStatistics(server.id),
+      getSimilarSeries(server.id),
+      getMostWatchedItems({
+        serverId: server.id,
+        userId: sas ? undefined : me?.id,
+      }),
+      getSeasonalRecommendations(server.id),
+    ]);
 
   return (
     <div className="flex flex-col gap-6">
       {/* <ServerSetupMonitor serverId={server.id} serverName={server.name} /> */}
+      {seasonalData && (
+        <SeasonalRecommendations data={seasonalData} server={server} />
+      )}
       <SimilarMovieStatistics data={similarData} server={server} />
       <SimilarSeriesStatistics data={similarSeriesData} server={server} />
       <MostWatchedItems data={data} server={server} />

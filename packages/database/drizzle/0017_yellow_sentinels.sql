@@ -1,0 +1,1 @@
+ALTER TABLE "servers" ADD COLUMN "disabled_holidays" text[] DEFAULT '{}';
