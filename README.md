@@ -4,7 +4,7 @@ Streamystats is a statistics service for Jellyfin, providing analytics and data 
 
 > This is a hobby project of mine. Don't expect fast development.
 
-## Features
+## ✨ Features
 
 - 🖥️ Dashboard with overview statistics, live sessions and more!
 - 👤 User-specific watch history and statistics
@@ -46,7 +46,7 @@ Recommendations use vector similarity (cosine distance) to find content similar 
 
 ## 🚀 Getting started
 
-> Playback reporting plugin is no longer needed and Streamystats soely relies on the Jellyfin API for statistics.
+> Playback reporting plugin is no longer needed and Streamystats solely relies on the Jellyfin API for statistics.
 
 ### Docker
 
