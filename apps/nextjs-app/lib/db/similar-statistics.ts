@@ -119,58 +119,35 @@ const stripEmbedding = (
   return card;
 };
 
-export async function getSimilarStatistics(
-  serverId: string | number,
-  userId?: string,
-  limit = 20,
+async function getSimilarStatisticsCached(
+  serverIdNum: number,
+  userId: string,
+  limit: number,
   timeWindow?: RecommendationTimeWindow,
 ): Promise<RecommendationItem[]> {
   "use cache";
   cacheLife("hours");
-
-  const serverIdNum = Number(serverId);
-
-  let targetUserId = userId;
-  if (!targetUserId) {
-    const currentUser = await getMe();
-    if (currentUser && currentUser.serverId === serverIdNum) {
-      targetUserId = currentUser.id;
-      debugLog(`🔍 Using current user: ${targetUserId}`);
-    } else {
-      debugLog("❌ No valid user found for recommendations");
-      return [];
-    }
-  }
-
   cacheTag(
     `recommendations-${serverIdNum}`,
-    `recommendations-${serverIdNum}-${targetUserId}`,
+    `recommendations-${serverIdNum}-${userId}`,
   );
 
   try {
     debugLog(
-      `\n🚀 Starting recommendation process for server ${serverIdNum}, user ${
-        targetUserId || "anonymous"
-      }, limit ${limit}`,
+      `\n🚀 Starting recommendation process for server ${serverIdNum}, user ${userId}, limit ${limit}`,
     );
 
     let recommendations: RecommendationItem[] = [];
 
-    if (targetUserId) {
-      // Get user-specific recommendations
-      debugLog("\n📊 Getting user-specific recommendations...");
-      recommendations = await getUserSpecificRecommendations(
-        serverIdNum,
-        targetUserId,
-        limit,
-        timeWindow,
-      );
-      debugLog(
-        `✅ Got ${recommendations.length} user-specific recommendations`,
-      );
-    }
+    debugLog("\n📊 Getting user-specific recommendations...");
+    recommendations = await getUserSpecificRecommendations(
+      serverIdNum,
+      userId,
+      limit,
+      timeWindow,
+    );
+    debugLog(`✅ Got ${recommendations.length} user-specific recommendations`);
 
-    // If we don't have enough user-specific recommendations, supplement with popular items
     if (recommendations.length < limit) {
       const remainingLimit = limit - recommendations.length;
       debugLog(
@@ -179,7 +156,7 @@ export async function getSimilarStatistics(
       const popularRecommendations = await getPopularRecommendations(
         serverIdNum,
         remainingLimit,
-        targetUserId,
+        userId,
       );
       debugLog(
         `✅ Got ${popularRecommendations.length} popular recommendations`,
@@ -195,6 +172,34 @@ export async function getSimilarStatistics(
     debugLog("❌ Error getting similar statistics:", error);
     return [];
   }
+}
+
+export async function getSimilarStatistics(
+  serverId: string | number,
+  userId?: string,
+  limit = 20,
+  timeWindow?: RecommendationTimeWindow,
+): Promise<RecommendationItem[]> {
+  const serverIdNum = Number(serverId);
+
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const currentUser = await getMe();
+    if (currentUser && currentUser.serverId === serverIdNum) {
+      targetUserId = currentUser.id;
+      debugLog(`🔍 Using current user: ${targetUserId}`);
+    } else {
+      debugLog("❌ No valid user found for recommendations");
+      return [];
+    }
+  }
+
+  return getSimilarStatisticsCached(
+    serverIdNum,
+    targetUserId,
+    limit,
+    timeWindow,
+  );
 }
 
 export const revalidateRecommendations = async (
