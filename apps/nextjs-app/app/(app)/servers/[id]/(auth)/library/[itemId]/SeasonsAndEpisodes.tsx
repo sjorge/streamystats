@@ -187,7 +187,7 @@ export function SeasonsAndEpisodes({
                               <Clock className="w-3 h-3" />
                               <span>
                                 {formatDuration(
-                                  Math.floor(episode.runtimeTicks / 10_000_000)
+                                  Math.floor(episode.runtimeTicks / 10_000_000),
                                 )}
                               </span>
                             </div>
@@ -197,7 +197,7 @@ export function SeasonsAndEpisodes({
                               <Calendar className="w-3 h-3" />
                               <span>
                                 {new Date(
-                                  episode.premiereDate
+                                  episode.premiereDate,
                                 ).toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric",

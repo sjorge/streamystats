@@ -19,10 +19,10 @@ import {
 import { useQueryParams } from "@/hooks/useQueryParams";
 import { formatDuration } from "@/lib/utils";
 import {
+  Cell,
   ColumnDef,
   ColumnFiltersState,
   Row,
-  Cell,
   SortingState,
   VisibilityState,
   flexRender,

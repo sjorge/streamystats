@@ -130,8 +130,7 @@ export function HistoryTable({
                   seriesId: row.original.item?.seriesId,
                   seriesPrimaryImageTag:
                     row.original.item?.seriesPrimaryImageTag,
-                  parentBackdropItemId:
-                    row.original.item?.parentBackdropItemId,
+                  parentBackdropItemId: row.original.item?.parentBackdropItemId,
                   parentBackdropImageTags:
                     row.original.item?.parentBackdropImageTags,
                   parentThumbItemId: row.original.item?.parentThumbItemId,

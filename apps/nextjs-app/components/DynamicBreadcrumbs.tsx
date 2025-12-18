@@ -39,7 +39,7 @@ export const DynamicBreadcrumbs: React.FC = () => {
   const { id } = params as { id: string };
   const pathname = usePathname();
   const [dynamicLabels, setDynamicLabels] = useState<Record<string, string>>(
-    {}
+    {},
   );
   const fetchedRef = useRef<Set<string>>(new Set());
 
@@ -49,7 +49,7 @@ export const DynamicBreadcrumbs: React.FC = () => {
         .split("/")
         .filter((segment) => segment)
         .slice(2),
-    [pathname]
+    [pathname],
   );
 
   useEffect(() => {

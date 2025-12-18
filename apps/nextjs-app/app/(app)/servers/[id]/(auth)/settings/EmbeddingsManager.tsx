@@ -130,22 +130,22 @@ function detectPreset(server: Server): PresetKey {
 export function EmbeddingsManager({ server }: { server: Server }) {
   // Preset selection
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>(
-    detectPreset(server)
+    detectPreset(server),
   );
 
   // Embedding config state
   const [baseUrl, setBaseUrl] = useState(
-    server.embeddingBaseUrl || PROVIDER_PRESETS.openai.baseUrl
+    server.embeddingBaseUrl || PROVIDER_PRESETS.openai.baseUrl,
   );
   const [apiKey, setApiKey] = useState(server.embeddingApiKey || "");
   const [model, setModel] = useState(
-    server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel
+    server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel,
   );
   const [dimensions, setDimensions] = useState(
-    server.embeddingDimensions || 1536
+    server.embeddingDimensions || 1536,
   );
   const [provider, setProvider] = useState<EmbeddingProvider>(
-    (server.embeddingProvider as EmbeddingProvider) || "openai-compatible"
+    (server.embeddingProvider as EmbeddingProvider) || "openai-compatible",
   );
 
   // UI state
@@ -155,7 +155,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   const [isClearing, setIsClearing] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [autoEmbeddings, setAutoEmbeddings] = useState(
-    server.autoGenerateEmbeddings || false
+    server.autoGenerateEmbeddings || false,
   );
   const [isUpdatingAutoEmbed, setIsUpdatingAutoEmbed] = useState(false);
   const [actionResult, setActionResult] = useState<{
