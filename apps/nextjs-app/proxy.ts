@@ -75,6 +75,7 @@ const ADMIN_ONLY_PATHS = [
 const ADMIN_ONLY_SUB_PATHS: Record<string, string[]> = {
   dashboard: ["security"],
 };
+const ADMIN_ONLY_USER_SUB_PATHS = ["security"];
 const PUBLIC_PATHS = ["login", "reconnect"];
 
 const BASE_PATH_REGEX = basePath.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&");
@@ -106,9 +107,9 @@ const parsePathname = (pathname: string) => {
     const page = segments[2];
     const subPage = segments[3];
 
-    // Handle /servers/:id/users/:name
+    // Handle /servers/:id/users/:name/:userSubPage
     if (page === "users" && segments[3]) {
-      return { id, page, name: segments[3] };
+      return { id, page, name: segments[3], userSubPage: segments[4] };
     }
 
     // Handle /servers/:id/items/:itemId
@@ -267,7 +268,7 @@ const validateJellyfinToken = async (
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const { id, page, subPage, name } = parsePathname(pathname);
+  const { id, page, subPage, name, userSubPage } = parsePathname(pathname);
 
   const servers = await getServers();
 
@@ -353,6 +354,15 @@ export async function proxy(request: NextRequest) {
 
   // Check if user is trying to access another users page (/servers/{x}/users/[userId])
   if (name && name !== session.id && !isAdmin) {
+    return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
+  }
+
+  // Check admin permission for user sub-paths (e.g., /users/:id/security)
+  if (
+    userSubPage &&
+    ADMIN_ONLY_USER_SUB_PATHS.includes(userSubPage) &&
+    !isAdmin
+  ) {
     return NextResponse.redirect(new URL(`${basePath}/not-found`, request.url));
   }
 
