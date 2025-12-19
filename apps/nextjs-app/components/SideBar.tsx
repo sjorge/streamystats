@@ -158,7 +158,7 @@ export const SideBar: React.FC<Props> = ({
   }, [me]);
 
   return (
-    <Sidebar variant="sidebar">
+    <Sidebar variant="sidebar" collapsible="icon">
       <SidebarHeader>
         <ServerSelector
           servers={servers}

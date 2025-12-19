@@ -37,7 +37,7 @@ export default async function SecurityLayout({
   ]);
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <SecurityHeader serverId={server.id} />
       <div className="space-y-6">
         <SecurityStats stats={stats} serverId={server.id} />

@@ -55,7 +55,7 @@ export default async function ItemDetailsPage({
       : [];
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <div className="space-y-6 pb-10">
         <ItemHeader
           item={itemDetails.item}

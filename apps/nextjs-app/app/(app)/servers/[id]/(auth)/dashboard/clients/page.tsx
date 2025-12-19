@@ -38,7 +38,7 @@ export default async function ClientsPage({
   const users = await getUsers({ serverId: server.id });
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <PageTitle title="Client Statistics" />
       <ClientFilters
         users={users.map((u) => ({ id: u.id, name: u.name }))}

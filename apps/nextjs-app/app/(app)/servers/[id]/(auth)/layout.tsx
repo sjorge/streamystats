@@ -5,7 +5,13 @@ import { SideBar } from "@/components/SideBar";
 import { SuspenseLoading } from "@/components/SuspenseLoading";
 import { UpdateNotifier } from "@/components/UpdateNotifier";
 import { Separator } from "@/components/ui/separator";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getServer, getServers } from "@/lib/db/server";
 import { getMe, isUserAdmin } from "@/lib/db/users";
@@ -76,10 +82,16 @@ function HeaderSkeleton() {
 }
 
 function SideBarSkeleton() {
-  return <Skeleton className="h-full w-64" />;
+  return (
+    <Sidebar variant="sidebar" collapsible="icon">
+      <SidebarContent>
+        <Skeleton className="h-full w-full" />
+      </SidebarContent>
+    </Sidebar>
+  );
 }
 
-export default async function layout({ children, params }: Props) {
+async function LayoutContent({ children, params }: Props) {
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value === "true";
 
@@ -88,14 +100,34 @@ export default async function layout({ children, params }: Props) {
       <Suspense fallback={<SideBarSkeleton />}>
         <SideBarContent params={params} />
       </Suspense>
-      <ErrorBoundary>
-        <main className="relative flex w-full flex-1 flex-col bg-background">
+      <SidebarInset className="min-w-0">
+        <ErrorBoundary>
           <Suspense fallback={<HeaderSkeleton />}>
             <HeaderContent params={params} />
           </Suspense>
           <Suspense fallback={<SuspenseLoading />}>{children}</Suspense>
-        </main>
-      </ErrorBoundary>
+        </ErrorBoundary>
+      </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function LayoutSkeleton() {
+  return (
+    <SidebarProvider>
+      <SideBarSkeleton />
+      <SidebarInset className="min-w-0">
+        <HeaderSkeleton />
+        <SuspenseLoading />
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+export default function layout({ children, params }: Props) {
+  return (
+    <Suspense fallback={<LayoutSkeleton />}>
+      <LayoutContent params={params}>{children}</LayoutContent>
+    </Suspense>
   );
 }

@@ -16,7 +16,7 @@ export default async function ChatAISettings(props: {
   }
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <h1 className="text-3xl font-bold mb-8">AI Chat Settings</h1>
 
       <div className="space-y-8">

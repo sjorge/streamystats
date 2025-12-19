@@ -56,7 +56,7 @@ export default async function WatchtimePage({
   const _endDate = setEndDateToEndOfDay(endDateParam);
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <PageTitle title="Watchtime Statistics" />
       <WatchtimeDateRangeFilter className="mb-6" />
       <Suspense fallback={<Skeleton className="h-48 w-full" />}>

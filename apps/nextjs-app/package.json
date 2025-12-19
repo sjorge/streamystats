@@ -95,7 +95,7 @@
     "umzug": "^3.8.2",
     "use-debounce": "^10.0.6",
     "use-stick-to-bottom": "^1.1.1",
-    "uuid": "^11.1.0",
+    "uuid": "^13.0.0",
     "zod": "3.25.76"
   },
   "devDependencies": {
@@ -106,7 +106,7 @@
     "@types/react": "19.1.5",
     "@types/react-dom": "19.1.5",
     "@types/sqlite3": "^3.1.11",
-    "@types/uuid": "^10.0.0",
+    "@types/uuid": "^11.0.0",
     "eslint": "^8",
     "eslint-config-next": "^16.1.0",
     "postcss": "^8.5.6",

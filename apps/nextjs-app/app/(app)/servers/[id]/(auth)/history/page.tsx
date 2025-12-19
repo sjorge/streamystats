@@ -86,7 +86,7 @@ export default async function HistoryPage({
   };
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <PageTitle title="History" subtitle="View playback history." />
       <HistoryTable
         data={historyData}

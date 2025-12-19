@@ -36,7 +36,7 @@ export default async function ActivitiesPage({
   });
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <PageTitle title="Activity Log" subtitle="All events on your server." />
       <Suspense
         fallback={

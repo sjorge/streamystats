@@ -33,7 +33,7 @@ export default async function DashboardPage({
   const { userActivityStartDate, userActivityEndDate } = await searchParams;
 
   return (
-    <Container className="relative flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="relative flex flex-col">
       <Suspense fallback={<Skeleton className="h-48 w-full mb-8" />}>
         <DashboardContent
           serverId={id}

@@ -97,7 +97,7 @@ export default async function User({
   ]);
 
   return (
-    <Container className="flex flex-col w-screen md:w-[calc(100vw-256px)]">
+    <Container className="flex flex-col">
       <div className="flex items-center justify-between">
         <PageTitle title={user.name || "N/A"} />
         {isAdmin && (
