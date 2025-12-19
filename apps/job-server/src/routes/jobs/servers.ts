@@ -315,7 +315,7 @@ app.post("/create-server", async (c) => {
           },
         },
         {
-          expireInMinutes: 360,
+          expireInSeconds: 21600,
           retryLimit: 1,
           retryDelay: 300,
         }

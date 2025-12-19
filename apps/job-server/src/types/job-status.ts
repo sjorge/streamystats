@@ -1,4 +1,4 @@
-import type PgBoss from "pg-boss";
+import type { Job } from "pg-boss";
 
 export type JobStatus = "processing" | "completed" | "failed";
 
@@ -30,8 +30,8 @@ export interface ServerIdJobData {
   serverId: number;
 }
 
-// Generic pg-boss job type with typed data
-export type PgBossJob<T> = PgBoss.Job<T>;
+// Generic pg-boss job type with typed data (v12 API)
+export type PgBossJob<T> = Job<T>;
 
 export type ServerJobState =
   | "running"

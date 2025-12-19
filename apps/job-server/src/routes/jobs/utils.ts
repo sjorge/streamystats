@@ -1,5 +1,3 @@
-import { db, servers } from "@streamystats/database";
-import { sql } from "drizzle-orm";
 import { getJobQueue } from "../../jobs/queue";
 
 export function toIsoUtcMicros(date: Date): string {
@@ -13,28 +11,27 @@ export async function cancelJobsByName(
   try {
     const boss = await getJobQueue();
 
-    const serverFilter =
-      typeof serverId === "number"
-        ? sql`and (data->>'serverId')::int = ${serverId}`
-        : sql``;
+    const jobs = await boss.fetch(jobName, { batchSize: 100 });
 
-    const rows = (await db.execute(
-      sql`
-        select id
-        from pgboss.job
-        where
-          name = ${jobName}
-          and state < 'completed'
-          ${serverFilter}
-      `
-    )) as unknown as Array<{ id: string }>;
-
-    const ids = rows.map((r) => r.id);
-    if (ids.length === 0) {
+    if (!jobs || jobs.length === 0) {
       return 0;
     }
 
-    await boss.cancel(ids);
+    // Filter by serverId if provided
+    const jobsToCancel = serverId
+      ? jobs.filter((j) => {
+          const data = j.data as { serverId?: number };
+          return data?.serverId === serverId;
+        })
+      : jobs;
+
+    if (jobsToCancel.length === 0) {
+      return 0;
+    }
+
+    const ids = jobsToCancel.map((j) => j.id);
+
+    await boss.cancel(jobName, ids);
     return ids.length;
   } catch (error) {
     console.error(`Error stopping jobs of type "${jobName}":`, error);

@@ -50,12 +50,13 @@ app.post("/cancel-by-type", async (c) => {
   }
 });
 
-app.get("/:jobId/status", async (c) => {
+app.get("/:queueName/:jobId/status", async (c) => {
   try {
+    const queueName = c.req.param("queueName");
     const jobId = c.req.param("jobId");
 
     const boss = await getJobQueue();
-    const job = await boss.getJobById(jobId);
+    const job = await boss.getJobById(queueName, jobId);
 
     if (!job) {
       return c.json({ error: "Job not found" }, 404);
@@ -69,9 +70,9 @@ app.get("/:jobId/status", async (c) => {
         state: job.state,
         data: job.data,
         output: job.output,
-        createdon: job.createdon,
-        startedon: job.startedon,
-        completedon: job.completedon,
+        createdOn: job.createdOn,
+        startedOn: job.startedOn,
+        completedOn: job.completedOn,
       },
     });
   } catch (error) {
@@ -126,18 +127,20 @@ app.get("/queue/stats", async (c) => {
     const boss = await getJobQueue();
 
     const stats = await Promise.all([
-      boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
-      boss.getQueueSize(JobTypes.ADD_SERVER),
-      boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
+      boss.getQueueStats(JobTypes.SYNC_SERVER_DATA),
+      boss.getQueueStats(JobTypes.ADD_SERVER),
+      boss.getQueueStats(JobTypes.GENERATE_ITEM_EMBEDDINGS),
     ]);
+
+    const queuedCounts = stats.map((s) => s.queuedCount);
 
     return c.json({
       success: true,
       queueStats: {
-        syncServerData: stats[0],
-        addServer: stats[1],
-        generateItemEmbeddings: stats[2],
-        total: stats.reduce((sum: number, stat: number) => sum + stat, 0),
+        syncServerData: queuedCounts[0],
+        addServer: queuedCounts[1],
+        generateItemEmbeddings: queuedCounts[2],
+        total: queuedCounts.reduce((sum, count) => sum + count, 0),
       },
     });
   } catch (error) {
@@ -147,4 +150,3 @@ app.get("/queue/stats", async (c) => {
 });
 
 export default app;
-

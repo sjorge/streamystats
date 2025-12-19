@@ -352,7 +352,7 @@ class SyncScheduler {
               },
             },
             {
-              expireInMinutes: 30, // Job expires after 30 minutes
+              expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
               retryLimit: 1, // Retry once if it fails
               retryDelay: 60, // Wait 60 seconds before retrying
             }
@@ -410,7 +410,7 @@ class SyncScheduler {
               },
             },
             {
-              expireInMinutes: 30, // Job expires after 30 minutes
+              expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
               retryLimit: 1, // Retry once if it fails
               retryDelay: 60, // Wait 60 seconds before retrying
             }
@@ -469,7 +469,7 @@ class SyncScheduler {
               },
             },
             {
-              expireInMinutes: 30, // Job expires after 30 minutes
+              expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
               retryLimit: 1, // Retry once if it fails
               retryDelay: 60, // Wait 60 seconds before retrying
             }
@@ -515,7 +515,7 @@ class SyncScheduler {
             { serverId: server.id },
             {
               singletonKey: `jellyfin-people-sync-${server.id}`,
-              expireInMinutes: 60,
+              expireInSeconds: 3600,
               retryLimit: 1,
               retryDelay: 60,
             }
@@ -586,17 +586,10 @@ class SyncScheduler {
 
           let hasActiveJob = false;
           try {
-            const existing = await db.execute(sql`
-              SELECT 1
-              FROM pgboss.job
-              WHERE name = 'generate-item-embeddings'
-                AND state IN ('created', 'active', 'retry')
-                AND data->>'serverId' = ${server.id.toString()}
-              LIMIT 1
-            `);
-            hasActiveJob = existing.length > 0;
+            const stats = await boss.getQueueStats("generate-item-embeddings");
+            hasActiveJob = stats.activeCount > 0 || stats.queuedCount > 0;
           } catch {
-            // If pgboss schema isn't available for some reason, fall back to enqueuing.
+            // If queue doesn't exist yet, no active jobs
             hasActiveJob = false;
           }
 
@@ -617,7 +610,7 @@ class SyncScheduler {
               },
             },
             {
-              expireInMinutes: 60,
+              expireInSeconds: 3600,
               retryLimit: 1,
               retryDelay: 60,
             }
@@ -674,7 +667,7 @@ class SyncScheduler {
               },
             },
             {
-              expireInMinutes: 360, // Job expires after 6 hours (longer for full sync)
+              expireInSeconds: 21600, // Job expires after 6 hours (21600 seconds)
               retryLimit: 1, // Retry once if it fails
               retryDelay: 300, // Wait 5 minutes before retrying
             }
@@ -900,7 +893,7 @@ class SyncScheduler {
           },
         },
         {
-          expireInMinutes: 30, // Job expires after 30 minutes
+          expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
           retryLimit: 1, // Retry once if it fails
           retryDelay: 60, // Wait 60 seconds before retrying
         }
@@ -939,7 +932,7 @@ class SyncScheduler {
           },
         },
         {
-          expireInMinutes: 30, // Job expires after 30 minutes
+          expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
           retryLimit: 1, // Retry once if it fails
           retryDelay: 60, // Wait 60 seconds before retrying
         }
@@ -995,7 +988,7 @@ class SyncScheduler {
           },
         },
         {
-          expireInMinutes: 360, // Job expires after 6 hours (longer for full sync)
+          expireInSeconds: 21600, // Job expires after 6 hours (21600 seconds)
           retryLimit: 1, // Retry once if it fails
           retryDelay: 300, // Wait 5 minutes before retrying
         }
@@ -1029,7 +1022,7 @@ class SyncScheduler {
           },
         },
         {
-          expireInMinutes: 30, // Job expires after 30 minutes
+          expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
           retryLimit: 1, // Retry once if it fails
           retryDelay: 60, // Wait 60 seconds before retrying
         }
@@ -1067,7 +1060,7 @@ class SyncScheduler {
           },
         },
         {
-          expireInMinutes: 120, // Job expires after 2 hours
+          expireInSeconds: 7200, // Job expires after 2 hours (7200 seconds)
           retryLimit: 1, // Retry once if it fails
           retryDelay: 60, // Wait 60 seconds before retrying
         }
@@ -1106,7 +1099,7 @@ class SyncScheduler {
             { serverId: server.id, batchSize: 100 },
             {
               singletonKey: `geolocate-activities-${server.id}`,
-              expireInMinutes: 30,
+              expireInSeconds: 1800,
               retryLimit: 1,
               retryDelay: 60,
             }
@@ -1144,7 +1137,7 @@ class SyncScheduler {
             { serverId: server.id },
             {
               singletonKey: `calculate-fingerprints-${server.id}`,
-              expireInMinutes: 60,
+              expireInSeconds: 3600,
               retryLimit: 1,
               retryDelay: 120,
             }
@@ -1173,7 +1166,7 @@ class SyncScheduler {
         GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
         { serverId, batchSize: 500 },
         {
-          expireInMinutes: 360,
+          expireInSeconds: 21600,
           retryLimit: 1,
           retryDelay: 300,
         }

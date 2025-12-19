@@ -284,22 +284,24 @@ app.get("/server-status", async (c) => {
   try {
     const boss = await getJobQueue();
 
-    const queueSizes = await Promise.all([
-      boss.getQueueSize(JobTypes.SYNC_SERVER_DATA),
-      boss.getQueueSize(JobTypes.ADD_SERVER),
-      boss.getQueueSize(JobTypes.GENERATE_ITEM_EMBEDDINGS),
+    const queueStats = await Promise.all([
+      boss.getQueueStats(JobTypes.SYNC_SERVER_DATA),
+      boss.getQueueStats(JobTypes.ADD_SERVER),
+      boss.getQueueStats(JobTypes.GENERATE_ITEM_EMBEDDINGS),
     ]);
+    const queueSizes = queueStats.map((s) => s.queuedCount);
 
-    const jellyfinQueueSizes = await Promise.all([
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.FULL_SYNC),
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.USERS_SYNC),
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.LIBRARIES_SYNC),
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.ITEMS_SYNC),
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC),
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC),
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC),
-      boss.getQueueSize(JELLYFIN_JOB_NAMES.PEOPLE_SYNC),
+    const jellyfinQueueStats = await Promise.all([
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.FULL_SYNC),
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.USERS_SYNC),
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.LIBRARIES_SYNC),
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.ITEMS_SYNC),
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC),
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC),
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC),
+      boss.getQueueStats(JELLYFIN_JOB_NAMES.PEOPLE_SYNC),
     ]);
+    const jellyfinQueueSizes = jellyfinQueueStats.map((s) => s.queuedCount);
 
     const allServers = await db
       .select({

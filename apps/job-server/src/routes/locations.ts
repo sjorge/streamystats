@@ -472,7 +472,7 @@ app.post("/servers/:serverId/locations/backfill", async (c) => {
       GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
       { serverId, batchSize: 500 },
       {
-        expireInMinutes: 360,
+        expireInSeconds: 21600,
         retryLimit: 1,
         retryDelay: 300,
       }
@@ -506,7 +506,7 @@ app.post("/servers/:serverId/fingerprints/recalculate", async (c) => {
       GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
       { serverId },
       {
-        expireInMinutes: 60,
+        expireInSeconds: 3600,
         retryLimit: 1,
         retryDelay: 120,
       }
@@ -641,7 +641,7 @@ app.post("/servers/:serverId/security/sync", async (c) => {
       SECURITY_SYNC_JOB_NAME,
       { serverId },
       {
-        expireInMinutes: 60,
+        expireInSeconds: 3600,
         retryLimit: 1,
         singletonKey: `security-sync-${serverId}`,
       }

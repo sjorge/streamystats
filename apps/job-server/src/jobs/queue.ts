@@ -1,4 +1,5 @@
-import PgBoss from "pg-boss";
+import { PgBoss } from "pg-boss";
+import type { Job } from "pg-boss";
 import {
   syncServerDataJob,
   addServerJob,
@@ -24,6 +25,22 @@ import {
 
 let bossInstance: PgBoss | null = null;
 
+// Default queue options for all queues
+const DEFAULT_QUEUE_OPTIONS = {
+  retryLimit: 3,
+  retryDelay: 30,
+  retentionSeconds: 60 * 60 * 24, // 24 hours
+};
+
+// Helper to wrap v9-style single-job handlers to v12 array-style handlers
+function wrapHandler<T, R>(handler: (job: Job<T>) => Promise<R>) {
+  return async (jobs: Job<T>[]): Promise<R> => {
+    // Process first job (batchSize defaults to 1)
+    const job = jobs[0];
+    return handler(job);
+  };
+}
+
 export async function getJobQueue(): Promise<PgBoss> {
   if (bossInstance) {
     return bossInstance;
@@ -34,106 +51,154 @@ export async function getJobQueue(): Promise<PgBoss> {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
+  const postgres = await import("postgres");
+  const sql = postgres.default(connectionString);
+
+  // Check if old v9 schema exists (has 'job' table without 'queue' table)
+  const schemaCheck = await sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = 'pgboss' AND table_name = 'job'
+    ) as has_job,
+    EXISTS (
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = 'pgboss' AND table_name = 'queue'
+    ) as has_queue
+  `;
+
+  const hasOldSchema =
+    schemaCheck[0]?.has_job === true && schemaCheck[0]?.has_queue === false;
+
+  if (hasOldSchema) {
+    console.warn(
+      "[pg-boss] Incompatible v9 schema detected, dropping and recreating..."
+    );
+    await sql`DROP SCHEMA IF EXISTS pgboss CASCADE`;
+    console.info("[pg-boss] Old schema dropped");
+  }
+
+  await sql.end();
+
   bossInstance = new PgBoss({
     connectionString,
-    retryLimit: 3,
-    retryDelay: 30000, // 30 seconds
-    onComplete: true,
-    deleteAfterHours: 24, // Clean up completed jobs after 24 hours
-    archiveCompletedAfterSeconds: 60 * 60 * 24, // Archive completed jobs after 24 hours
   });
 
   await bossInstance.start();
+
+  await createQueues(bossInstance);
   await registerJobHandlers(bossInstance);
 
   return bossInstance;
+}
+
+async function createQueues(boss: PgBoss) {
+  // Create all queues with default options
+  const queueNames = [
+    "sync-server-data",
+    "add-server",
+    "generate-item-embeddings",
+    JELLYFIN_JOB_NAMES.FULL_SYNC,
+    JELLYFIN_JOB_NAMES.USERS_SYNC,
+    JELLYFIN_JOB_NAMES.LIBRARIES_SYNC,
+    JELLYFIN_JOB_NAMES.ITEMS_SYNC,
+    JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC,
+    JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC,
+    JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
+    JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+    GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES,
+    GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
+    GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
+    SECURITY_SYNC_JOB_NAME,
+  ];
+
+  for (const name of queueNames) {
+    await boss.createQueue(name, DEFAULT_QUEUE_OPTIONS);
+  }
+
+  console.log(`Created ${queueNames.length} job queues`);
 }
 
 async function registerJobHandlers(boss: PgBoss) {
   // Register media server job types
   await boss.work(
     "sync-server-data",
-    { teamSize: 2, teamConcurrency: 1 }, // Limited concurrency for API rate limiting
-    syncServerDataJob
+    { batchSize: 1 },
+    wrapHandler(syncServerDataJob)
   );
-  await boss.work(
-    "add-server",
-    { teamSize: 1, teamConcurrency: 1 },
-    addServerJob
-  );
+  await boss.work("add-server", { batchSize: 1 }, wrapHandler(addServerJob));
 
   // Register item embeddings job
   await boss.work(
     "generate-item-embeddings",
-    { teamSize: 1, teamConcurrency: 1 }, // Limited for API rate limiting
-    generateItemEmbeddingsJob
+    { batchSize: 1 },
+    wrapHandler(generateItemEmbeddingsJob)
   );
 
   // Register Jellyfin sync workers
   await boss.work(
     JELLYFIN_JOB_NAMES.FULL_SYNC,
-    { teamSize: 1, teamConcurrency: 1 }, // Limited concurrency for heavy operations
-    jellyfinFullSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinFullSyncWorker)
   );
   await boss.work(
     JELLYFIN_JOB_NAMES.USERS_SYNC,
-    { teamSize: 2, teamConcurrency: 2 },
-    jellyfinUsersSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinUsersSyncWorker)
   );
   await boss.work(
     JELLYFIN_JOB_NAMES.LIBRARIES_SYNC,
-    { teamSize: 2, teamConcurrency: 2 },
-    jellyfinLibrariesSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinLibrariesSyncWorker)
   );
   await boss.work(
     JELLYFIN_JOB_NAMES.ITEMS_SYNC,
-    { teamSize: 1, teamConcurrency: 1 }, // Limited concurrency for heavy operations
-    jellyfinItemsSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinItemsSyncWorker)
   );
   await boss.work(
     JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC,
-    { teamSize: 2, teamConcurrency: 2 },
-    jellyfinActivitiesSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinActivitiesSyncWorker)
   );
   await boss.work(
     JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC,
-    { teamSize: 3, teamConcurrency: 3 }, // Higher concurrency for lighter operations
-    jellyfinRecentItemsSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinRecentItemsSyncWorker)
   );
   await boss.work(
     JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
-    { teamSize: 3, teamConcurrency: 3 }, // Higher concurrency for lighter operations
-    jellyfinRecentActivitiesSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinRecentActivitiesSyncWorker)
   );
 
   await boss.work(
     JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
-    { teamSize: 1, teamConcurrency: 1 },
-    jellyfinPeopleSyncWorker
+    { batchSize: 1 },
+    wrapHandler(jellyfinPeopleSyncWorker)
   );
 
   // Register geolocation jobs
   await boss.work(
     GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES,
-    { teamSize: 2, teamConcurrency: 2 },
-    geolocateActivitiesJob
+    { batchSize: 1 },
+    wrapHandler(geolocateActivitiesJob)
   );
   await boss.work(
     GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
-    { teamSize: 1, teamConcurrency: 1 },
-    calculateFingerprintsJob
+    { batchSize: 1 },
+    wrapHandler(calculateFingerprintsJob)
   );
   await boss.work(
     GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
-    { teamSize: 1, teamConcurrency: 1 },
-    backfillActivityLocationsJob
+    { batchSize: 1 },
+    wrapHandler(backfillActivityLocationsJob)
   );
 
   // Register security sync job
   await boss.work(
     SECURITY_SYNC_JOB_NAME,
-    { teamSize: 1, teamConcurrency: 1 },
-    securityFullSyncJob
+    { batchSize: 1 },
+    wrapHandler(securityFullSyncJob)
   );
 
   console.log("All job handlers registered successfully");
