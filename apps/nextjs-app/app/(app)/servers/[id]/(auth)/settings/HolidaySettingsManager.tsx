@@ -54,7 +54,7 @@ export function HolidaySettingsManager({
         setDisabledHolidays(
           enabled
             ? [...disabledHolidays, holidayId]
-            : disabledHolidays.filter((id) => id !== holidayId)
+            : disabledHolidays.filter((id) => id !== holidayId),
         );
         toast.error(result.message || "Failed to update settings");
       }
@@ -65,8 +65,18 @@ export function HolidaySettingsManager({
     if (holiday.dateRanges.length === 0) return "Special";
 
     const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ];
 
     return holiday.dateRanges
@@ -163,4 +173,3 @@ export function HolidaySettingsManager({
     </Card>
   );
 }
-

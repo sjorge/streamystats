@@ -69,7 +69,7 @@ function FitBoundsComponent({ locations }: FitBoundsComponentProps) {
     if (locations.length === 0) return;
 
     const bounds = L.latLngBounds(
-      locations.map((loc) => [loc.latitude, loc.longitude] as [number, number])
+      locations.map((loc) => [loc.latitude, loc.longitude] as [number, number]),
     );
 
     map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });

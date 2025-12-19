@@ -21,7 +21,7 @@ import {
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
-import { getActiveHolidays, type Holiday } from "../holidays";
+import { type Holiday, getActiveHolidays } from "../holidays";
 import { getMe } from "./users";
 
 export interface SeasonalRecommendationItem {
@@ -100,11 +100,13 @@ export async function getSeasonalRecommendations(
   // Get all active holidays and filter out disabled ones
   const activeHolidays = getActiveHolidays();
   const enabledHolidays = activeHolidays.filter(
-    (h) => !disabledHolidays.includes(h.id)
+    (h) => !disabledHolidays.includes(h.id),
   );
 
   if (enabledHolidays.length === 0) {
-    console.log(`[Seasonal] No enabled holidays (${activeHolidays.length} active, ${disabledHolidays.length} disabled)`);
+    console.log(
+      `[Seasonal] No enabled holidays (${activeHolidays.length} active, ${disabledHolidays.length} disabled)`,
+    );
     return null;
   }
 
@@ -113,12 +115,15 @@ export async function getSeasonalRecommendations(
   // cacheTag(`seasonal-${serverIdNum}-${holiday.id}`);
 
   console.log(`[Seasonal] Active holiday: ${holiday.name} (${holiday.id})`);
-  console.log(`[Seasonal] Keywords: ${holiday.keywords.slice(0, 5).join(", ")}...`);
+  console.log(
+    `[Seasonal] Keywords: ${holiday.keywords.slice(0, 5).join(", ")}...`,
+  );
   console.log(`[Seasonal] Genres: ${holiday.genres.join(", ") || "none"}`);
 
   try {
     const currentUser = await getMe();
-    const userId = currentUser?.serverId === serverIdNum ? currentUser.id : null;
+    const userId =
+      currentUser?.serverId === serverIdNum ? currentUser.id : null;
 
     // Get user's watched items and hidden recommendations
     let watchedItemIds: string[] = [];
@@ -174,7 +179,9 @@ export async function getSeasonalRecommendations(
       return null;
     }
 
-    console.log(`[Seasonal] Search conditions count: ${searchConditions.length}`);
+    console.log(
+      `[Seasonal] Search conditions count: ${searchConditions.length}`,
+    );
     console.log(`[Seasonal] Exclude IDs count: ${excludeIds.length}`);
 
     // First, find direct keyword/genre matches (Movies and Series only)
@@ -222,7 +229,10 @@ export async function getSeasonalRecommendations(
           // Overview match - only count if keyword is specific enough (5+ chars)
           if (keyword.length >= 5) {
             score += 3;
-            if (reasons.length < 2 && !reasons.some(r => r.includes("description"))) {
+            if (
+              reasons.length < 2 &&
+              !reasons.some((r) => r.includes("description"))
+            ) {
               reasons.push("keyword in description");
             }
           }
@@ -240,7 +250,10 @@ export async function getSeasonalRecommendations(
       }
 
       // Penalize items that ONLY have weak overview matches (no title, no genre)
-      if (!hasTitleMatch && !itemGenres.some(g => holiday.genres.includes(g))) {
+      if (
+        !hasTitleMatch &&
+        !itemGenres.some((g) => holiday.genres.includes(g))
+      ) {
         score = Math.floor(score * 0.3); // Heavy penalty for overview-only matches
       }
 
@@ -264,20 +277,33 @@ export async function getSeasonalRecommendations(
 
     // Sort by score and filter out weak matches
     scoredMatches.sort((a, b) => b.matchScore - a.matchScore);
-    
+
     // Only keep items with a minimum score (title match or genre match)
     const MIN_SCORE = 10;
-    const qualifiedMatches = scoredMatches.filter((m) => m.matchScore >= MIN_SCORE);
-    
-    console.log(`[Seasonal] Qualified matches (score >= ${MIN_SCORE}): ${qualifiedMatches.length}`);
+    const qualifiedMatches = scoredMatches.filter(
+      (m) => m.matchScore >= MIN_SCORE,
+    );
+
+    console.log(
+      `[Seasonal] Qualified matches (score >= ${MIN_SCORE}): ${qualifiedMatches.length}`,
+    );
     if (qualifiedMatches.length > 0) {
-      console.log(`[Seasonal] Top 3 qualified:`, qualifiedMatches.slice(0, 3).map(m => 
-        `"${m.item.name}" (score: ${m.matchScore}, reason: ${m.matchReason})`
-      ));
+      console.log(
+        "[Seasonal] Top 3 qualified:",
+        qualifiedMatches
+          .slice(0, 3)
+          .map(
+            (m) =>
+              `"${m.item.name}" (score: ${m.matchScore}, reason: ${m.matchReason})`,
+          ),
+      );
     }
 
     // If we have matches with embeddings, find similar items
-    const topMatches = qualifiedMatches.slice(0, Math.min(5, qualifiedMatches.length));
+    const topMatches = qualifiedMatches.slice(
+      0,
+      Math.min(5, qualifiedMatches.length),
+    );
     const matchesWithEmbeddings = topMatches.filter((m) => m.embedding);
 
     let similarItems: Array<{
@@ -356,11 +382,13 @@ export async function getSeasonalRecommendations(
 
     console.log(`[Seasonal] Final results count: ${finalResults.length}`);
     if (finalResults.length > 0) {
-      console.log(`[Seasonal] Top result: "${finalResults[0].item.name}" (${finalResults[0].matchReason})`);
+      console.log(
+        `[Seasonal] Top result: "${finalResults[0].item.name}" (${finalResults[0].matchReason})`,
+      );
     }
 
     if (finalResults.length === 0) {
-      console.log(`[Seasonal] No results found, returning null`);
+      console.log("[Seasonal] No results found, returning null");
       return null;
     }
 
@@ -373,4 +401,3 @@ export async function getSeasonalRecommendations(
     return null;
   }
 }
-

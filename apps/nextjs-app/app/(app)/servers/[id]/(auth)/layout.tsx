@@ -9,6 +9,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getServer, getServers } from "@/lib/db/server";
 import { getMe, isUserAdmin } from "@/lib/db/users";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { type PropsWithChildren, Suspense } from "react";
 
@@ -78,14 +79,17 @@ function SideBarSkeleton() {
   return <Skeleton className="h-full w-64" />;
 }
 
-export default function layout({ children, params }: Props) {
+export default async function layout({ children, params }: Props) {
+  const cookieStore = await cookies();
+  const defaultOpen = cookieStore.get("sidebar_state")?.value === "true";
+
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={defaultOpen}>
       <Suspense fallback={<SideBarSkeleton />}>
         <SideBarContent params={params} />
       </Suspense>
       <ErrorBoundary>
-        <main>
+        <main className="relative flex w-full flex-1 flex-col bg-background">
           <Suspense fallback={<HeaderSkeleton />}>
             <HeaderContent params={params} />
           </Suspense>

@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
  */
 export async function updateDisabledHolidaysAction(
   serverId: number,
-  disabledHolidays: string[]
+  disabledHolidays: string[],
 ) {
   try {
     await db
@@ -35,4 +35,3 @@ export async function updateDisabledHolidaysAction(
     };
   }
 }
-

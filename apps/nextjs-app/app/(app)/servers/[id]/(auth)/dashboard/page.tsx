@@ -1,8 +1,8 @@
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getServer } from "@/lib/db/server";
 import { getSeasonalRecommendations } from "@/lib/db/seasonal-recommendations";
+import { getServer } from "@/lib/db/server";
 import { getSimilarSeries } from "@/lib/db/similar-series-statistics";
 import { getSimilarStatistics } from "@/lib/db/similar-statistics";
 import { getMostWatchedItems } from "@/lib/db/statistics";

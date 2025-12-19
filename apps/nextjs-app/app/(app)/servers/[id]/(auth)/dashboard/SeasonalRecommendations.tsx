@@ -3,8 +3,8 @@
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import type { Holiday } from "@/lib/holidays";
 import type { SeasonalRecommendationResult } from "@/lib/db/seasonal-recommendations";
+import type { Holiday } from "@/lib/holidays";
 import type { Server } from "@streamystats/database";
 import {
   BookOpen,
@@ -21,6 +21,7 @@ import {
   Heart,
   Laugh,
   Leaf,
+  type LucideIcon,
   Moon,
   PartyPopper,
   Skull,
@@ -28,7 +29,6 @@ import {
   User,
   Users,
   UtensilsCrossed,
-  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 

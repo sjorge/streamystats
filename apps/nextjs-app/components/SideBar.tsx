@@ -37,6 +37,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -158,13 +159,13 @@ export const SideBar: React.FC<Props> = ({
 
   return (
     <Sidebar variant="sidebar">
+      <SidebarHeader>
+        <ServerSelector
+          servers={servers}
+          allowedToCreateServer={allowedToCreateServer}
+        />
+      </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <ServerSelector
-            servers={servers}
-            allowedToCreateServer={allowedToCreateServer}
-          />
-        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Home</SidebarGroupLabel>
           <SidebarGroupContent>

@@ -106,7 +106,7 @@ export const getWatchTimePerWeekDay = async ({
   const result = await db
     .select({
       weekDay: sql<string>`TRIM(TO_CHAR(${sessions.startTime}, 'Day'))`.as(
-        "weekDay"
+        "weekDay",
       ),
       watchTime: sum(sessions.playDuration).as("watchTime"),
     })
