@@ -260,7 +260,7 @@ export async function getSimilarUsers(
 
   // Filter out the target user and excluded users from the list of candidates
   const otherUsers = allUsers.filter(
-    (u) => u.id !== targetUserId && !excludedUserIds.includes(u.id)
+    (u) => u.id !== targetUserId && !excludedUserIds.includes(u.id),
   );
   if (otherUsers.length === 0) {
     return { overall: [], thisMonth: [] };

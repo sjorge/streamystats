@@ -1,7 +1,5 @@
-"use cache";
-
 import { db, items, servers, sessions } from "@streamystats/database";
-import { and, eq, inArray, notInArray, type SQL } from "drizzle-orm";
+import { type SQL, and, eq, inArray, notInArray } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
 
 export interface ExclusionSettings {
@@ -14,7 +12,7 @@ export interface ExclusionSettings {
  * Results are cached for performance.
  */
 export async function getExclusionSettings(
-  serverId: number
+  serverId: number,
 ): Promise<ExclusionSettings> {
   "use cache";
   cacheLife("hours");
@@ -39,7 +37,7 @@ export async function getExclusionSettings(
  * Returns undefined if no users are excluded.
  */
 export function buildUserExclusionCondition(
-  excludedUserIds: string[]
+  excludedUserIds: string[],
 ): SQL | undefined {
   if (excludedUserIds.length === 0) {
     return undefined;
@@ -53,7 +51,7 @@ export function buildUserExclusionCondition(
  * Returns undefined if no libraries are excluded.
  */
 export function buildLibraryExclusionCondition(
-  excludedLibraryIds: string[]
+  excludedLibraryIds: string[],
 ): SQL | undefined {
   if (excludedLibraryIds.length === 0) {
     return undefined;
@@ -67,7 +65,7 @@ export function buildLibraryExclusionCondition(
  */
 export async function getExcludedItemIds(
   serverId: number,
-  excludedLibraryIds: string[]
+  excludedLibraryIds: string[],
 ): Promise<string[]> {
   if (excludedLibraryIds.length === 0) {
     return [];
@@ -79,8 +77,8 @@ export async function getExcludedItemIds(
     .where(
       and(
         eq(items.serverId, serverId),
-        inArray(items.libraryId, excludedLibraryIds)
-      )
+        inArray(items.libraryId, excludedLibraryIds),
+      ),
     );
 
   return excludedItems.map((item) => item.id);
@@ -92,7 +90,7 @@ export async function getExcludedItemIds(
  */
 export function addExclusionConditions(
   conditions: SQL[],
-  exclusions: ExclusionSettings
+  exclusions: ExclusionSettings,
 ): SQL[] {
   const userCondition = buildUserExclusionCondition(exclusions.excludedUserIds);
   if (userCondition) {
@@ -100,7 +98,7 @@ export function addExclusionConditions(
   }
 
   const libraryCondition = buildLibraryExclusionCondition(
-    exclusions.excludedLibraryIds
+    exclusions.excludedLibraryIds,
   );
   if (libraryCondition) {
     conditions.push(libraryCondition);
@@ -108,4 +106,3 @@ export function addExclusionConditions(
 
   return conditions;
 }
-

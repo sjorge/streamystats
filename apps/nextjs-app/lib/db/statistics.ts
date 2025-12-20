@@ -47,7 +47,7 @@ export async function getMostWatchedItems({
 
   // Get exclusion settings
   const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-    Number(serverId)
+    Number(serverId),
   );
 
   // First get the aggregated session data for Movies and Episodes
@@ -94,7 +94,10 @@ export async function getMostWatchedItems({
   }
   const itemsData =
     itemIds.length > 0
-      ? await db.select().from(items).where(and(...itemConditions))
+      ? await db
+          .select()
+          .from(items)
+          .where(and(...itemConditions))
       : [];
 
   // Create a map for O(1) lookup
@@ -225,7 +228,7 @@ export async function getWatchTimePerType({
 
   // Get exclusion settings
   const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-    Number(serverId)
+    Number(serverId),
   );
 
   const whereConditions: ReturnType<typeof eq>[] = [
@@ -368,7 +371,7 @@ export async function getWatchTimeByLibrary({
 
   // Get exclusion settings
   const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-    Number(serverId)
+    Number(serverId),
   );
 
   const whereConditions: ReturnType<typeof eq>[] = [
@@ -442,7 +445,9 @@ export async function getMostWatchedDay({
   userId?: string | number;
 }): Promise<MostWatchedDay | null> {
   // Get exclusion settings
-  const { excludedUserIds } = await getExclusionSettings(Number(serverId));
+  const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
+    Number(serverId),
+  );
 
   const whereConditions: ReturnType<typeof eq>[] = [
     eq(sessions.serverId, Number(serverId)),
@@ -459,13 +464,18 @@ export async function getMostWatchedDay({
   if (excludedUserIds.length > 0) {
     whereConditions.push(notInArray(sessions.userId, excludedUserIds));
   }
+  if (excludedLibraryIds.length > 0) {
+    whereConditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  }
 
+  // Join with items to filter by library
   const rows = await db
     .select({
       date: sql<string>`DATE(${sessions.startTime})`.as("date"),
       totalWatchTime: sum(sessions.playDuration).as("totalWatchTime"),
     })
     .from(sessions)
+    .innerJoin(items, eq(sessions.itemId, items.id))
     .where(and(...whereConditions))
     .groupBy(sql`DATE(${sessions.startTime})`)
     .orderBy(desc(sum(sessions.playDuration)))

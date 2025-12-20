@@ -21,8 +21,8 @@ import {
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
-import { getExclusionSettings } from "./exclusions";
 import { type Holiday, getActiveHolidays } from "../holidays";
+import { getExclusionSettings } from "./exclusions";
 import { getMe } from "./users";
 
 export interface SeasonalRecommendationItem {

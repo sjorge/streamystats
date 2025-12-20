@@ -51,13 +51,13 @@ export function ExcludedLibrariesManager({
       const result = await updateExcludedLibrariesAction(serverId, newExcluded);
       if (result.success) {
         toast.success(
-          visible ? "Library now visible" : "Library hidden from stats"
+          visible ? "Library now visible" : "Library hidden from stats",
         );
       } else {
         setExcludedLibraryIds(
           visible
             ? [...excludedLibraryIds, libraryId]
-            : excludedLibraryIds.filter((id) => id !== libraryId)
+            : excludedLibraryIds.filter((id) => id !== libraryId),
         );
         toast.error(result.message || "Failed to update settings");
       }
@@ -151,4 +151,3 @@ export function ExcludedLibrariesManager({
     </Card>
   );
 }
-

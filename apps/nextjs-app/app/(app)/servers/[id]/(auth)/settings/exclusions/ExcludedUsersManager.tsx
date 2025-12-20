@@ -55,7 +55,7 @@ export function ExcludedUsersManager({
         setExcludedUserIds(
           visible
             ? [...excludedUserIds, userId]
-            : excludedUserIds.filter((id) => id !== userId)
+            : excludedUserIds.filter((id) => id !== userId),
         );
         toast.error(result.message || "Failed to update settings");
       }
@@ -149,4 +149,3 @@ export function ExcludedUsersManager({
     </Card>
   );
 }
-

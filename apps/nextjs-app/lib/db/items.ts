@@ -386,7 +386,7 @@ export const getItemUserStats = async ({
   // Add user exclusion filter
   if (exclusions.excludedUserIds.length > 0) {
     whereConditions.push(
-      notInArray(sessions.userId, exclusions.excludedUserIds)
+      notInArray(sessions.userId, exclusions.excludedUserIds),
     );
   }
 

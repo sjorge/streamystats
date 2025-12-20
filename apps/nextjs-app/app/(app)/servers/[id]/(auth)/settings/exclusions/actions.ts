@@ -10,7 +10,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
  */
 export async function updateExcludedUsersAction(
   serverId: number,
-  excludedUserIds: string[]
+  excludedUserIds: string[],
 ) {
   try {
     await db
@@ -46,7 +46,7 @@ export async function updateExcludedUsersAction(
  */
 export async function updateExcludedLibrariesAction(
   serverId: number,
-  excludedLibraryIds: string[]
+  excludedLibraryIds: string[],
 ) {
   try {
     await db
@@ -76,4 +76,3 @@ export async function updateExcludedLibrariesAction(
     };
   }
 }
-
