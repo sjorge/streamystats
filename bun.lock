@@ -157,10 +157,9 @@
     },
   },
   "trustedDependencies": [
-    "geoip-lite",
     "sharp",
-    "@biomejs/biome",
     "esbuild",
+    "@biomejs/biome",
   ],
   "overrides": {
     "@types/react": "19.1.5",

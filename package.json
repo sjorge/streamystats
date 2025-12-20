@@ -50,7 +50,6 @@
   "trustedDependencies": [
     "sharp",
     "esbuild",
-    "@biomejs/biome",
-    "geoip-lite"
+    "@biomejs/biome"
   ]
 }
