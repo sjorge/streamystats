@@ -1,5 +1,5 @@
 # Build stage
-FROM oven/bun:1.3.4 AS builder
+FROM oven/bun:1.3.5 AS builder
 WORKDIR /app
 
 # Copy configuration files
@@ -17,12 +17,20 @@ RUN bun install
 COPY packages/database ./packages/database
 COPY apps/job-server ./apps/job-server
 
+# Re-run install to ensure workspace dependencies are fully resolved
+RUN bun install
+
 # Build the database package (if it requires a build step)
 WORKDIR /app/packages/database
 RUN bun run build
 
 # Compile the job-server to a single binary
 WORKDIR /app/apps/job-server
+
+# Install geoip-lite with its data (the package includes pre-built data files)
+RUN bun add geoip-lite@1.4.10
+RUN ls -la node_modules/geoip-lite/data/ || echo "Checking root..." && ls -la /app/node_modules/geoip-lite/data/
+
 # Compile for the current architecture (matches builder and runner)
 RUN bun build ./src/index.ts --compile --minify --outfile server
 
@@ -39,7 +47,8 @@ WORKDIR /app
 COPY --from=builder /app/apps/job-server/server ./server
 
 # Copy geoip-lite data files (required at runtime, not bundled in binary)
-COPY --from=builder /app/node_modules/geoip-lite/data ./node_modules/geoip-lite/data
+# Try app-level first (where bun add installs it), fall back to root
+COPY --from=builder /app/apps/job-server/node_modules/geoip-lite/data ./node_modules/geoip-lite/data
 
 # Environment setup
 ENV NODE_ENV=production
