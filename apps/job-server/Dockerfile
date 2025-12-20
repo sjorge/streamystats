@@ -29,7 +29,6 @@ WORKDIR /app/apps/job-server
 
 # Install geoip-lite with its data (the package includes pre-built data files)
 RUN bun add geoip-lite@1.4.10
-RUN ls -la node_modules/geoip-lite/data/ || echo "Checking root..." && ls -la /app/node_modules/geoip-lite/data/
 
 # Compile for the current architecture (matches builder and runner)
 RUN bun build ./src/index.ts --compile --minify --outfile server
