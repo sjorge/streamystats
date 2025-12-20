@@ -17,9 +17,6 @@ RUN bun install
 COPY packages/database ./packages/database
 COPY apps/job-server ./apps/job-server
 
-# Re-run install to ensure workspace dependencies are fully resolved
-RUN bun install
-
 # Build the database package (if it requires a build step)
 WORKDIR /app/packages/database
 RUN bun run build
