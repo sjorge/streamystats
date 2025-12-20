@@ -21,6 +21,7 @@ import {
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
+import { getExclusionSettings } from "./exclusions";
 import { type Holiday, getActiveHolidays } from "../holidays";
 import { getMe } from "./users";
 
@@ -89,13 +90,17 @@ export async function getSeasonalRecommendations(
 
   const serverIdNum = Number(serverId);
 
-  // Get server's disabled holidays
-  const server = await db.query.servers.findFirst({
-    where: eq(servers.id, serverIdNum),
-    columns: { disabledHolidays: true },
-  });
+  // Get server's disabled holidays and exclusion settings
+  const [server, exclusions] = await Promise.all([
+    db.query.servers.findFirst({
+      where: eq(servers.id, serverIdNum),
+      columns: { disabledHolidays: true },
+    }),
+    getExclusionSettings(serverIdNum),
+  ]);
 
   const disabledHolidays = server?.disabledHolidays || [];
+  const { excludedLibraryIds } = exclusions;
 
   // Get all active holidays and filter out disabled ones
   const activeHolidays = getActiveHolidays();
@@ -197,6 +202,10 @@ export async function getSeasonalRecommendations(
           isNull(items.deletedAt),
           inArray(items.type, ["Movie", "Series"]),
           or(...searchConditions),
+          // Exclude items from excluded libraries
+          excludedLibraryIds.length > 0
+            ? notInArray(items.libraryId, excludedLibraryIds)
+            : sql`true`,
           excludeIds.length > 0 ? notInArray(items.id, excludeIds) : sql`true`,
         ),
       )

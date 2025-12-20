@@ -19,9 +19,11 @@ import {
   inArray,
   isNotNull,
   lte,
+  notInArray,
   or,
   sql,
 } from "drizzle-orm";
+import { getExclusionSettings } from "./exclusions";
 
 export interface HistoryItem {
   session: Session;
@@ -65,14 +67,26 @@ export const getHistory = async (
     playMethod?: string;
   },
 ): Promise<HistoryResponse> => {
+  // Get exclusion settings
+  const { excludedUserIds, excludedLibraryIds } =
+    await getExclusionSettings(serverId);
+
   const offset = (page - 1) * perPage;
 
   // Build base query conditions
-  const conditions = [
+  const conditions: ReturnType<typeof eq>[] = [
     eq(sessions.serverId, serverId),
     isNotNull(sessions.itemId),
     isNotNull(sessions.userId),
   ];
+
+  // Add exclusion filters
+  if (excludedUserIds.length > 0) {
+    conditions.push(notInArray(sessions.userId, excludedUserIds));
+  }
+  if (excludedLibraryIds.length > 0) {
+    conditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  }
 
   // Add date range filters
   if (filters?.startDate) {
@@ -313,20 +327,28 @@ export const getItemHistory = async (
   page = 1,
   perPage = 50,
 ): Promise<HistoryResponse> => {
+  // Get exclusion settings
+  const { excludedUserIds } = await getExclusionSettings(serverId);
+
   const offset = (page - 1) * perPage;
+
+  const conditions: ReturnType<typeof eq>[] = [
+    eq(sessions.serverId, serverId),
+    eq(sessions.itemId, itemId),
+    isNotNull(sessions.userId),
+  ];
+
+  // Add exclusion filters
+  if (excludedUserIds.length > 0) {
+    conditions.push(notInArray(sessions.userId, excludedUserIds));
+  }
 
   const data = await db
     .select()
     .from(sessions)
     .leftJoin(items, eq(sessions.itemId, items.id))
     .leftJoin(users, eq(sessions.userId, users.id))
-    .where(
-      and(
-        eq(sessions.serverId, serverId),
-        eq(sessions.itemId, itemId),
-        isNotNull(sessions.userId),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(desc(sessions.createdAt))
     .limit(perPage)
     .offset(offset);
@@ -334,13 +356,7 @@ export const getItemHistory = async (
   const totalCount = await db
     .select({ count: sql<number>`COUNT(*)` })
     .from(sessions)
-    .where(
-      and(
-        eq(sessions.serverId, serverId),
-        eq(sessions.itemId, itemId),
-        isNotNull(sessions.userId),
-      ),
-    )
+    .where(and(...conditions))
     .then((result) => result[0]?.count || 0);
 
   const totalPages = Math.ceil(totalCount / perPage);
@@ -376,12 +392,24 @@ export const getHistoryByFilters = async ({
   endDate?: string;
   limit?: number;
 }): Promise<HistoryItem[]> => {
-  const conditions = [
+  // Get exclusion settings
+  const { excludedUserIds, excludedLibraryIds } =
+    await getExclusionSettings(serverId);
+
+  const conditions: ReturnType<typeof eq>[] = [
     eq(sessions.serverId, serverId),
     isNotNull(sessions.itemId),
     isNotNull(sessions.userId),
     isNotNull(sessions.startTime),
   ];
+
+  // Add exclusion filters
+  if (excludedUserIds.length > 0) {
+    conditions.push(notInArray(sessions.userId, excludedUserIds));
+  }
+  if (excludedLibraryIds.length > 0) {
+    conditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  }
 
   if (userId) {
     conditions.push(eq(sessions.userId, userId));

@@ -127,6 +127,13 @@
       "when": 1766084153261,
       "tag": "0017_yellow_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1766223554950,
+      "tag": "0018_stormy_wildside",
+      "breakpoints": true
     }
   ]
 }

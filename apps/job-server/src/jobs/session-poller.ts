@@ -7,7 +7,7 @@ import {
 } from "@streamystats/database";
 import type { Server } from "@streamystats/database/schema";
 import { JellyfinClient } from "../jellyfin/client";
-import type {
+import {
   JellyfinSession,
   TrackedSession,
   ActiveSessionResponse,
@@ -151,7 +151,7 @@ class SessionPoller {
   /**
    * Poll sessions for a specific server
    */
-  private async pollServer(server: Server): Promise<void> {
+  private async pollServer(server: any): Promise<void> {
     try {
       const client = JellyfinClient.fromServer(server);
       const currentSessions = await client.getSessions();
@@ -169,7 +169,7 @@ class SessionPoller {
    * Process sessions for a server
    */
   private async processSessions(
-    server: Server,
+    server: any,
     currentSessions: JellyfinSession[]
   ): Promise<void> {
     const serverKey = `server_${server.id}`;
@@ -369,7 +369,7 @@ class SessionPoller {
    * Handle updated sessions
    */
   private async handleUpdatedSessions(
-    server: Server,
+    server: any,
     updatedSessions: JellyfinSession[],
     trackedSessions: Map<string, TrackedSession>
   ): Promise<Map<string, TrackedSession>> {
@@ -476,7 +476,7 @@ class SessionPoller {
    * Handle ended sessions
    */
   private async handleEndedSessions(
-    server: Server,
+    server: any,
     endedSessions: Array<{ key: string; session: TrackedSession }>,
     trackedSessions: Map<string, TrackedSession>
   ): Promise<Map<string, TrackedSession>> {
@@ -566,7 +566,7 @@ class SessionPoller {
    * Save playback record to database
    */
   private async savePlaybackRecord(
-    server: Server,
+    server: any,
     tracked: TrackedSession,
     finalDuration: number,
     percentComplete: number,

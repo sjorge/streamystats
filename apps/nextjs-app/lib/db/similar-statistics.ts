@@ -22,6 +22,7 @@ import {
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
 import { cacheLife, cacheTag, revalidateTag } from "next/cache";
+import { getExclusionSettings } from "./exclusions";
 import { getMe } from "./users";
 
 const debugLog = (..._args: unknown[]) => {};
@@ -558,6 +559,10 @@ async function getPopularRecommendations(
     }`,
   );
 
+  // Get exclusion settings
+  const { excludedUserIds, excludedLibraryIds } =
+    await getExclusionSettings(serverId);
+
   // Get items that are popular (most watched) but exclude items already watched by the current user
   let watchedItemIds: string[] = [];
   let hiddenItemIds: string[] = [];
@@ -622,6 +627,14 @@ async function getPopularRecommendations(
         // Exclude user's hidden items if we have a user
         hiddenItemIds.length > 0
           ? notInArray(items.id, hiddenItemIds)
+          : sql`true`,
+        // Exclude items from excluded libraries
+        excludedLibraryIds.length > 0
+          ? notInArray(items.libraryId, excludedLibraryIds)
+          : sql`true`,
+        // Exclude sessions from excluded users in the count
+        excludedUserIds.length > 0
+          ? notInArray(sessions.userId, excludedUserIds)
           : sql`true`,
       ),
     )
