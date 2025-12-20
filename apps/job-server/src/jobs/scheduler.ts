@@ -15,8 +15,7 @@ class SyncScheduler {
     Bun.env.CRON_ACTIVITY_SYNC || "*/1 * * * *"; // Every minute
   private recentItemsSyncInterval: string =
     Bun.env.CRON_RECENT_ITEMS_SYNC || "*/1 * * * *"; // Every minute
-  private userSyncInterval: string =
-    Bun.env.CRON_USER_SYNC || "*/1 * * * *"; // Every minute
+  private userSyncInterval: string = Bun.env.CRON_USER_SYNC || "*/1 * * * *"; // Every minute
   private peopleSyncInterval: string =
     Bun.env.CRON_PEOPLE_SYNC || "*/15 * * * *"; // Every 15 minutes
   private embeddingsSyncInterval: string =
@@ -29,8 +28,7 @@ class SyncScheduler {
     Bun.env.CRON_JOB_CLEANUP || "*/1 * * * *"; // Every minute
   private oldJobCleanupInterval: string =
     Bun.env.CRON_OLD_JOB_CLEANUP || "0 3 * * *"; // Daily at 3 AM
-  private fullSyncInterval: string =
-    Bun.env.CRON_FULL_SYNC || "0 2 * * *"; // Daily at 2 AM
+  private fullSyncInterval: string = Bun.env.CRON_FULL_SYNC || "0 2 * * *"; // Daily at 2 AM
   private deletedItemsCleanupInterval: string =
     Bun.env.CRON_DELETED_ITEMS_CLEANUP || "0 * * * *"; // Every hour
 
