@@ -46,8 +46,11 @@ class SessionPoller {
   private config: Required<SessionPollerConfig>;
 
   constructor(config: SessionPollerConfig = {}) {
+    const envIntervalMs = Bun.env.SESSION_POLL_INTERVAL_MS
+      ? Number.parseInt(Bun.env.SESSION_POLL_INTERVAL_MS, 10)
+      : undefined;
     this.config = {
-      intervalMs: config.intervalMs || 5000, // 5 seconds as requested
+      intervalMs: config.intervalMs || envIntervalMs || 5000, // 5 seconds default
       enabled: config.enabled ?? true,
     };
   }
