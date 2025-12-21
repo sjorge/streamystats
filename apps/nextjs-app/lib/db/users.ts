@@ -2,6 +2,7 @@
 
 import { type User, db, items, sessions, users } from "@streamystats/database";
 import {
+  type SQL,
   and,
   eq,
   gte,
@@ -107,9 +108,7 @@ export const getWatchTimePerWeekDay = async ({
   );
 
   // Build the where condition based on whether userId is provided
-  const whereConditions: ReturnType<typeof eq>[] = [
-    eq(sessions.serverId, Number(serverId)),
-  ];
+  const whereConditions: SQL[] = [eq(sessions.serverId, Number(serverId))];
   if (userId !== undefined) {
     whereConditions.push(eq(sessions.userId, String(userId)));
   }
@@ -191,9 +190,7 @@ export const getWatchTimePerHour = async ({
   );
 
   // Build the where condition based on whether userId is provided
-  const whereConditions: ReturnType<typeof eq>[] = [
-    eq(sessions.serverId, Number(serverId)),
-  ];
+  const whereConditions: SQL[] = [eq(sessions.serverId, Number(serverId))];
   if (userId !== undefined) {
     whereConditions.push(eq(sessions.userId, String(userId)));
   }
@@ -250,9 +247,7 @@ export const getTotalWatchTime = async ({
   );
 
   // Build the where condition based on whether userId is provided
-  const whereConditions: ReturnType<typeof eq>[] = [
-    eq(sessions.serverId, Number(serverId)),
-  ];
+  const whereConditions: SQL[] = [eq(sessions.serverId, Number(serverId))];
   if (userId !== undefined) {
     whereConditions.push(eq(sessions.userId, String(userId)));
   }
@@ -338,7 +333,7 @@ export const getUserActivityPerDay = async ({
   // Get exclusion settings
   const { excludedUserIds } = await getExclusionSettings(Number(serverId));
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
     gte(sessions.startTime, new Date(startDate)),
     lte(sessions.startTime, new Date(endDate)),
@@ -481,7 +476,7 @@ export const getUserStatsSummaryForServer = async ({
     Number(serverId),
   );
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
     isNotNull(sessions.startTime),
   ];

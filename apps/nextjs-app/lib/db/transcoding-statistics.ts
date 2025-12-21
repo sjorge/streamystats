@@ -1,7 +1,15 @@
 // Transcoding statistics types and functions
 import { db, sessions } from "@streamystats/database";
 import type { Session } from "@streamystats/database";
-import { and, eq, gte, isNotNull, lte, notInArray } from "drizzle-orm";
+import {
+  type SQL,
+  and,
+  eq,
+  gte,
+  isNotNull,
+  lte,
+  notInArray,
+} from "drizzle-orm";
 import { getExclusionSettings } from "./exclusions";
 
 type UnknownRecord = Record<string, unknown>;
@@ -91,9 +99,7 @@ export async function getTranscodingStatistics(
   const { excludedUserIds } = await getExclusionSettings(serverId);
 
   // Get all sessions with transcoding data for the specified date range
-  const whereConditions: ReturnType<typeof eq>[] = [
-    eq(sessions.serverId, serverId),
-  ];
+  const whereConditions: SQL[] = [eq(sessions.serverId, serverId)];
 
   if (startDate) {
     whereConditions.push(gte(sessions.startTime, new Date(startDate)));
@@ -381,7 +387,7 @@ export async function getBitrateDistribution(
   // Get exclusion settings
   const { excludedUserIds } = await getExclusionSettings(serverId);
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, serverId),
     isNotNull(sessions.videoBitRate),
   ];
@@ -465,9 +471,7 @@ export async function getCodecDistribution(
   // Get exclusion settings
   const { excludedUserIds } = await getExclusionSettings(serverId);
 
-  const whereConditions: ReturnType<typeof eq>[] = [
-    eq(sessions.serverId, serverId),
-  ];
+  const whereConditions: SQL[] = [eq(sessions.serverId, serverId)];
 
   if (startDate) {
     whereConditions.push(gte(sessions.startTime, new Date(startDate)));
@@ -530,7 +534,7 @@ export async function getResolutionDistribution(
   // Get exclusion settings
   const { excludedUserIds } = await getExclusionSettings(serverId);
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, serverId),
     isNotNull(sessions.transcodingWidth),
     isNotNull(sessions.transcodingHeight),
