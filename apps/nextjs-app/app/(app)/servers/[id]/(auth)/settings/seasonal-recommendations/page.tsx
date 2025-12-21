@@ -25,4 +25,3 @@ export default async function SeasonalRecommendationsSettings(props: {
     </Container>
   );
 }
-
