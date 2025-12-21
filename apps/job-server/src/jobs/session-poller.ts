@@ -4,10 +4,10 @@ import {
   sessions,
   users,
   type NewSession,
+  type Server,
 } from "@streamystats/database";
-import type { Server } from "@streamystats/database/schema";
 import { JellyfinClient } from "../jellyfin/client";
-import type {
+import {
   JellyfinSession,
   TrackedSession,
   ActiveSessionResponse,
@@ -26,7 +26,7 @@ function log(
       parts.push(`${key}=${value}`);
     }
   }
-  console.log(parts.join(" "));
+  process.stdout.write(`${parts.join(" ")}\n`);
 }
 
 interface SessionPollerConfig {
@@ -147,7 +147,7 @@ class SessionPoller {
   /**
    * List all active servers
    */
-  private async listServers() {
+  private async listServers(): Promise<Server[]> {
     return await db.select().from(servers);
   }
 

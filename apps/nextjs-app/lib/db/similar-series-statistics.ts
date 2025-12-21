@@ -20,6 +20,7 @@ import {
 } from "drizzle-orm";
 import { cosineDistance } from "drizzle-orm";
 import { cacheLife, cacheTag, revalidateTag } from "next/cache";
+import { getExclusionSettings } from "./exclusions";
 import { getMe } from "./users";
 
 const enableDebug = false;
@@ -514,6 +515,10 @@ async function getPopularSeriesRecommendations(
     }`,
   );
 
+  // Get exclusion settings
+  const { excludedUserIds, excludedLibraryIds } =
+    await getExclusionSettings(serverId);
+
   // Get series that are popular (most episodes watched) but exclude series already watched by the current user
   let watchedSeriesIds: string[] = [];
   let hiddenItemIds: string[] = [];
@@ -579,6 +584,14 @@ async function getPopularSeriesRecommendations(
         // Exclude user's hidden series if we have a user
         hiddenItemIds.length > 0
           ? notInArray(items.id, hiddenItemIds)
+          : sql`true`,
+        // Exclude series from excluded libraries
+        excludedLibraryIds.length > 0
+          ? notInArray(items.libraryId, excludedLibraryIds)
+          : sql`true`,
+        // Exclude sessions from excluded users in the count
+        excludedUserIds.length > 0
+          ? notInArray(sessions.userId, excludedUserIds)
           : sql`true`,
       ),
     )

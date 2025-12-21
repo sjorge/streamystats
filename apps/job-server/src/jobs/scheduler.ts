@@ -593,6 +593,7 @@ class SyncScheduler {
             continue;
           }
 
+          // pg-boss v12: use API to check for active jobs
           let hasActiveJob = false;
           try {
             const stats = await boss.getQueueStats("generate-item-embeddings");
