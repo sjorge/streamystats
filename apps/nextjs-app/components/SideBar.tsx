@@ -8,6 +8,7 @@ import {
   BarChart3,
   BookOpen,
   Calendar,
+  CalendarDays,
   Clock,
   EyeOff,
   Library,
@@ -103,6 +104,11 @@ const settings_items = [
     title: "Exclusions",
     url: "/settings/exclusions",
     icon: EyeOff,
+  },
+  {
+    title: "Seasonal",
+    url: "/settings/seasonal-recommendations",
+    icon: CalendarDays,
   },
   {
     title: "AI Recommendations",
