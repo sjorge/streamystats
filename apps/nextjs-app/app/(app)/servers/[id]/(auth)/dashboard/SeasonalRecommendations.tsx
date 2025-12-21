@@ -3,7 +3,10 @@
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import type { SeasonalRecommendationResult } from "@/lib/db/seasonal-recommendations";
+import {
+  type SeasonalRecommendationResult,
+  getSeasonalRecommendations,
+} from "@/lib/db/seasonal-recommendations";
 import type { Holiday } from "@/lib/holidays";
 import type { Server } from "@streamystats/database";
 import {
@@ -31,6 +34,7 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 // Map icon names to Lucide components
 const iconMap: Record<string, LucideIcon> = {
@@ -215,9 +219,14 @@ export function SeasonalRecommendations({
   data,
   server,
 }: SeasonalRecommendationsProps) {
-  const { holiday, items } = data;
+  const { holiday, items: initialItems } = data;
   const theme = getHolidayTheme(holiday.id);
   const Icon = getHolidayIcon(holiday.icon);
+
+  const [items, setItems] = useState(initialItems);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const formatRuntime = (ticks: number | null) => {
     if (!ticks) return null;
@@ -230,6 +239,49 @@ export function SeasonalRecommendations({
     }
     return `${minutes}m`;
   };
+
+  useEffect(() => {
+    setItems(initialItems);
+    setHasMore(true);
+  }, [initialItems]);
+
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry?.isIntersecting && !isLoading && hasMore) {
+          setIsLoading(true);
+          getSeasonalRecommendations(server.id, 15, items.length)
+            .then((result) => {
+              if (!result || result.items.length === 0) {
+                setHasMore(false);
+              } else {
+                setItems((prev) => [...prev, ...result.items]);
+              }
+            })
+            .catch((error) => {
+              console.error("Error fetching next page:", error);
+            })
+            .finally(() => {
+              setIsLoading(false);
+            });
+        }
+      },
+      {
+        root: null,
+        rootMargin: "100px",
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(sentinelRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [server.id, items.length, isLoading, hasMore]);
 
   if (!items || items.length === 0) {
     return null;
@@ -349,6 +401,7 @@ export function SeasonalRecommendations({
                     </div>
                   );
                 })}
+                <div ref={sentinelRef} className="flex-shrink-0 w-4" />
               </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>

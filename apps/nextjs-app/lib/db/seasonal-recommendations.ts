@@ -76,19 +76,19 @@ const itemSelect = {
   parentThumbImageTag: items.parentThumbImageTag,
 } as const;
 
-/**
- * Get seasonal recommendations based on the current active holiday/season.
- * Uses keyword matching in name/overview and genre matching.
- */
-export async function getSeasonalRecommendations(
-  serverId: string | number,
-  limit = 15,
-): Promise<SeasonalRecommendationResult | null> {
-  // Note: Removing cache temporarily for debugging - can re-enable later
-  // "use cache";
-  // cacheLife("hours");
+const SEASONAL_POOL_SIZE = 200;
 
-  const serverIdNum = Number(serverId);
+async function getSeasonalRecommendationsCached(
+  serverIdNum: number,
+  userId: string | null,
+  poolSize: number,
+): Promise<SeasonalRecommendationResult | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(
+    `seasonal-${serverIdNum}`,
+    userId ? `seasonal-${serverIdNum}-${userId}` : `seasonal-${serverIdNum}-anon`,
+  );
 
   // Get server's disabled holidays and exclusion settings
   const [server, exclusions] = await Promise.all([
@@ -114,13 +114,8 @@ export async function getSeasonalRecommendations(
 
   // Use the highest priority enabled holiday
   const holiday = enabledHolidays[0];
-  // cacheTag(`seasonal-${serverIdNum}-${holiday.id}`);
 
   try {
-    const currentUser = await getMe();
-    const userId =
-      currentUser?.serverId === serverIdNum ? currentUser.id : null;
-
     // Get user's watched items and hidden recommendations
     let watchedItemIds: string[] = [];
     let hiddenItemIds: string[] = [];
@@ -195,7 +190,7 @@ export async function getSeasonalRecommendations(
           excludeIds.length > 0 ? notInArray(items.id, excludeIds) : sql`true`,
         ),
       )
-      .limit(limit * 2);
+      .limit(poolSize * 2);
 
     // Score and categorize matches
     const scoredMatches = directMatches.map((match) => {
@@ -356,7 +351,7 @@ export async function getSeasonalRecommendations(
 
     // Sort by score and take top results
     allResults.sort((a, b) => b.matchScore - a.matchScore);
-    const finalResults = allResults.slice(0, limit);
+    const finalResults = allResults.slice(0, poolSize);
 
     if (finalResults.length === 0) {
       return null;
@@ -369,4 +364,46 @@ export async function getSeasonalRecommendations(
   } catch {
     return null;
   }
+}
+
+/**
+ * Get seasonal recommendations based on the current active holiday/season.
+ * Uses keyword matching in name/overview and genre matching.
+ */
+export async function getSeasonalRecommendations(
+  serverId: string | number,
+  limit = 15,
+  offset = 0,
+): Promise<SeasonalRecommendationResult | null> {
+  const serverIdNum = Number(serverId);
+
+  // Get user outside the cached function
+  const currentUser = await getMe();
+  const userId =
+    currentUser?.serverId === serverIdNum ? currentUser.id : null;
+
+  const result = await getSeasonalRecommendationsCached(
+    serverIdNum,
+    userId,
+    SEASONAL_POOL_SIZE,
+  );
+
+  if (!result) {
+    return null;
+  }
+
+  const paginatedItems = result.items.slice(offset, offset + limit);
+
+  if (paginatedItems.length === 0 && offset > 0) {
+    // No more items for this offset
+    return {
+      holiday: result.holiday,
+      items: [],
+    };
+  }
+
+  return {
+    holiday: result.holiday,
+    items: paginatedItems,
+  };
 }
