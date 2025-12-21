@@ -109,21 +109,12 @@ export async function getSeasonalRecommendations(
   );
 
   if (enabledHolidays.length === 0) {
-    console.log(
-      `[Seasonal] No enabled holidays (${activeHolidays.length} active, ${disabledHolidays.length} disabled)`,
-    );
     return null;
   }
 
   // Use the highest priority enabled holiday
   const holiday = enabledHolidays[0];
   // cacheTag(`seasonal-${serverIdNum}-${holiday.id}`);
-
-  console.log(`[Seasonal] Active holiday: ${holiday.name} (${holiday.id})`);
-  console.log(
-    `[Seasonal] Keywords: ${holiday.keywords.slice(0, 5).join(", ")}...`,
-  );
-  console.log(`[Seasonal] Genres: ${holiday.genres.join(", ") || "none"}`);
 
   try {
     const currentUser = await getMe();
@@ -184,11 +175,6 @@ export async function getSeasonalRecommendations(
       return null;
     }
 
-    console.log(
-      `[Seasonal] Search conditions count: ${searchConditions.length}`,
-    );
-    console.log(`[Seasonal] Exclude IDs count: ${excludeIds.length}`);
-
     // First, find direct keyword/genre matches (Movies and Series only)
     const directMatches = await db
       .select({
@@ -210,8 +196,6 @@ export async function getSeasonalRecommendations(
         ),
       )
       .limit(limit * 2);
-
-    console.log(`[Seasonal] Direct matches found: ${directMatches.length}`);
 
     // Score and categorize matches
     const scoredMatches = directMatches.map((match) => {
@@ -292,21 +276,6 @@ export async function getSeasonalRecommendations(
     const qualifiedMatches = scoredMatches.filter(
       (m) => m.matchScore >= MIN_SCORE,
     );
-
-    console.log(
-      `[Seasonal] Qualified matches (score >= ${MIN_SCORE}): ${qualifiedMatches.length}`,
-    );
-    if (qualifiedMatches.length > 0) {
-      console.log(
-        "[Seasonal] Top 3 qualified:",
-        qualifiedMatches
-          .slice(0, 3)
-          .map(
-            (m) =>
-              `"${m.item.name}" (score: ${m.matchScore}, reason: ${m.matchReason})`,
-          ),
-      );
-    }
 
     // If we have matches with embeddings, find similar items
     const topMatches = qualifiedMatches.slice(
@@ -389,15 +358,7 @@ export async function getSeasonalRecommendations(
     allResults.sort((a, b) => b.matchScore - a.matchScore);
     const finalResults = allResults.slice(0, limit);
 
-    console.log(`[Seasonal] Final results count: ${finalResults.length}`);
-    if (finalResults.length > 0) {
-      console.log(
-        `[Seasonal] Top result: "${finalResults[0].item.name}" (${finalResults[0].matchReason})`,
-      );
-    }
-
     if (finalResults.length === 0) {
-      console.log("[Seasonal] No results found, returning null");
       return null;
     }
 
@@ -405,8 +366,7 @@ export async function getSeasonalRecommendations(
       holiday,
       items: finalResults,
     };
-  } catch (error) {
-    console.error("[Seasonal] Error getting seasonal recommendations:", error);
+  } catch {
     return null;
   }
 }
