@@ -413,44 +413,44 @@ function parsePlaybackReportingJson(
   // Handle different JSON formats that might come from Playback Reporting
   if (Array.isArray(jsonData)) {
     console.info(`Processing JSON array with ${jsonData.length} items`);
-				return jsonData
-					.map((item: unknown, index) => {
-						if (typeof item !== "object" || item === null) {
-							throw new Error(`Invalid item at index ${index}: not an object`);
-						}
+		return jsonData
+      .map((item: unknown, index) => {
+        if (typeof item !== "object" || item === null) {
+          throw new Error(`Invalid item at index ${index}: not an object`);
+        }
 
-						const record = item as Record<string, unknown>;
-						try {
-							const timestamp =
-								getValue(record, "timestamp", "date", "time") ||
-								new Date().toISOString();
+        const record = item as Record<string, unknown>;
+        try {
+          const timestamp =
+            getValue(record, "timestamp", "date", "time") ||
+            new Date().toISOString();
 
-							const durationValue =
-								getValue(
-									record,
-									"durationSeconds",
-									"duration_seconds",
-									"Duration",
-								) || "0";
-							const parsedDuration = Number.parseInt(durationValue, 10);
+          const durationValue =
+            getValue(
+              record,
+              "durationSeconds",
+              "duration_seconds",
+              "Duration",
+            ) || "0";
+          const parsedDuration = Number.parseInt(durationValue, 10);
 
-							if (Number.isNaN(parsedDuration) || parsedDuration < 0) {
-								console.warn(
-									`Skipping JSON item at index ${index}: invalid duration "${parsedDuration}"`,
-								);
-								return null;
-							}
+          if (Number.isNaN(parsedDuration) || parsedDuration < 0) {
+            console.warn(
+              `Skipping JSON item at index ${index}: invalid duration "${parsedDuration}"`,
+            );
+            return null;
+          }
 
-							return buildPlaybackData(timestamp, record, parsedDuration);
-						} catch (error) {
-							console.error(`Error parsing JSON item at index ${index}:`, {
-								error: error instanceof Error ? error.message : "Unknown error",
-								item,
-							});
-							throw error;
-						}
-					})
-					.filter((item): item is PlaybackReportingData => item !== null);
+          return buildPlaybackData(timestamp, record, parsedDuration);
+        } catch (error) {
+          console.error(`Error parsing JSON item at index ${index}:`, {
+            error: error instanceof Error ? error.message : "Unknown error",
+            item,
+          });
+          throw error;
+        }
+      })
+      .filter((item): item is PlaybackReportingData => item !== null);
   }
 
   // If it's not an array, try to extract from a nested structure
