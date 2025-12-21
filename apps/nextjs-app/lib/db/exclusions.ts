@@ -1,4 +1,11 @@
-import { db, items, servers, sessions } from "@streamystats/database";
+import {
+  db,
+  items,
+  libraries,
+  servers,
+  sessions,
+  users,
+} from "@streamystats/database";
 import { type SQL, and, eq, inArray, notInArray } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
 
@@ -12,14 +19,15 @@ export interface ExclusionSettings {
  * Results are cached for performance.
  */
 export async function getExclusionSettings(
-  serverId: number,
+  serverId: number | string
 ): Promise<ExclusionSettings> {
   "use cache";
+  const id = Number(serverId);
   cacheLife("hours");
-  cacheTag(`exclusion-settings-${serverId}`);
+  cacheTag(`exclusion-settings-${id}`);
 
   const server = await db.query.servers.findFirst({
-    where: eq(servers.id, serverId),
+    where: eq(servers.id, id),
     columns: {
       excludedUserIds: true,
       excludedLibraryIds: true,
@@ -33,11 +41,62 @@ export async function getExclusionSettings(
 }
 
 /**
+ * Unified helper to get all exclusion filters for statistics queries.
+ * This should be the preferred way to handle exclusions in new code.
+ *
+ * @example
+ * const { userExclusion, itemLibraryExclusion, requiresItemsJoin } = await getStatisticsExclusions(serverId);
+ * const conditions = [eq(sessions.serverId, serverId), userExclusion];
+ * if (requiresItemsJoin) {
+ *   query.innerJoin(items, eq(sessions.itemId, items.id));
+ *   conditions.push(itemLibraryExclusion);
+ * }
+ */
+export async function getStatisticsExclusions(serverId: number | string) {
+  const settings = await getExclusionSettings(serverId);
+  const { excludedUserIds, excludedLibraryIds } = settings;
+
+  const hasUserExclusions = excludedUserIds.length > 0;
+  const hasLibraryExclusions = excludedLibraryIds.length > 0;
+
+  return {
+    ...settings,
+
+    // Boolean flags for easy checking
+    hasUserExclusions,
+    hasLibraryExclusions,
+    requiresItemsJoin: hasLibraryExclusions,
+
+    // Pre-built SQL conditions for common tables
+
+    // For 'sessions' table queries
+    userExclusion: hasUserExclusions
+      ? notInArray(sessions.userId, excludedUserIds)
+      : undefined,
+
+    // For queries involving 'items' table (either direct or joined)
+    itemLibraryExclusion: hasLibraryExclusions
+      ? notInArray(items.libraryId, excludedLibraryIds)
+      : undefined,
+
+    // For 'users' table queries
+    usersTableExclusion: hasUserExclusions
+      ? notInArray(users.id, excludedUserIds)
+      : undefined,
+
+    // For 'libraries' table queries
+    librariesTableExclusion: hasLibraryExclusions
+      ? notInArray(libraries.id, excludedLibraryIds)
+      : undefined,
+  };
+}
+
+/**
  * Build a SQL condition to exclude users from a sessions query.
  * Returns undefined if no users are excluded.
  */
 export function buildUserExclusionCondition(
-  excludedUserIds: string[],
+  excludedUserIds: string[]
 ): SQL | undefined {
   if (excludedUserIds.length === 0) {
     return undefined;
@@ -51,7 +110,7 @@ export function buildUserExclusionCondition(
  * Returns undefined if no libraries are excluded.
  */
 export function buildLibraryExclusionCondition(
-  excludedLibraryIds: string[],
+  excludedLibraryIds: string[]
 ): SQL | undefined {
   if (excludedLibraryIds.length === 0) {
     return undefined;
@@ -65,7 +124,7 @@ export function buildLibraryExclusionCondition(
  */
 export async function getExcludedItemIds(
   serverId: number,
-  excludedLibraryIds: string[],
+  excludedLibraryIds: string[]
 ): Promise<string[]> {
   if (excludedLibraryIds.length === 0) {
     return [];
@@ -77,8 +136,8 @@ export async function getExcludedItemIds(
     .where(
       and(
         eq(items.serverId, serverId),
-        inArray(items.libraryId, excludedLibraryIds),
-      ),
+        inArray(items.libraryId, excludedLibraryIds)
+      )
     );
 
   return excludedItems.map((item) => item.id);
@@ -90,7 +149,7 @@ export async function getExcludedItemIds(
  */
 export function addExclusionConditions(
   conditions: SQL[],
-  exclusions: ExclusionSettings,
+  exclusions: ExclusionSettings
 ): SQL[] {
   const userCondition = buildUserExclusionCondition(exclusions.excludedUserIds);
   if (userCondition) {
@@ -98,7 +157,7 @@ export function addExclusionConditions(
   }
 
   const libraryCondition = buildLibraryExclusionCondition(
-    exclusions.excludedLibraryIds,
+    exclusions.excludedLibraryIds
   );
   if (libraryCondition) {
     conditions.push(libraryCondition);

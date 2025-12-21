@@ -9,20 +9,19 @@ import {
   users,
 } from "@streamystats/database";
 import {
+  type SQL,
   and,
   asc,
   count,
   desc,
   eq,
-  gte,
   inArray,
   isNotNull,
-  lte,
   notInArray,
   sql,
   sum,
 } from "drizzle-orm";
-import { getExclusionSettings } from "./exclusions";
+import { getStatisticsExclusions } from "./exclusions";
 
 export interface ItemStats {
   totalViews: number;
@@ -358,8 +357,8 @@ export const getItemUserStats = async ({
 
   // Get exclusion settings if serverId provided
   const exclusions = serverId
-    ? await getExclusionSettings(serverId)
-    : { excludedUserIds: [] };
+    ? await getStatisticsExclusions(serverId)
+    : { userExclusion: undefined };
 
   let itemIdsToQuery: string[] = [itemId];
 
@@ -374,7 +373,7 @@ export const getItemUserStats = async ({
   }
 
   // Build where conditions
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     inArray(sessions.itemId, itemIdsToQuery),
     isNotNull(sessions.userId),
   ];
@@ -384,10 +383,8 @@ export const getItemUserStats = async ({
   }
 
   // Add user exclusion filter
-  if (exclusions.excludedUserIds.length > 0) {
-    whereConditions.push(
-      notInArray(sessions.userId, exclusions.excludedUserIds),
-    );
+  if (exclusions.userExclusion) {
+    whereConditions.push(exclusions.userExclusion);
   }
 
   const userStats = await db

@@ -8,6 +8,7 @@ import {
   sessions,
 } from "@streamystats/database";
 import {
+  type SQL,
   and,
   count,
   desc,
@@ -21,7 +22,7 @@ import {
   sum,
 } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
-import { getExclusionSettings } from "./exclusions";
+import { getStatisticsExclusions } from "./exclusions";
 
 interface ItemWithStats extends Item {
   totalPlayCount: number;
@@ -46,12 +47,12 @@ export async function getMostWatchedItems({
   cacheTag(`most-watched-${serverId}${userId ? `-${userId}` : ""}`);
 
   // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-    Number(serverId),
+  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
+    serverId,
   );
 
   // First get the aggregated session data for Movies and Episodes
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
     isNotNull(sessions.itemId),
   ];
@@ -62,8 +63,8 @@ export async function getMostWatchedItems({
   }
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    whereConditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    whereConditions.push(userExclusion);
   }
 
   const rawSessionStats = await db
@@ -88,10 +89,12 @@ export async function getMostWatchedItems({
   // Batch fetch all items in a single query instead of N+1 queries
   // Also filter out items from excluded libraries
   const itemIds = sessionStats.map((stat) => stat.itemId);
-  const itemConditions: ReturnType<typeof eq>[] = [inArray(items.id, itemIds)];
-  if (excludedLibraryIds.length > 0) {
-    itemConditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  const itemConditions: SQL[] = [inArray(items.id, itemIds)];
+  
+  if (itemLibraryExclusion) {
+    itemConditions.push(itemLibraryExclusion);
   }
+  
   const itemsData =
     itemIds.length > 0
       ? await db
@@ -227,11 +230,11 @@ export async function getWatchTimePerType({
   );
 
   // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-    Number(serverId),
+  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
+    serverId,
   );
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
     gte(sessions.startTime, new Date(startDate)),
     lte(sessions.startTime, new Date(endDate)),
@@ -244,8 +247,8 @@ export async function getWatchTimePerType({
   }
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    whereConditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    whereConditions.push(userExclusion);
   }
 
   const rawResults = await db
@@ -272,11 +275,11 @@ export async function getWatchTimePerType({
   const itemIds = [
     ...new Set(results.map((r) => r.itemId).filter((id) => id)),
   ] as string[];
-  const itemTypeConditions: ReturnType<typeof eq>[] = [
+  const itemTypeConditions: SQL[] = [
     inArray(items.id, itemIds),
   ];
-  if (excludedLibraryIds.length > 0) {
-    itemTypeConditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  if (itemLibraryExclusion) {
+    itemTypeConditions.push(itemLibraryExclusion);
   }
   const itemTypes = (await db
     .select({
@@ -370,11 +373,11 @@ export async function getWatchTimeByLibrary({
   cacheTag(`watch-time-by-library-${serverId}-${startDate}-${endDate}`);
 
   // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-    Number(serverId),
+  const { userExclusion, librariesTableExclusion } = await getStatisticsExclusions(
+    serverId,
   );
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
     gte(sessions.startTime, new Date(startDate)),
     lte(sessions.startTime, new Date(endDate)),
@@ -382,11 +385,11 @@ export async function getWatchTimeByLibrary({
   ];
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    whereConditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    whereConditions.push(userExclusion);
   }
-  if (excludedLibraryIds.length > 0) {
-    whereConditions.push(notInArray(libraries.id, excludedLibraryIds));
+  if (librariesTableExclusion) {
+    whereConditions.push(librariesTableExclusion);
   }
 
   const results = await db
@@ -445,11 +448,11 @@ export async function getMostWatchedDay({
   userId?: string | number;
 }): Promise<MostWatchedDay | null> {
   // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-    Number(serverId),
+  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
+    serverId,
   );
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
     isNotNull(sessions.startTime),
     gte(sessions.startTime, new Date(startDate)),
@@ -461,11 +464,11 @@ export async function getMostWatchedDay({
   }
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    whereConditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    whereConditions.push(userExclusion);
   }
-  if (excludedLibraryIds.length > 0) {
-    whereConditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  if (itemLibraryExclusion) {
+    whereConditions.push(itemLibraryExclusion);
   }
 
   // Join with items to filter by library
@@ -505,9 +508,9 @@ export async function getMostActiveUsersDay({
   endDate: string;
 }): Promise<MostActiveUsersDay | null> {
   // Get exclusion settings
-  const { excludedUserIds } = await getExclusionSettings(Number(serverId));
+  const { userExclusion } = await getStatisticsExclusions(serverId);
 
-  const whereConditions: ReturnType<typeof eq>[] = [
+  const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
     isNotNull(sessions.startTime),
     isNotNull(sessions.userId),
@@ -516,8 +519,8 @@ export async function getMostActiveUsersDay({
   ];
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    whereConditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    whereConditions.push(userExclusion);
   }
 
   const rows = await db

@@ -27,7 +27,7 @@ import {
   sql,
   sum,
 } from "drizzle-orm";
-import { getExclusionSettings } from "./exclusions";
+import { getStatisticsExclusions } from "./exclusions";
 
 // Type definitions for library statistics
 export interface AggregatedLibraryStatistics {
@@ -69,16 +69,20 @@ export const getAggregatedLibraryStatistics = async ({
   serverId: number;
 }): Promise<AggregatedLibraryStatistics> => {
   // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } =
-    await getExclusionSettings(serverId);
+  const {
+    itemLibraryExclusion,
+    usersTableExclusion,
+    librariesTableExclusion,
+    userExclusion,
+  } = await getStatisticsExclusions(serverId);
 
   // Build item conditions (excluding soft-deleted items and excluded libraries)
-  const itemConditions: ReturnType<typeof eq>[] = [
+  const itemConditions: SQL[] = [
     eq(items.serverId, serverId),
     isNull(items.deletedAt),
   ];
-  if (excludedLibraryIds.length > 0) {
-    itemConditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  if (itemLibraryExclusion) {
+    itemConditions.push(itemLibraryExclusion);
   }
 
   // Get counts by item type (excluding soft-deleted items and excluded libraries)
@@ -92,11 +96,11 @@ export const getAggregatedLibraryStatistics = async ({
     .groupBy(items.type);
 
   // Build library conditions
-  const libraryConditions: ReturnType<typeof eq>[] = [
+  const libraryConditions: SQL[] = [
     eq(libraries.serverId, serverId),
   ];
-  if (excludedLibraryIds.length > 0) {
-    libraryConditions.push(notInArray(libraries.id, excludedLibraryIds));
+  if (librariesTableExclusion) {
+    libraryConditions.push(librariesTableExclusion);
   }
 
   // Get library count (excluding excluded libraries)
@@ -107,11 +111,11 @@ export const getAggregatedLibraryStatistics = async ({
     .then((result: { count: number }[]) => result[0]?.count || 0);
 
   // Build user conditions
-  const userConditions: ReturnType<typeof eq>[] = [
+  const userConditions: SQL[] = [
     eq(users.serverId, serverId),
   ];
-  if (excludedUserIds.length > 0) {
-    userConditions.push(notInArray(users.id, excludedUserIds));
+  if (usersTableExclusion) {
+    userConditions.push(usersTableExclusion);
   }
 
   // Get user count (excluding excluded users)
@@ -122,11 +126,11 @@ export const getAggregatedLibraryStatistics = async ({
     .then((result: { count: number }[]) => result[0]?.count || 0);
 
   // Build session conditions
-  const sessionConditions: ReturnType<typeof eq>[] = [
+  const sessionConditions: SQL[] = [
     eq(sessions.serverId, serverId),
   ];
-  if (excludedUserIds.length > 0) {
-    sessionConditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    sessionConditions.push(userExclusion);
   }
 
   // Get total watch stats (excluding excluded users)
@@ -189,21 +193,21 @@ export const getLibraryItemsWithStats = async ({
   libraryIds?: string;
 }): Promise<ItemWatchStatsResponse> => {
   // Get exclusion settings
-  const { excludedLibraryIds } = await getExclusionSettings(serverId);
+  const { itemLibraryExclusion } = await getStatisticsExclusions(serverId);
 
   const currentPage = Math.max(1, Number(page) || 1);
   const perPage = 20;
   const offset = (currentPage - 1) * perPage;
 
   // Build base query conditions (excluding soft-deleted items and excluded libraries)
-  const conditions: ReturnType<typeof eq>[] = [
+  const conditions: SQL[] = [
     eq(items.serverId, serverId),
     isNull(items.deletedAt),
   ];
 
   // Add library exclusion filter
-  if (excludedLibraryIds.length > 0) {
-    conditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  if (itemLibraryExclusion) {
+    conditions.push(itemLibraryExclusion);
   }
 
   // Add type filter

@@ -16,14 +16,12 @@ import {
   eq,
   gte,
   ilike,
-  inArray,
   isNotNull,
   lte,
-  notInArray,
   or,
   sql,
 } from "drizzle-orm";
-import { getExclusionSettings } from "./exclusions";
+import { getStatisticsExclusions } from "./exclusions";
 
 export interface HistoryItem {
   session: Session;
@@ -68,24 +66,25 @@ export const getHistory = async (
   },
 ): Promise<HistoryResponse> => {
   // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } =
-    await getExclusionSettings(serverId);
+  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
+    serverId,
+  );
 
   const offset = (page - 1) * perPage;
 
   // Build base query conditions
-  const conditions: ReturnType<typeof eq>[] = [
+  const conditions: SQL[] = [
     eq(sessions.serverId, serverId),
     isNotNull(sessions.itemId),
     isNotNull(sessions.userId),
   ];
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    conditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    conditions.push(userExclusion);
   }
-  if (excludedLibraryIds.length > 0) {
-    conditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  if (itemLibraryExclusion) {
+    conditions.push(itemLibraryExclusion);
   }
 
   // Add date range filters
@@ -328,19 +327,19 @@ export const getItemHistory = async (
   perPage = 50,
 ): Promise<HistoryResponse> => {
   // Get exclusion settings
-  const { excludedUserIds } = await getExclusionSettings(serverId);
+  const { userExclusion } = await getStatisticsExclusions(serverId);
 
   const offset = (page - 1) * perPage;
 
-  const conditions: ReturnType<typeof eq>[] = [
+  const conditions: SQL[] = [
     eq(sessions.serverId, serverId),
     eq(sessions.itemId, itemId),
     isNotNull(sessions.userId),
   ];
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    conditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    conditions.push(userExclusion);
   }
 
   const data = await db
@@ -393,10 +392,11 @@ export const getHistoryByFilters = async ({
   limit?: number;
 }): Promise<HistoryItem[]> => {
   // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } =
-    await getExclusionSettings(serverId);
+  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
+    serverId,
+  );
 
-  const conditions: ReturnType<typeof eq>[] = [
+  const conditions: SQL[] = [
     eq(sessions.serverId, serverId),
     isNotNull(sessions.itemId),
     isNotNull(sessions.userId),
@@ -404,11 +404,11 @@ export const getHistoryByFilters = async ({
   ];
 
   // Add exclusion filters
-  if (excludedUserIds.length > 0) {
-    conditions.push(notInArray(sessions.userId, excludedUserIds));
+  if (userExclusion) {
+    conditions.push(userExclusion);
   }
-  if (excludedLibraryIds.length > 0) {
-    conditions.push(notInArray(items.libraryId, excludedLibraryIds));
+  if (itemLibraryExclusion) {
+    conditions.push(itemLibraryExclusion);
   }
 
   if (userId) {

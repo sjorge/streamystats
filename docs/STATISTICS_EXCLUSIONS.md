@@ -16,95 +16,76 @@ excludedLibraryIds: text("excluded_library_ids").array().default([]),
 
 ## Helper Functions
 
-All exclusion logic is centralized in `apps/nextjs-app/lib/db/exclusions.ts`:
+All exclusion logic is centralized in `apps/nextjs-app/lib/db/exclusions.ts`. The primary helper is `getStatisticsExclusions`.
 
 ```typescript
-import { getExclusionSettings } from "./exclusions";
+import { getStatisticsExclusions } from "./exclusions";
 
-// Fetch exclusion settings (cached)
-const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(serverId);
+// Fetch all exclusion filters at once
+const { 
+  userExclusion,          // SQL condition for sessions.userId
+  itemLibraryExclusion,   // SQL condition for items.libraryId (requires join)
+  requiresItemsJoin       // Boolean: do we need to join items table?
+} = await getStatisticsExclusions(serverId);
 ```
 
 ## Implementation Pattern
 
-### For User Exclusions
+### For Session Queries
 
-User exclusions filter sessions by `userId`. This is straightforward since sessions have a direct `userId` field:
+Use the pre-built `userExclusion` and `itemLibraryExclusion` conditions.
 
 ```typescript
-import { notInArray } from "drizzle-orm";
-import { getExclusionSettings } from "./exclusions";
+import { and, eq } from "drizzle-orm";
+import { getStatisticsExclusions } from "./exclusions";
 
-const { excludedUserIds } = await getExclusionSettings(Number(serverId));
+const { userExclusion, itemLibraryExclusion, requiresItemsJoin } = 
+  await getStatisticsExclusions(serverId);
 
-const whereConditions: ReturnType<typeof eq>[] = [
+const whereConditions: SQL[] = [
   eq(sessions.serverId, serverId),
   // ... other conditions
 ];
 
-if (excludedUserIds.length > 0) {
-  whereConditions.push(notInArray(sessions.userId, excludedUserIds));
+// Always add user exclusion
+if (userExclusion) {
+  whereConditions.push(userExclusion);
 }
-```
-
-### For Library Exclusions
-
-Library exclusions require joining the `items` table since sessions don't have a direct `libraryId`:
-
-```typescript
-import { notInArray } from "drizzle-orm";
-import { getExclusionSettings } from "./exclusions";
-
-const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(
-  Number(serverId)
-);
-
-const whereConditions: ReturnType<typeof eq>[] = [
-  eq(sessions.serverId, serverId),
-  // ... other conditions
-];
-
-// User exclusion
-if (excludedUserIds.length > 0) {
-  whereConditions.push(notInArray(sessions.userId, excludedUserIds));
-}
-
-// Library exclusion - requires items join
-if (excludedLibraryIds.length > 0) {
-  whereConditions.push(notInArray(items.libraryId, excludedLibraryIds));
-}
-
-// Query MUST join items table when library exclusions exist
-const results = await db
-  .select({ /* ... */ })
-  .from(sessions)
-  .innerJoin(items, eq(sessions.itemId, items.id))  // Required for library filter
-  .where(and(...whereConditions));
-```
-
-### Conditional Join Pattern
-
-When a function may or may not need the items join (e.g., optional item type filtering), use this pattern:
-
-```typescript
-const { excludedUserIds, excludedLibraryIds } = await getExclusionSettings(serverId);
-
-// Need items join if we have library exclusions OR other item-dependent filters
-const needsItemJoin = 
-  excludedLibraryIds.length > 0 || 
-  someOtherConditionRequiringItems;
 
 let query = db
   .select({ /* ... */ })
-  .from(sessions)
-  .leftJoin(users, eq(sessions.userId, users.id));
+  .from(sessions);
 
-if (needsItemJoin) {
+// Conditionally join items if needed for library exclusion
+if (requiresItemsJoin) {
   query = query.innerJoin(items, eq(sessions.itemId, items.id));
-  
-  if (excludedLibraryIds.length > 0) {
-    whereConditions.push(notInArray(items.libraryId, excludedLibraryIds));
-  }
+  whereConditions.push(itemLibraryExclusion!);
+}
+
+const results = await query.where(and(...whereConditions));
+```
+
+### For Library Queries
+
+Use `librariesTableExclusion` when querying the `libraries` table directly.
+
+```typescript
+const { librariesTableExclusion } = await getStatisticsExclusions(serverId);
+
+if (librariesTableExclusion) {
+  whereConditions.push(librariesTableExclusion);
+}
+```
+
+### For User Queries
+
+Use `usersTableExclusion` when querying the `users` table directly.
+
+```typescript
+const { usersTableExclusion } = await getStatisticsExclusions(serverId);
+
+if (usersTableExclusion) {
+  whereConditions.push(usersTableExclusion);
 }
 ```
 
@@ -130,12 +111,12 @@ The following statistics files implement exclusions:
 
 When creating a new statistics query function:
 
-1. [ ] Import `getExclusionSettings` from `./exclusions`
-2. [ ] Fetch exclusion settings at the start of the function
-3. [ ] Add user exclusion filter if querying sessions
-4. [ ] Add library exclusion filter if the statistic should respect library visibility
-5. [ ] Join with `items` table if library exclusion is needed
-6. [ ] Use `notInArray` from drizzle-orm for exclusion conditions
+1. [ ] Import `getStatisticsExclusions` from `./exclusions`
+2. [ ] Fetch exclusion settings: `const { userExclusion, itemLibraryExclusion, requiresItemsJoin } = await getStatisticsExclusions(serverId);`
+3. [ ] Add `userExclusion` to where conditions
+4. [ ] If library exclusion is relevant:
+    - Join `items` table if `requiresItemsJoin` is true (or if you need it anyway)
+    - Add `itemLibraryExclusion` to where conditions
 
 ## Settings UI
 
@@ -153,4 +134,3 @@ When exclusion settings change, the following cache tags are invalidated:
 - `exclusion-settings-{serverId}`
 
 The exclusion settings themselves are cached with `cacheLife("hours")`.
-
