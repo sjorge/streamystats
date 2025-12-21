@@ -13,7 +13,7 @@ import {
 import type { Server } from "@streamystats/database";
 import { EyeOffIcon, Link2, type LucideIcon, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   RecommendationCardItem,
@@ -36,6 +36,7 @@ interface RecommendationsSectionProps {
   }>;
   formatRuntime?: (ticks: number | null) => string | null;
   emptyMessage: string;
+  fetchNextPage?: (offset: number) => Promise<RecommendationListItem[]>;
 }
 
 export function RecommendationsSection({
@@ -47,11 +48,15 @@ export function RecommendationsSection({
   onHideRecommendation,
   formatRuntime,
   emptyMessage,
+  fetchNextPage,
 }: RecommendationsSectionProps & {
   recommendations: RecommendationListItem[];
 }) {
   const [items, setItems] = useState(recommendations);
   const [hidingItems, setHidingItems] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const handleHideRecommendation = async (
     recommendation: RecommendationListItem,
@@ -91,6 +96,49 @@ export function RecommendationsSection({
     if (similarity >= 0.6) return "text-blue-500";
     return "text-yellow-500";
   };
+
+  useEffect(() => {
+    setItems(recommendations);
+    setHasMore(true);
+  }, [recommendations]);
+
+  useEffect(() => {
+    if (!fetchNextPage || !sentinelRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry?.isIntersecting && !isLoading && hasMore) {
+          setIsLoading(true);
+          fetchNextPage(items.length)
+            .then((newItems) => {
+              if (newItems.length === 0) {
+                setHasMore(false);
+              } else {
+                setItems((prev) => [...prev, ...newItems]);
+              }
+            })
+            .catch((error) => {
+              console.error("Error fetching next page:", error);
+            })
+            .finally(() => {
+              setIsLoading(false);
+            });
+        }
+      },
+      {
+        root: null,
+        rootMargin: "100px",
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(sentinelRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [fetchNextPage, items.length, isLoading, hasMore]);
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return (
@@ -316,6 +364,9 @@ export function RecommendationsSection({
                       </div>
                     );
                   })}
+                  {fetchNextPage && (
+                    <div ref={sentinelRef} className="flex-shrink-0 w-4" />
+                  )}
                 </div>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>

@@ -120,10 +120,12 @@ const stripEmbedding = (
   return card;
 };
 
+const RECOMMENDATION_POOL_SIZE = 500;
+
 async function getSimilarStatisticsCached(
   serverIdNum: number,
   userId: string,
-  limit: number,
+  poolSize: number,
   timeWindow?: RecommendationTimeWindow,
 ): Promise<RecommendationItem[]> {
   "use cache";
@@ -135,7 +137,7 @@ async function getSimilarStatisticsCached(
 
   try {
     debugLog(
-      `\n🚀 Starting recommendation process for server ${serverIdNum}, user ${userId}, limit ${limit}`,
+      `\n🚀 Starting recommendation process for server ${serverIdNum}, user ${userId}, pool size ${poolSize}`,
     );
 
     let recommendations: RecommendationItem[] = [];
@@ -144,13 +146,13 @@ async function getSimilarStatisticsCached(
     recommendations = await getUserSpecificRecommendations(
       serverIdNum,
       userId,
-      limit,
+      poolSize,
       timeWindow,
     );
     debugLog(`✅ Got ${recommendations.length} user-specific recommendations`);
 
-    if (recommendations.length < limit) {
-      const remainingLimit = limit - recommendations.length;
+    if (recommendations.length < poolSize) {
+      const remainingLimit = poolSize - recommendations.length;
       debugLog(
         `\n🔥 Need ${remainingLimit} more recommendations, getting popular items...`,
       );
@@ -179,6 +181,7 @@ export async function getSimilarStatistics(
   serverId: string | number,
   userId?: string,
   limit = 20,
+  offset = 0,
   timeWindow?: RecommendationTimeWindow,
 ): Promise<RecommendationItem[]> {
   const serverIdNum = Number(serverId);
@@ -195,12 +198,14 @@ export async function getSimilarStatistics(
     }
   }
 
-  return getSimilarStatisticsCached(
+  const allRecommendations = await getSimilarStatisticsCached(
     serverIdNum,
     targetUserId,
-    limit,
+    RECOMMENDATION_POOL_SIZE,
     timeWindow,
   );
+
+  return allRecommendations.slice(offset, offset + limit);
 }
 
 export const revalidateRecommendations = async (
@@ -380,7 +385,7 @@ async function getUserSpecificRecommendations(
       watchedItem.embedding,
     )})`;
 
-    // First, let's see the distribution of similarity scores
+    // Get a large pool of similar items with low threshold, sorted by similarity
     const allSimilarItems = await db
       .select({
         item: itemCardSelect,
@@ -400,7 +405,7 @@ async function getUserSpecificRecommendations(
         ),
       )
       .orderBy(desc(similarity))
-      .limit(50); // Get more for analysis
+      .limit(200); // Get a large pool for each base movie
 
     debugLog("  📊 Similarity score distribution (top 10):");
     allSimilarItems.slice(0, 10).forEach((result, index) => {
@@ -411,13 +416,14 @@ async function getUserSpecificRecommendations(
       );
     });
 
-    // Now filter for actual recommendations with lower threshold
+    // Filter with low threshold to ensure we have enough candidates
+    // Results are already sorted by similarity, so best matches come first
     const similarItems = allSimilarItems.filter(
-      (result) => Number(result.similarity) > 0.35,
+      (result) => Number(result.similarity) > 0.1,
     );
 
     debugLog(
-      `  Found ${similarItems.length} similar items (similarity > 0.35):`,
+      `  Found ${similarItems.length} similar items (similarity > 0.1):`,
     );
     similarItems.slice(0, 5).forEach((result, index) => {
       debugLog(
