@@ -42,9 +42,9 @@ WORKDIR /app
 # Copy only the compiled binary
 COPY --from=builder /app/apps/job-server/server ./server
 
-# Copy geoip-lite data files (required at runtime, not bundled in binary)
-# Try app-level first (where bun add installs it), fall back to root
-COPY --from=builder /app/apps/job-server/node_modules/geoip-lite/data ./node_modules/geoip-lite/data
+# Copy geoip-lite data files to the exact path bun expects at runtime
+# Bun stores packages in .bun cache with version-specific paths
+COPY --from=builder /app/apps/job-server/node_modules/geoip-lite/data ./node_modules/.bun/geoip-lite@1.4.10/node_modules/geoip-lite/data
 
 # Environment setup
 ENV NODE_ENV=production
