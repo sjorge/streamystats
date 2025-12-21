@@ -37,6 +37,8 @@ services:
       - CRON_OLD_JOB_CLEANUP=${CRON_OLD_JOB_CLEANUP:-0 3 * * *}
       - CRON_FULL_SYNC=${CRON_FULL_SYNC:-0 2 * * *}
       - CRON_DELETED_ITEMS_CLEANUP=${CRON_DELETED_ITEMS_CLEANUP:-0 * * * *}
+      # Skip full sync on server startup (set to "true" or "1" to skip)
+      - SKIP_STARTUP_FULL_SYNC=${SKIP_STARTUP_FULL_SYNC:-false}
     volumes:
       - streamystats_data:/var/lib/postgresql/data
     restart: unless-stopped
