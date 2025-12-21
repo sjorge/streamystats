@@ -150,7 +150,7 @@ export function RecommendationsSection({
 
                     return (
                       <div
-                        key={item.id || `${item.name}-${item.productionYear}`}
+                        key={item.id}
                         className="flex-shrink-0 group relative"
                       >
                         <div className="relative w-[190px] sm:w-[230px] py-2">

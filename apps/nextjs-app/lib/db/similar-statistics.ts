@@ -475,19 +475,25 @@ async function getUserSpecificRecommendations(
     }
   }
 
-  // Get the best recommendation for each base movie
+  // Get the best recommendation for each base movie, deduplicating by item ID
   const guaranteedRecommendations: RecommendationItem[] = [];
+  const guaranteedItemIds = new Set<string>();
   debugLog("\n🎯 Guaranteed recommendations (one per base movie):");
   for (const [baseMovieId, recs] of recommendationsPerBaseMovie) {
     if (recs.length > 0) {
-      const bestRec = recs.sort((a, b) => b.similarity - a.similarity)[0];
-      const baseMovie = baseMovies.find((m) => m.id === baseMovieId);
-      debugLog(
-        `  "${bestRec.item.name}" (similarity: ${bestRec.similarity.toFixed(
-          3,
-        )}) <- based on "${baseMovie?.name}"`,
-      );
-      guaranteedRecommendations.push(bestRec);
+      // Sort by similarity and find the best one that hasn't been added yet
+      const sortedRecs = recs.sort((a, b) => b.similarity - a.similarity);
+      const bestRec = sortedRecs.find((r) => !guaranteedItemIds.has(r.item.id));
+      if (bestRec) {
+        const baseMovie = baseMovies.find((m) => m.id === baseMovieId);
+        debugLog(
+          `  "${bestRec.item.name}" (similarity: ${bestRec.similarity.toFixed(
+            3,
+          )}) <- based on "${baseMovie?.name}"`,
+        );
+        guaranteedRecommendations.push(bestRec);
+        guaranteedItemIds.add(bestRec.item.id);
+      }
     }
   }
 
