@@ -87,7 +87,9 @@ async function getSeasonalRecommendationsCached(
   cacheLife("hours");
   cacheTag(
     `seasonal-${serverIdNum}`,
-    userId ? `seasonal-${serverIdNum}-${userId}` : `seasonal-${serverIdNum}-anon`,
+    userId
+      ? `seasonal-${serverIdNum}-${userId}`
+      : `seasonal-${serverIdNum}-anon`,
   );
 
   // Get server's disabled holidays and exclusion settings
@@ -379,8 +381,7 @@ export async function getSeasonalRecommendations(
 
   // Get user outside the cached function
   const currentUser = await getMe();
-  const userId =
-    currentUser?.serverId === serverIdNum ? currentUser.id : null;
+  const userId = currentUser?.serverId === serverIdNum ? currentUser.id : null;
 
   const result = await getSeasonalRecommendationsCached(
     serverIdNum,

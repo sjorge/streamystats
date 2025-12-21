@@ -462,9 +462,7 @@ async function getUserSpecificSeriesRecommendations(
       (result) => Number(result.similarity) > 0.1,
     );
 
-    debugLog(
-      `  ${qualifiedSimilarSeries.length} series with similarity > 0.1`,
-    );
+    debugLog(`  ${qualifiedSimilarSeries.length} series with similarity > 0.1`);
 
     // Add similarities to candidate series
     for (const result of qualifiedSimilarSeries) {
