@@ -47,9 +47,8 @@ export async function getMostWatchedItems({
   cacheTag(`most-watched-${serverId}${userId ? `-${userId}` : ""}`);
 
   // Get exclusion settings
-  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
-    serverId,
-  );
+  const { userExclusion, itemLibraryExclusion } =
+    await getStatisticsExclusions(serverId);
 
   // First get the aggregated session data for Movies and Episodes
   const whereConditions: SQL[] = [
@@ -90,11 +89,11 @@ export async function getMostWatchedItems({
   // Also filter out items from excluded libraries
   const itemIds = sessionStats.map((stat) => stat.itemId);
   const itemConditions: SQL[] = [inArray(items.id, itemIds)];
-  
+
   if (itemLibraryExclusion) {
     itemConditions.push(itemLibraryExclusion);
   }
-  
+
   const itemsData =
     itemIds.length > 0
       ? await db
@@ -230,9 +229,8 @@ export async function getWatchTimePerType({
   );
 
   // Get exclusion settings
-  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
-    serverId,
-  );
+  const { userExclusion, itemLibraryExclusion } =
+    await getStatisticsExclusions(serverId);
 
   const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
@@ -275,9 +273,7 @@ export async function getWatchTimePerType({
   const itemIds = [
     ...new Set(results.map((r) => r.itemId).filter((id) => id)),
   ] as string[];
-  const itemTypeConditions: SQL[] = [
-    inArray(items.id, itemIds),
-  ];
+  const itemTypeConditions: SQL[] = [inArray(items.id, itemIds)];
   if (itemLibraryExclusion) {
     itemTypeConditions.push(itemLibraryExclusion);
   }
@@ -373,9 +369,8 @@ export async function getWatchTimeByLibrary({
   cacheTag(`watch-time-by-library-${serverId}-${startDate}-${endDate}`);
 
   // Get exclusion settings
-  const { userExclusion, librariesTableExclusion } = await getStatisticsExclusions(
-    serverId,
-  );
+  const { userExclusion, librariesTableExclusion } =
+    await getStatisticsExclusions(serverId);
 
   const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),
@@ -448,9 +443,8 @@ export async function getMostWatchedDay({
   userId?: string | number;
 }): Promise<MostWatchedDay | null> {
   // Get exclusion settings
-  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
-    serverId,
-  );
+  const { userExclusion, itemLibraryExclusion } =
+    await getStatisticsExclusions(serverId);
 
   const whereConditions: SQL[] = [
     eq(sessions.serverId, Number(serverId)),

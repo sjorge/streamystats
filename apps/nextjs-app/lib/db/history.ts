@@ -66,9 +66,8 @@ export const getHistory = async (
   },
 ): Promise<HistoryResponse> => {
   // Get exclusion settings
-  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
-    serverId,
-  );
+  const { userExclusion, itemLibraryExclusion } =
+    await getStatisticsExclusions(serverId);
 
   const offset = (page - 1) * perPage;
 
@@ -392,9 +391,8 @@ export const getHistoryByFilters = async ({
   limit?: number;
 }): Promise<HistoryItem[]> => {
   // Get exclusion settings
-  const { userExclusion, itemLibraryExclusion } = await getStatisticsExclusions(
-    serverId,
-  );
+  const { userExclusion, itemLibraryExclusion } =
+    await getStatisticsExclusions(serverId);
 
   const conditions: SQL[] = [
     eq(sessions.serverId, serverId),

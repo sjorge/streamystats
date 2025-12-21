@@ -96,9 +96,7 @@ export const getAggregatedLibraryStatistics = async ({
     .groupBy(items.type);
 
   // Build library conditions
-  const libraryConditions: SQL[] = [
-    eq(libraries.serverId, serverId),
-  ];
+  const libraryConditions: SQL[] = [eq(libraries.serverId, serverId)];
   if (librariesTableExclusion) {
     libraryConditions.push(librariesTableExclusion);
   }
@@ -111,9 +109,7 @@ export const getAggregatedLibraryStatistics = async ({
     .then((result: { count: number }[]) => result[0]?.count || 0);
 
   // Build user conditions
-  const userConditions: SQL[] = [
-    eq(users.serverId, serverId),
-  ];
+  const userConditions: SQL[] = [eq(users.serverId, serverId)];
   if (usersTableExclusion) {
     userConditions.push(usersTableExclusion);
   }
@@ -126,9 +122,7 @@ export const getAggregatedLibraryStatistics = async ({
     .then((result: { count: number }[]) => result[0]?.count || 0);
 
   // Build session conditions
-  const sessionConditions: SQL[] = [
-    eq(sessions.serverId, serverId),
-  ];
+  const sessionConditions: SQL[] = [eq(sessions.serverId, serverId)];
   if (userExclusion) {
     sessionConditions.push(userExclusion);
   }
