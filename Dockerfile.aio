@@ -91,8 +91,8 @@ COPY --from=database-builder /app/packages/database/drizzle ./drizzle
 # Copy job-server binary
 COPY --from=job-server-builder /app/apps/job-server/job-server ./job-server
 
-# Copy geoip-lite data
-COPY --from=job-server-builder /app/apps/job-server/node_modules/geoip-lite/data ./node_modules/geoip-lite/data
+# Copy geoip-lite data to the exact path bun expects at runtime
+COPY --from=job-server-builder /app/apps/job-server/node_modules/geoip-lite/data ./node_modules/.bun/geoip-lite@1.4.10/node_modules/geoip-lite/data
 
 # Copy Next.js standalone build
 COPY --from=nextjs-builder /app/apps/nextjs-app/.next/standalone ./
