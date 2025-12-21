@@ -75,8 +75,17 @@ class SyncScheduler {
     }
 
     await this.performStartupCleanup();
-    console.log("[scheduler] trigger=startup-full-sync");
-    await this.triggerFullSync();
+    
+    const skipStartupFullSync = 
+      Bun.env.SKIP_STARTUP_FULL_SYNC?.toLowerCase() === "true" ||
+      Bun.env.SKIP_STARTUP_FULL_SYNC === "1";
+    
+    if (skipStartupFullSync) {
+      console.log("[scheduler] trigger=startup-full-sync status=skipped reason=SKIP_STARTUP_FULL_SYNC");
+    } else {
+      console.log("[scheduler] trigger=startup-full-sync");
+      await this.triggerFullSync();
+    }
 
     this.enabled = true;
 
@@ -593,6 +602,7 @@ class SyncScheduler {
             continue;
           }
 
+          // pg-boss v12: use API to check for active jobs
           let hasActiveJob = false;
           try {
             const stats = await boss.getQueueStats("generate-item-embeddings");

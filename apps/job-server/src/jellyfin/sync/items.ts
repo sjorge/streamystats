@@ -19,6 +19,7 @@ import {
 import pMap from "p-map";
 import { sleep } from "../../utils/sleep";
 import { formatSyncLogLine } from "./sync-log";
+import { formatError } from "../../utils/format-error";
 
 export interface ItemSyncOptions {
   itemPageSize?: number;
@@ -830,7 +831,11 @@ async function mapItemsWithKnownLibrary(
       validItems.push(mappedItem);
     } catch (error) {
       // Catch any mapping errors
-      console.error(`Error mapping item ${item.Id}:`, error);
+      console.error(
+        `[items-sync] serverId=${serverId} itemId=${item.Id} status=map-error error=${formatError(
+          error
+        )}`
+      );
       invalidItems.push({
         id: item.Id,
         error: error instanceof Error ? error.message : "Unknown error",
