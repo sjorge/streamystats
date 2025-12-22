@@ -5,7 +5,6 @@ import { Container } from "@/components/Container";
 import { getServer } from "@/lib/db/server";
 import DatabaseBackupRestore from "./DatabaseBackupRestore";
 import JellystatsImport from "./JellystatsImport";
-import LegacyImport from "./LegacyImport";
 import PlaybackReportingImport from "./PlaybackReportingImport";
 
 export default async function BackupAndImportSettings(props: {
@@ -29,10 +28,6 @@ export default async function BackupAndImportSettings(props: {
 
         <div>
           <PlaybackReportingImport serverId={server.id} />
-        </div>
-
-        <div>
-          <LegacyImport serverId={server.id} />
         </div>
 
         <hr className="my-8" />

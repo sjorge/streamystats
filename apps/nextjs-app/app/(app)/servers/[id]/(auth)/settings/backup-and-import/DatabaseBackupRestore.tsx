@@ -116,11 +116,7 @@ export default function DatabaseBackupRestore({
           <CardDescription>
             Export or restore your playback session data.
             <br />
-            <b>
-              Only works with the new version of Streamystats. If you want to
-              import old Streamystats data please use legacy import at the
-              bottom.
-            </b>
+            <b>Only works with the new version of Streamystats.</b>
           </CardDescription>
         </CardHeader>
 
