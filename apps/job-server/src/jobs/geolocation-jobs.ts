@@ -326,6 +326,11 @@ async function checkActivityAnomaly(
     }
   }
 
+  // Get device label from activity name or fall back to session device
+  // Define here so it's available in both fingerprint branches
+  const deviceLabel = deviceFromActivity || recentSession[0]?.deviceName;
+  const sessionDeviceId = recentSession[0]?.deviceId;
+
   // Check fingerprint-based anomalies
   if (fingerprint) {
     const { knownCountries, knownCities, knownDeviceIds } = fingerprint;
@@ -372,9 +377,10 @@ async function checkActivityAnomaly(
     }
 
     // Check for new device using parsed device/client name from activity
-    if (deviceFromActivity) {
-      // Normalize device name for comparison (handle extra spaces, case)
-      const normalizedDevice = deviceFromActivity.trim().toLowerCase();
+
+    if (deviceLabel) {
+      // Normalize device label for comparison (handle extra spaces, case)
+      const normalizedDevice = deviceLabel.trim().toLowerCase();
       const isKnownDevice = knownDeviceIds.some(
         (id) => id.toLowerCase() === normalizedDevice
       );
@@ -387,9 +393,10 @@ async function checkActivityAnomaly(
           anomalyType: "new_device",
           severity: "medium",
           details: {
-            description: `First access from device: ${deviceFromActivity}`,
-            deviceId: deviceFromActivity,
-            deviceName: deviceFromActivity,
+            description: `First access from device: ${deviceLabel}`,
+            // Keep deviceId as opaque identifier from session, deviceLabel as human-readable
+            deviceId: sessionDeviceId ?? normalizedDevice,
+            deviceName: deviceLabel,
             clientName: recentSession[0]?.clientName ?? undefined,
             currentLocation: {
               country: geo.country || "",
@@ -420,9 +427,13 @@ async function checkActivityAnomaly(
             updatedCities.push(geo.city);
           }
         }
-        if (anomaly.anomalyType === "new_device" && anomaly.details.deviceId) {
-          if (!updatedDeviceIds.includes(anomaly.details.deviceId)) {
-            updatedDeviceIds.push(anomaly.details.deviceId);
+        if (anomaly.anomalyType === "new_device" && anomaly.details.deviceName) {
+          // Store normalized device label for consistent matching
+          const normalizedLabel = String(anomaly.details.deviceName)
+            .trim()
+            .toLowerCase();
+          if (!updatedDeviceIds.includes(normalizedLabel)) {
+            updatedDeviceIds.push(normalizedLabel);
           }
         }
       }
@@ -452,11 +463,13 @@ async function checkActivityAnomaly(
     }
   } else if (geo.countryCode) {
     // No fingerprint yet - create initial one and cache it
-    await createInitialFingerprint(serverId, userId, geo, deviceFromActivity);
+    const normalizedDevice = deviceLabel?.trim().toLowerCase() ?? null;
+
+    await createInitialFingerprint(serverId, userId, geo, deviceLabel);
     fingerprintCache.set(cacheKey, {
       knownCountries: geo.countryCode ? [geo.countryCode] : [],
       knownCities: geo.city ? [geo.city] : [],
-      knownDeviceIds: deviceFromActivity ? [deviceFromActivity] : [],
+      knownDeviceIds: normalizedDevice ? [normalizedDevice] : [],
     });
   }
 
@@ -502,16 +515,19 @@ async function createInitialFingerprint(
     latitude: number | null;
     longitude: number | null;
   },
-  deviceFromActivity: string | null = null
+  deviceLabel: string | null = null
 ): Promise<void> {
   const now = new Date().toISOString();
+  // Normalize for matching, keep original for display
+  const normalizedDevice = deviceLabel?.trim().toLowerCase() ?? null;
 
   const fingerprint: NewUserFingerprint = {
     userId,
     serverId,
     knownCountries: geo.countryCode ? [geo.countryCode] : [],
     knownCities: geo.city ? [geo.city] : [],
-    knownDeviceIds: deviceFromActivity ? [deviceFromActivity] : [],
+    // Store normalized device labels for consistent matching
+    knownDeviceIds: normalizedDevice ? [normalizedDevice] : [],
     knownClients: [],
     locationPatterns: geo.countryCode
       ? [
@@ -525,11 +541,11 @@ async function createInitialFingerprint(
           },
         ]
       : [],
-    devicePatterns: deviceFromActivity
+    devicePatterns: deviceLabel && normalizedDevice
       ? [
           {
-            deviceId: deviceFromActivity,
-            deviceName: deviceFromActivity,
+            deviceId: normalizedDevice,
+            deviceName: deviceLabel, // Keep original casing for display
             clientName: null,
             sessionCount: 1,
             lastSeenAt: now,
@@ -708,19 +724,21 @@ async function calculateUserFingerprint(
       activity.type
     );
     if (deviceFromActivity) {
-      deviceIdSet.add(deviceFromActivity);
+      // Normalize device label for consistent matching
+      const normalizedDevice = deviceFromActivity.trim().toLowerCase();
+      deviceIdSet.add(normalizedDevice);
       const activityTime =
         activity.date?.toISOString() || new Date().toISOString();
-      const existing = deviceMap.get(deviceFromActivity);
+      const existing = deviceMap.get(normalizedDevice);
       if (existing) {
         existing.sessionCount++;
         if (activityTime > existing.lastSeenAt) {
           existing.lastSeenAt = activityTime;
         }
       } else {
-        deviceMap.set(deviceFromActivity, {
-          deviceId: deviceFromActivity,
-          deviceName: deviceFromActivity,
+        deviceMap.set(normalizedDevice, {
+          deviceId: normalizedDevice,
+          deviceName: deviceFromActivity, // Keep original for display
           clientName: null,
           sessionCount: 1,
           lastSeenAt: activityTime,
@@ -729,17 +747,18 @@ async function calculateUserFingerprint(
     }
   }
 
-  // Aggregate device data from sessions
+  // Aggregate device data from sessions (fallback for activities without device in name)
   for (const session of userSessions) {
-    if (session.deviceId) {
-      deviceIdSet.add(session.deviceId);
-      const existing = deviceMap.get(session.deviceId);
-      if (existing) {
-        existing.sessionCount++;
-      } else {
-        deviceMap.set(session.deviceId, {
-          deviceId: session.deviceId,
-          deviceName: session.deviceName,
+    // Prefer deviceName over deviceId for human-readable labels, then normalize
+    const deviceLabel = session.deviceName || session.deviceId;
+    if (deviceLabel) {
+      const normalizedDevice = deviceLabel.trim().toLowerCase();
+      // Only add if we don't already have this device from activity parsing
+      if (!deviceIdSet.has(normalizedDevice)) {
+        deviceIdSet.add(normalizedDevice);
+        deviceMap.set(normalizedDevice, {
+          deviceId: normalizedDevice,
+          deviceName: session.deviceName || session.deviceId,
           clientName: session.clientName,
           sessionCount: 1,
           lastSeenAt: new Date().toISOString(),
