@@ -5,13 +5,8 @@ import {
   normalizePosition,
   parseTsvLine,
   parseEpisodeInfo,
-} from "./importPlaybackReporting";
-
-// Inline hex32 validation for tests (not exported from main module due to "use server")
-const HEX32 = /^[0-9a-f]{32}$/i;
-function isValidHex32(value: string): boolean {
-  return HEX32.test(value);
-}
+  isValidHex32,
+} from "./playbackReportingParsers";
 
 // =============================================================================
 // parseDotNetTimestamp Tests
