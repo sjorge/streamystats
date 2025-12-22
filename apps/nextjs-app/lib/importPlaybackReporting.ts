@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { db } from "@streamystats/database";
 import {
   items,
@@ -8,18 +9,21 @@ import {
   users,
 } from "@streamystats/database/schema";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
 import {
   parseDotNetTimestamp,
   parseEpisodeInfo,
   parsePlayMethod,
-  parseTsvLine
+  parseTsvLine,
 } from "./playbackReportingParsers";
 
 // Re-export types for consumers
 export type {
-  EpisodeInfo, ItemType, PlaybackRow, PlayMethodParsed, PlayMode,
-  PositionKind
+  EpisodeInfo,
+  ItemType,
+  PlaybackRow,
+  PlayMethodParsed,
+  PlayMode,
+  PositionKind,
 } from "./playbackReportingParsers";
 
 // =============================================================================
@@ -159,12 +163,8 @@ function parsePlaybackReportingJson(
           new Date().toISOString();
 
         const durationValue =
-          getValue(
-            record,
-            "durationSeconds",
-            "duration_seconds",
-            "Duration",
-          ) || "0";
+          getValue(record, "durationSeconds", "duration_seconds", "Duration") ||
+          "0";
         const parsedDuration = Number.parseInt(durationValue, 10);
 
         if (Number.isNaN(parsedDuration) || parsedDuration < 0) {

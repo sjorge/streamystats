@@ -187,7 +187,10 @@ export default function PlaybackReportingImport({
                         <details className="mt-2">
                           <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                             Show details ({state.errors.length} issues
-                            {state.errors.length === 50 ? ", showing first 50" : ""})
+                            {state.errors.length === 50
+                              ? ", showing first 50"
+                              : ""}
+                            )
                           </summary>
                           <ul className="mt-2 max-h-48 overflow-y-auto text-xs space-y-1 bg-muted/50 p-2 rounded">
                             {state.errors.map((err, i) => (

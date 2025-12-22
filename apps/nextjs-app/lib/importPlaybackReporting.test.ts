@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
-  parseDotNetTimestamp,
-  parsePlayMethod,
-  normalizePosition,
-  parseTsvLine,
-  parseEpisodeInfo,
   isValidHex32,
+  normalizePosition,
+  parseDotNetTimestamp,
+  parseEpisodeInfo,
+  parsePlayMethod,
+  parseTsvLine,
 } from "./playbackReportingParsers";
 
 // =============================================================================
@@ -846,4 +846,3 @@ describe("parseTsvLine integration", () => {
     expect(episodeInfo.episodeNumber).toBeNull();
   });
 });
-

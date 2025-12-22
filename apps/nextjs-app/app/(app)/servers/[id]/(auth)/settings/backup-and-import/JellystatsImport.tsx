@@ -187,7 +187,9 @@ export default function JellystatsImport({
           <div className="flex flex-col items-start justify-start">
             <Button
               type="submit"
-              disabled={isUploading || !selectedFile || !hasCompletedInitialSync}
+              disabled={
+                isUploading || !selectedFile || !hasCompletedInitialSync
+              }
               className="w-full"
             >
               {isUploading ? (

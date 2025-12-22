@@ -80,7 +80,7 @@ export function parseDotNetTimestamp(raw: string): number | undefined {
 
   // Convert fractional part to milliseconds (pad/truncate to 3 digits)
   const fracStr = (frac ?? "").trim();
-  const msStr = (fracStr + "000").slice(0, 3);
+  const msStr = `${fracStr}000`.slice(0, 3);
   const ms = Number(msStr);
 
   const dt = new Date(year, month - 1, day, hours, minutes, seconds, ms);
@@ -246,4 +246,3 @@ export function parseTsvLine(line: string): PlaybackRow | null {
 export function isValidHex32(value: string): boolean {
   return HEX32.test(value);
 }
-
