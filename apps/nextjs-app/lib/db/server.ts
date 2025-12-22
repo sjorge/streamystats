@@ -1,18 +1,8 @@
 "use server";
 
-import {
-  activities,
-  db,
-  items,
-  jobResults,
-  libraries,
-  servers,
-  sessions,
-  users,
-} from "@streamystats/database";
-import { and, count, desc, eq, sql } from "drizzle-orm";
-
+import { db, items, jobResults, servers } from "@streamystats/database";
 import type { EmbeddingJobResult, Server } from "@streamystats/database/schema";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 
 export const getServers = async (): Promise<Server[]> => {
   return await db.select().from(servers);

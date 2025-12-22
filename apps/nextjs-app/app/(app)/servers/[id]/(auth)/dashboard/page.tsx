@@ -1,3 +1,6 @@
+import type { Server } from "@streamystats/database/schema";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,9 +11,6 @@ import { getSimilarStatistics } from "@/lib/db/similar-statistics";
 import { getMostWatchedItems } from "@/lib/db/statistics";
 import { getMe } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
-import type { Server } from "@streamystats/database/schema";
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import { ActiveSessions } from "./ActiveSessions";
 import { MostWatchedItems } from "./MostWatchedItems";
 import { SeasonalRecommendations } from "./SeasonalRecommendations";

@@ -1,6 +1,15 @@
 "use client";
 
 import {
+  AlertCircle,
+  CheckCircle2,
+  HelpCircle,
+  Loader2,
+  Upload,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -17,16 +26,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { fetch } from "@/lib/utils";
-import {
-  AlertCircle,
-  CheckCircle2,
-  HelpCircle,
-  Info,
-  Loader2,
-  Upload,
-} from "lucide-react";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
 
 interface ImportResult {
   success: boolean;

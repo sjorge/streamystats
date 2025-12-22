@@ -1,6 +1,6 @@
-import { fetch } from "@/lib/utils";
 import type { Item, User } from "@streamystats/database/schema";
 import { toast } from "sonner";
+import { fetch } from "@/lib/utils";
 
 export type ActiveSession = {
   sessionKey: string;

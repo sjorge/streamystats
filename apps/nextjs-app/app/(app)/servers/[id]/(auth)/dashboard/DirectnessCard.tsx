@@ -1,9 +1,16 @@
 "use client";
 
+import { InfoIcon } from "lucide-react";
 import {
-  CustomBarLabel,
-  CustomValueLabel,
-} from "@/components/ui/CustomBarLabel";
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import {
   Card,
   CardContent,
@@ -19,16 +26,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { DirectnessStat } from "@/lib/db/transcoding-statistics";
-import { InfoIcon } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  LabelList,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 interface DirectnessCardProps {
   data: DirectnessStat[];
@@ -51,8 +48,6 @@ export const DirectnessCard = ({ data }: DirectnessCardProps) => {
       count: item.count,
     }))
     .filter((item) => item.count > 0);
-
-  const maxCount = Math.max(...directnessData.map((d) => d.count));
 
   const total = directnessData.reduce((sum, item) => sum + item.count, 0);
   const directnessDataWithPercent = directnessData.map((item) => ({
