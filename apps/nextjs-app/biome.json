@@ -10,7 +10,9 @@
       "!**/.github",
       "!**/.vscode",
       "!**/dist",
-      "!**/server"
+      "!**/server",
+      "!**/components/ui",
+      "!**/components/ai-elements"
     ]
   },
   "linter": {
@@ -21,7 +23,11 @@
         "noNonNullAssertion": "off"
       },
       "recommended": true,
-      "correctness": { "useExhaustiveDependencies": "off" },
+      "correctness": {
+        "useExhaustiveDependencies": "off",
+        "noUnusedVariables": "off",
+        "noUnusedFunctionParameters": "off"
+      },
       "suspicious": {
         "noExplicitAny": "off",
         "noArrayIndexKey": "off"
@@ -51,6 +57,14 @@
   "json": {
     "formatter": {
       "trailingCommas": "none"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    },
+    "linter": {
+      "enabled": false
     }
   }
 }
