@@ -1,3 +1,6 @@
+import type { Server } from "@streamystats/database";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,9 +9,6 @@ import { getClientStatistics } from "@/lib/db/client-statistics";
 import { getServer } from "@/lib/db/server";
 import { getMe, getUsers } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
-import type { Server } from "@streamystats/database";
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import { ClientStatistics } from "../ClientStatistics";
 import { ClientFilters } from "./ClientFilters";
 

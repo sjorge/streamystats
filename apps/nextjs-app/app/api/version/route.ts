@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 type VersionResponse = {
   currentVersion: string;

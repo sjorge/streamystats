@@ -1,17 +1,16 @@
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { requireAdmin } from "@/lib/api-auth";
-import type { LegacySessionData } from "@/lib/types/legacy-import";
 import { db } from "@streamystats/database";
-import { sessions } from "@streamystats/database/schema";
 import type { NewSession } from "@streamystats/database/schema";
+import { sessions } from "@streamystats/database/schema";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-// @ts-ignore - stream-json doesn't have types
+// @ts-expect-error - stream-json doesn't have types
 import { parser } from "stream-json";
-// @ts-ignore - stream-json doesn't have types
+// @ts-expect-error - stream-json doesn't have types
 import { streamArray } from "stream-json/streamers/StreamArray";
-import { v4 as uuidv4 } from "uuid";
+import { requireAdmin } from "@/lib/api-auth";
+import type { LegacySessionData } from "@/lib/types/legacy-import";
 
 export async function POST(req: NextRequest) {
   try {
@@ -113,31 +112,31 @@ async function importLegacySession(
   }
 
   // Parse numeric and boolean values from strings
-  const playDuration = Number.parseInt(legacySession.play_duration) || 0;
-  const positionTicks = Number.parseInt(legacySession.position_ticks) || 0;
+  const playDuration = Number.parseInt(legacySession.play_duration, 10) || 0;
+  const positionTicks = Number.parseInt(legacySession.position_ticks, 10) || 0;
   const runtimeTicks = legacySession.runtime_ticks
-    ? Number.parseInt(legacySession.runtime_ticks)
+    ? Number.parseInt(legacySession.runtime_ticks, 10)
     : null;
   const completed = legacySession.completed === "true";
   const percentComplete = legacySession.percent_complete || 0;
 
   // Parse optional numeric fields
   const volumeLevel = legacySession.volume_level
-    ? Number.parseInt(legacySession.volume_level)
+    ? Number.parseInt(legacySession.volume_level, 10)
     : null;
   const audioStreamIndex = legacySession.audio_stream_index
-    ? Number.parseInt(legacySession.audio_stream_index)
+    ? Number.parseInt(legacySession.audio_stream_index, 10)
     : null;
   const subtitleStreamIndex = legacySession.subtitle_stream_index
-    ? Number.parseInt(legacySession.subtitle_stream_index)
+    ? Number.parseInt(legacySession.subtitle_stream_index, 10)
     : null;
 
   // Parse transcoding fields (only those that exist in schema)
   const transcodingWidth = legacySession.transcoding_width
-    ? Number.parseInt(legacySession.transcoding_width)
+    ? Number.parseInt(legacySession.transcoding_width, 10)
     : null;
   const transcodingHeight = legacySession.transcoding_height
-    ? Number.parseInt(legacySession.transcoding_height)
+    ? Number.parseInt(legacySession.transcoding_height, 10)
     : null;
 
   // Parse boolean fields

@@ -1,9 +1,16 @@
 "use client";
 
+import { InfoIcon } from "lucide-react";
+import React from "react";
 import {
-  CustomBarLabel,
-  CustomValueLabel,
-} from "@/components/ui/CustomBarLabel";
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import {
   Card,
   CardContent,
@@ -19,16 +26,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { NumericStat } from "@/lib/db/transcoding-statistics";
-import { InfoIcon } from "lucide-react";
-import React from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  LabelList,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 interface Props {
   width: NumericStat;
@@ -36,7 +33,7 @@ interface Props {
 }
 
 // Helper function to categorize resolution by width
-function categorizeResolution(width: number, height: number): string {
+function categorizeResolution(width: number, _height: number): string {
   // Common resolution categories based on width
   if (width >= 3840) return "4K (3840+)";
   if (width >= 2560) return "1440p (2560+)";
@@ -105,7 +102,7 @@ export const ResolutionStatisticsCard = ({ width, height }: Props) => {
     },
   } satisfies ChartConfig;
 
-  const maxCount =
+  const _maxCount =
     resolutionWidthData.length > 0
       ? Math.max(...resolutionWidthData.map((d) => d.count))
       : 0;

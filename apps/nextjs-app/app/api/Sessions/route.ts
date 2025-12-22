@@ -1,8 +1,8 @@
+import { db, items, users } from "@streamystats/database";
+import { eq } from "drizzle-orm";
 import { requireSession } from "@/lib/api-auth";
 import type { ActiveSession } from "@/lib/db/active-sessions";
 import { getServer } from "@/lib/db/server";
-import { db, items, users } from "@streamystats/database";
-import { eq } from "drizzle-orm";
 
 export async function GET(request: Request) {
   // Require valid session to view active sessions

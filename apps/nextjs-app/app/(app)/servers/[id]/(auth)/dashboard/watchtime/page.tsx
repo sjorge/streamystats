@@ -1,3 +1,7 @@
+import type { Server } from "@streamystats/database/schema";
+import { addDays } from "date-fns";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,10 +15,6 @@ import {
   getWatchTimePerWeekDay,
 } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
-import type { Server } from "@streamystats/database/schema";
-import { addDays } from "date-fns";
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import Graph from "../Graph";
 import TotalWatchTime from "../TotalWatchTime";
 import { WatchTimePerHour } from "../WatchTimePerHour";

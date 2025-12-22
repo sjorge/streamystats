@@ -1,6 +1,9 @@
+import { Shield } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Container } from "@/components/Container";
-import { PageTitle } from "@/components/PageTitle";
 import { AnomalyBadge } from "@/components/locations";
+import { PageTitle } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
 import {
   getUniqueClientNames,
@@ -14,16 +17,13 @@ import { getMostWatchedItems } from "@/lib/db/statistics";
 import {
   getUserById,
   getUserGenreStats,
-  getUserWatchStats,
   getUsers,
+  getUserWatchStats,
   getWatchTimePerWeekDay,
   isUserAdmin,
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { showAdminStatistics } from "@/utils/adminTools";
-import { Shield } from "lucide-react";
-import Link from "next/link";
-import { redirect } from "next/navigation";
 import { HistoryTable } from "../../history/HistoryTable";
 import { GenreStatsGraph } from "./GenreStatsGraph";
 import { TopItemsList } from "./TopItems";
@@ -62,7 +62,7 @@ export default async function User({
   ]);
 
   // Get additional user statistics and history
-  const currentPage = Number.parseInt(page);
+  const currentPage = Number.parseInt(page, 10);
   const [
     watchStats,
     watchTimePerWeekday,

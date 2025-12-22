@@ -1,13 +1,5 @@
 "use client";
 
-import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import {
-  type SeasonalRecommendationResult,
-  getSeasonalRecommendations,
-} from "@/lib/db/seasonal-recommendations";
-import type { Holiday } from "@/lib/holidays";
 import type { Server } from "@streamystats/database";
 import {
   BookOpen,
@@ -35,6 +27,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  getSeasonalRecommendations,
+  type SeasonalRecommendationResult,
+} from "@/lib/db/seasonal-recommendations";
 
 // Map icon names to Lucide components
 const iconMap: Record<string, LucideIcon> = {

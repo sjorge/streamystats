@@ -1,7 +1,7 @@
 "use server";
 
-import { isUserAdmin } from "@/lib/db/users";
 import { cookies } from "next/headers";
+import { isUserAdmin } from "@/lib/db/users";
 
 export const showAdminStatistics = async () => {
   const isAdmin = await isUserAdmin();

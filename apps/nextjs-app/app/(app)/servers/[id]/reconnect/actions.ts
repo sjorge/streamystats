@@ -1,11 +1,11 @@
 "use server";
 
+import { cookies } from "next/headers";
 import {
   type UpdateServerConnectionResult,
   updateServerConnection,
 } from "@/lib/db/server";
 import { shouldUseSecureCookies } from "@/lib/secure-cookies";
-import { cookies } from "next/headers";
 
 export const updateServerConnectionAction = async ({
   serverId,

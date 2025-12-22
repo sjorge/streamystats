@@ -1,25 +1,22 @@
 "use client";
 
-import { usePersistantState } from "@/hooks/usePersistantState";
-import { useQueryParams } from "@/hooks/useQueryParams";
+import type { Activity, Server } from "@streamystats/database/schema";
 import {
   type ColumnDef,
   type ColumnFiltersState,
-  type SortingState,
-  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  getSortedRowModel,
+  type SortingState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { useDebounce } from "use-debounce";
-
 import JellyfinAvatar from "@/components/JellyfinAvatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +34,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Activity, Server } from "@streamystats/database/schema";
+import { usePersistantState } from "@/hooks/usePersistantState";
+import { useQueryParams } from "@/hooks/useQueryParams";
 
 interface PaginatedActivities {
   data: Activity[];
@@ -55,7 +53,7 @@ export interface ActivityLogTableProps {
 }
 
 export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const searchParams = useSearchParams();
   const { updateQueryParams } = useQueryParams();
 
@@ -72,7 +70,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
   );
-  const [columnVisibility, setColumnVisibility, isLoadingVisibility] =
+  const [columnVisibility, setColumnVisibility, _isLoadingVisibility] =
     usePersistantState<VisibilityState>(
       `activities-column-visibility-${server.id}`,
       {},

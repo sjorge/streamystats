@@ -1,5 +1,16 @@
 "use client";
 
+import { InfoIcon } from "lucide-react";
+import { useCallback } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { CustomBarLabel } from "@/components/ui/CustomBarLabel";
 import {
   Card,
@@ -16,17 +27,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import type { CategoryStat } from "@/lib/db/transcoding-statistics";
-import { InfoIcon } from "lucide-react";
-import { useCallback } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  LabelList,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 interface TranscodingReasonsCardProps {
   data: CategoryStat[];
@@ -41,7 +41,7 @@ function cleanReasonLabel(label: string): string {
       if (Array.isArray(parsed)) {
         return parsed.join(", ");
       }
-    } catch (error) {
+    } catch (_error) {
       // If parsing fails, return the original label
     }
   }
@@ -87,7 +87,7 @@ export const TranscodingReasonsCard = ({
     return Math.min(Math.max(minHeight, dataLength * heightPerBar), maxHeight);
   };
 
-  const maxCount = Math.max(...reasonsData.map((d) => d.count));
+  const _maxCount = Math.max(...reasonsData.map((d) => d.count));
 
   const total = reasonsData.reduce((sum, item) => sum + item.count, 0);
   const reasonsDataWithPercent = reasonsData.map((item) => ({

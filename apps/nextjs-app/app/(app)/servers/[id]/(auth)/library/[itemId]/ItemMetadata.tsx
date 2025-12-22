@@ -1,9 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateUS, formatDuration } from "@/lib/utils";
 import type { Item } from "@streamystats/database/schema";
 import {
   BarChart3,
@@ -14,8 +10,12 @@ import {
   Video,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { ViewerDetailsDialog } from "./ViewerDetailsDialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDateUS, formatDuration } from "@/lib/utils";
 import type { ItemDetailsResponse } from "./types";
+import { ViewerDetailsDialog } from "./ViewerDetailsDialog";
 
 interface ItemMetadataProps {
   item: Item;

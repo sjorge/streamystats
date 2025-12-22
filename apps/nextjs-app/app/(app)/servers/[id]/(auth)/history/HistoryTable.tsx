@@ -3,19 +3,22 @@
 import {
   type ColumnDef,
   type ColumnFiltersState,
-  type SortingState,
-  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import * as React from "react";
-
+import { useEffect } from "react";
+import { useDebounce } from "use-debounce";
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import JellyfinAvatar from "@/components/JellyfinAvatar";
 import { PlaybackMethodBadge } from "@/components/PlaybackMethodBadge";
@@ -42,10 +45,6 @@ import type { HistoryItem, HistoryResponse } from "@/lib/db/history";
 import { formatLocalDate } from "@/lib/timezone";
 import type { Server } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "nextjs-toploader/app";
-import { useEffect } from "react";
-import { useDebounce } from "use-debounce";
 import { HistoryFilters } from "./HistoryFilters";
 
 export interface HistoryTableProps {
@@ -67,7 +66,7 @@ export function HistoryTable({
   clientNames,
   playMethods,
 }: HistoryTableProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const searchParams = useSearchParams();
   const { updateQueryParams, isLoading } = useQueryParams();
 
@@ -326,7 +325,7 @@ export function HistoryTable({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
   );
-  const [columnVisibility, setColumnVisibility, isLoadingVisibility] =
+  const [columnVisibility, setColumnVisibility, _isLoadingVisibility] =
     usePersistantState<VisibilityState>(
       `history-column-visibility-${server.id}`,
       {

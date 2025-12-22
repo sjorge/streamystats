@@ -1,11 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import {
   setShowAdminStatistics,
   showAdminStatistics,
 } from "@/utils/adminTools";
-import { useEffect, useState } from "react";
 import { Label } from "./ui/label";
 
 export const ShowAdminStatisticsSwitch = ({

@@ -1,8 +1,8 @@
+import type { Server } from "@streamystats/database";
+import type { JSX } from "react";
 import { getWatchTimePerType } from "@/lib/db/statistics";
 import { getMe } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
-import type { Server } from "@streamystats/database";
-import { type JSX, Suspense } from "react";
 import { WatchTimeGraph } from "./WatchTimeGraph";
 
 interface Props {

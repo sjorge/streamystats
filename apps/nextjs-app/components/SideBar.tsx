@@ -1,6 +1,5 @@
 "use client";
 
-import { getUser } from "@/lib/db/users";
 import type { Server, User } from "@streamystats/database";
 import {
   Activity,
@@ -24,6 +23,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { getUser } from "@/lib/db/users";
 import { ServerSelector } from "./ServerSelector";
 import { ShowAdminStatisticsSwitch } from "./ShowAdminStatisticsSwitch";
 import { UserMenu } from "./UserMenu";
@@ -270,7 +270,7 @@ export const SideBar: React.FC<Props> = ({
         />
         <UserMenu
           me={fullUser || undefined}
-          serverUrl={servers.find((s) => s.id === Number.parseInt(id))?.url}
+          serverUrl={servers.find((s) => s.id === Number.parseInt(id, 10))?.url}
         />
       </SidebarFooter>
     </Sidebar>

@@ -1,5 +1,22 @@
 "use client";
 
+import { useChat } from "@ai-sdk/react";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithToolCalls,
+} from "ai";
+import {
+  AlertCircle,
+  Bot,
+  ExternalLink,
+  Film,
+  Sparkles,
+  Tv,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Streamdown } from "streamdown";
 import {
   Conversation,
   ConversationContent,
@@ -26,23 +43,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { User } from "@/lib/types";
-import { useChat } from "@ai-sdk/react";
-import {
-  DefaultChatTransport,
-  lastAssistantMessageIsCompleteWithToolCalls,
-} from "ai";
-import {
-  AlertCircle,
-  Bot,
-  ExternalLink,
-  Film,
-  Sparkles,
-  Tv,
-} from "lucide-react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Streamdown } from "streamdown";
 import JellyfinAvatar from "./JellyfinAvatar";
 
 interface ChatDialogProps {

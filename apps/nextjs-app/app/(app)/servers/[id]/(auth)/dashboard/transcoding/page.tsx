@@ -1,3 +1,6 @@
+import type { Server } from "@streamystats/database";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -5,9 +8,6 @@ import { getServer } from "@/lib/db/server";
 import { getTranscodingStatistics } from "@/lib/db/transcoding-statistics";
 import { getMe } from "@/lib/db/users";
 import { showAdminStatistics } from "@/utils/adminTools";
-import type { Server } from "@streamystats/database";
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import { TranscodingStatistics } from "../TranscodingStatistics";
 
 export default async function TranscodingPage({

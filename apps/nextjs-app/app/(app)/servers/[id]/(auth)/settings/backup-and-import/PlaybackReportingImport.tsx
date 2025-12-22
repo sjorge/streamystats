@@ -1,6 +1,16 @@
 "use client";
 
 import {
+  AlertCircle,
+  CheckCircle2,
+  HelpCircle,
+  Info,
+  Loader2,
+  Upload,
+} from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -20,16 +30,6 @@ import {
   type ImportState,
   importFromPlaybackReporting,
 } from "@/lib/importPlaybackReporting";
-import {
-  AlertCircle,
-  CheckCircle2,
-  HelpCircle,
-  Info,
-  Loader2,
-  Upload,
-} from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 
 // Form submit button with loading state
 function SubmitButton({ hasFile }: { hasFile: boolean }) {

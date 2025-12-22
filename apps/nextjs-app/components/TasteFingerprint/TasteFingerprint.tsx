@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import type { TasteProfile } from "@/lib/db/taste-profile";
 import { Download, Share2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import type { TasteProfile } from "@/lib/db/taste-profile";
 
 interface TasteFingerprintProps {
   profile: TasteProfile;
@@ -128,7 +128,7 @@ export function TasteFingerprint({
       }
 
       // Draw the genre nodes (glowing orbs)
-      genreNodes.forEach((node, i) => {
+      genreNodes.forEach((node, _i) => {
         // Outer glow
         const glowGrad = ctx.createRadialGradient(
           node.x,

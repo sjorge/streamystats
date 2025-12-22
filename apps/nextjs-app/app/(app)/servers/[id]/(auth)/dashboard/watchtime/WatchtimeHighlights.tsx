@@ -1,7 +1,7 @@
+import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MostActiveUsersDay, MostWatchedDay } from "@/lib/db/statistics";
 import { formatDuration } from "@/lib/utils";
-import { format, parseISO } from "date-fns";
 
 function formatDateLabel(dateStr: string): string {
   const parsed = parseISO(dateStr);

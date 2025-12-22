@@ -1,11 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getMe, getTotalWatchTime } from "@/lib/db/users";
-import { formatDuration } from "@/lib/utils";
-import { showAdminStatistics } from "@/utils/adminTools";
 import type { Server } from "@streamystats/database";
 import { Clock } from "lucide-react";
 import { redirect } from "next/navigation";
 import type React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getMe, getTotalWatchTime } from "@/lib/db/users";
+import { formatDuration } from "@/lib/utils";
+import { showAdminStatistics } from "@/utils/adminTools";
 
 interface Props {
   server: Server;

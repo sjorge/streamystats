@@ -3,8 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@streamystats/database";
 import {
-  type NewSession,
   items,
+  type NewSession,
   sessions,
   users,
 } from "@streamystats/database/schema";
@@ -88,7 +88,7 @@ function buildPlaybackData(
 }
 
 export async function importFromPlaybackReporting(
-  prevState: ImportState,
+  _prevState: ImportState,
   formData: FormData,
 ): Promise<ImportState> {
   console.info("Starting Playback Reporting import process");
@@ -617,7 +617,7 @@ async function importPlaybackReportingSession(
 
     // Extract series information from item name if it's an episode
     let seriesName: string | null = null;
-    let seasonInfo: string | null = null;
+    let _seasonInfo: string | null = null;
     if (
       playbackData.itemType?.toLowerCase() === "episode" &&
       playbackData.itemName
@@ -631,7 +631,7 @@ async function importPlaybackReportingSession(
       // Extract season info
       const seasonMatch = playbackData.itemName.match(/s(\d+)e\d+/i);
       if (seasonMatch) {
-        seasonInfo = `Season ${seasonMatch[1]}`;
+        _seasonInfo = `Season ${seasonMatch[1]}`;
       }
     }
 

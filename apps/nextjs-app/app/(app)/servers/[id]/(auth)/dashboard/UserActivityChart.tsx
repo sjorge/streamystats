@@ -1,12 +1,11 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, UsersIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { Suspense, useTransition } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -35,14 +34,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getDefaultEndDate,
-  getDefaultStartDate,
-  setEndDateToEndOfDay,
-} from "@/dates";
+import { getDefaultStartDate, setEndDateToEndOfDay } from "@/dates";
 import { useQueryParams } from "@/hooks/useQueryParams";
 import type { UserActivityPerDay } from "@/lib/db/users";
-import { UsersIcon } from "lucide-react";
 
 const chartConfig = {
   active_users: {
@@ -136,7 +130,7 @@ function UserActivityChartView({
           cursor={false}
           content={
             <ChartTooltipContent
-              formatter={(value, name, entry) => (
+              formatter={(value, _name, entry) => (
                 <div className="flex flex-col gap-1 min-w-[140px]">
                   <div className="text-sm font-medium">
                     {entry?.payload?.formattedDate}
