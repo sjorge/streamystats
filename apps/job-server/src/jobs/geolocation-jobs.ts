@@ -14,6 +14,7 @@ import {
   geolocateIp,
   checkImpossibleTravel,
   parseIpFromShortOverview,
+  getDeviceOrClientFromActivity,
 } from "../services/geolocation";
 import { publishJobEvent, nowIsoMicroUtc } from "../events/job-events";
 
@@ -138,7 +139,8 @@ export async function geolocateActivitiesJob(job: {
           activity.id,
           geo,
           activity.date,
-          activity.name
+          activity.name,
+          activity.type
         );
         if (anomaly) {
           anomalyCount++;
@@ -178,7 +180,8 @@ async function checkActivityAnomaly(
     longitude: number | null;
   },
   activityDate: Date,
-  activityName: string
+  activityName: string,
+  activityType: string
 ): Promise<NewAnomalyEvent | null> {
   const cacheKey = getFingerprintCacheKey(serverId, userId);
   
@@ -209,7 +212,13 @@ async function checkActivityAnomaly(
   
   fingerprint = cachedFp;
 
-  // Get user's most recent session to check device
+  // Get device/client from activity name (primary source - always available)
+  const deviceFromActivity = getDeviceOrClientFromActivity(
+    activityName,
+    activityType
+  );
+
+  // Get user's most recent session as fallback for additional context
   const recentSession = await db
     .select({
       deviceId: sessions.deviceId,
@@ -362,33 +371,35 @@ async function checkActivityAnomaly(
       });
     }
 
-    // Check for new device
-    const latestSession = recentSession[0];
-    if (
-      latestSession?.deviceId &&
-      !knownDeviceIds.includes(latestSession.deviceId)
-    ) {
-      anomalies.push({
-        userId,
-        serverId,
-        activityId,
-        anomalyType: "new_device",
-        severity: "medium",
-        details: {
-          description: `First access from device: ${
-            latestSession.deviceName || latestSession.deviceId
-          }`,
-          deviceId: latestSession.deviceId,
-          deviceName: latestSession.deviceName ?? undefined,
-          clientName: latestSession.clientName ?? undefined,
-          currentLocation: {
-            country: geo.country || "",
-            city: geo.city,
-            latitude: geo.latitude,
-            longitude: geo.longitude,
+    // Check for new device using parsed device/client name from activity
+    if (deviceFromActivity) {
+      // Normalize device name for comparison (handle extra spaces, case)
+      const normalizedDevice = deviceFromActivity.trim().toLowerCase();
+      const isKnownDevice = knownDeviceIds.some(
+        (id) => id.toLowerCase() === normalizedDevice
+      );
+
+      if (!isKnownDevice) {
+        anomalies.push({
+          userId,
+          serverId,
+          activityId,
+          anomalyType: "new_device",
+          severity: "medium",
+          details: {
+            description: `First access from device: ${deviceFromActivity}`,
+            deviceId: deviceFromActivity,
+            deviceName: deviceFromActivity,
+            clientName: recentSession[0]?.clientName ?? undefined,
+            currentLocation: {
+              country: geo.country || "",
+              city: geo.city,
+              latitude: geo.latitude,
+              longitude: geo.longitude,
+            },
           },
-        },
-      });
+        });
+      }
     }
 
     // Immediately update fingerprint with new locations/devices to prevent duplicates
@@ -441,11 +452,11 @@ async function checkActivityAnomaly(
     }
   } else if (geo.countryCode) {
     // No fingerprint yet - create initial one and cache it
-    await createInitialFingerprint(serverId, userId, geo);
+    await createInitialFingerprint(serverId, userId, geo, deviceFromActivity);
     fingerprintCache.set(cacheKey, {
       knownCountries: geo.countryCode ? [geo.countryCode] : [],
       knownCities: geo.city ? [geo.city] : [],
-      knownDeviceIds: [],
+      knownDeviceIds: deviceFromActivity ? [deviceFromActivity] : [],
     });
   }
 
@@ -490,7 +501,8 @@ async function createInitialFingerprint(
     city: string | null;
     latitude: number | null;
     longitude: number | null;
-  }
+  },
+  deviceFromActivity: string | null = null
 ): Promise<void> {
   const now = new Date().toISOString();
 
@@ -499,7 +511,7 @@ async function createInitialFingerprint(
     serverId,
     knownCountries: geo.countryCode ? [geo.countryCode] : [],
     knownCities: geo.city ? [geo.city] : [],
-    knownDeviceIds: [],
+    knownDeviceIds: deviceFromActivity ? [deviceFromActivity] : [],
     knownClients: [],
     locationPatterns: geo.countryCode
       ? [
@@ -513,7 +525,17 @@ async function createInitialFingerprint(
           },
         ]
       : [],
-    devicePatterns: [],
+    devicePatterns: deviceFromActivity
+      ? [
+          {
+            deviceId: deviceFromActivity,
+            deviceName: deviceFromActivity,
+            clientName: null,
+            sessionCount: 1,
+            lastSeenAt: now,
+          },
+        ]
+      : [],
     totalSessions: 1,
     lastCalculatedAt: new Date(),
   };
@@ -586,6 +608,7 @@ async function calculateUserFingerprint(
       activityId: activities.id,
       date: activities.date,
       type: activities.type,
+      name: activities.name,
       countryCode: activityLocations.countryCode,
       country: activityLocations.country,
       city: activityLocations.city,
@@ -677,6 +700,32 @@ async function calculateUserFingerprint(
     if (activity.date) {
       const hour = activity.date.getUTCHours();
       hourHistogram[hour] = (hourHistogram[hour] || 0) + 1;
+    }
+
+    // Device patterns from activity name (more reliable than sessions)
+    const deviceFromActivity = getDeviceOrClientFromActivity(
+      activity.name,
+      activity.type
+    );
+    if (deviceFromActivity) {
+      deviceIdSet.add(deviceFromActivity);
+      const activityTime =
+        activity.date?.toISOString() || new Date().toISOString();
+      const existing = deviceMap.get(deviceFromActivity);
+      if (existing) {
+        existing.sessionCount++;
+        if (activityTime > existing.lastSeenAt) {
+          existing.lastSeenAt = activityTime;
+        }
+      } else {
+        deviceMap.set(deviceFromActivity, {
+          deviceId: deviceFromActivity,
+          deviceName: deviceFromActivity,
+          clientName: null,
+          sessionCount: 1,
+          lastSeenAt: activityTime,
+        });
+      }
     }
   }
 
