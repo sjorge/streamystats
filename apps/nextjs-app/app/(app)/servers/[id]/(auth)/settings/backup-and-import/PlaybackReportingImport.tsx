@@ -156,13 +156,37 @@ export default function PlaybackReportingImport({
                 {state.type === "success" &&
                   state.importedCount !== undefined &&
                   state.totalCount !== undefined && (
-                    <div className="mt-2 text-sm">
-                      Successfully imported {state.importedCount} of{" "}
-                      {state.totalCount} sessions.
-                      {state.errorCount && state.errorCount > 0 && (
-                        <p className="text-orange-600">
-                          {state.errorCount} sessions failed to import.
+                    <div className="mt-2 text-sm space-y-2">
+                      <p>
+                        Successfully imported {state.importedCount} of{" "}
+                        {state.totalCount} sessions.
+                      </p>
+                      {((state.skippedCount && state.skippedCount > 0) ||
+                        (state.errorCount && state.errorCount > 0)) && (
+                        <p className="text-orange-600 dark:text-orange-400">
+                          {state.skippedCount || 0} skipped,{" "}
+                          {state.errorCount || 0} failed.
                         </p>
+                      )}
+                      {state.errors && state.errors.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                            Show details ({state.errors.length} issues
+                            {state.errors.length === 50 ? ", showing first 50" : ""})
+                          </summary>
+                          <ul className="mt-2 max-h-48 overflow-y-auto text-xs space-y-1 bg-muted/50 p-2 rounded">
+                            {state.errors.map((err, i) => (
+                              <li key={i} className="text-muted-foreground">
+                                <span className="font-medium text-foreground">
+                                  {err.reason}
+                                </span>
+                                {err.itemName && (
+                                  <span className="ml-1">- {err.itemName}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
                       )}
                     </div>
                   )}

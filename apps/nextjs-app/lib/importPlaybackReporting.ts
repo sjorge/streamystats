@@ -31,12 +31,20 @@ export type {
 // Types
 // =============================================================================
 
+export interface ImportError {
+  reason: string;
+  itemName?: string;
+  timestamp?: string;
+}
+
 export interface ImportState {
   type: "success" | "error" | "info" | null;
   message: string;
   importedCount?: number;
   totalCount?: number;
   errorCount?: number;
+  skippedCount?: number;
+  errors?: ImportError[];
 }
 
 // Internal interface for DB mapping
@@ -289,18 +297,39 @@ export async function importFromPlaybackReporting(
     let importedCount = 0;
     const totalCount = data.length;
     let errorCount = 0;
+    let skippedCount = 0;
+    const errors: ImportError[] = [];
+    const maxErrors = 50; // Limit error list size
 
     for (const playbackData of data) {
       try {
-        const imported = await importPlaybackReportingSession(
+        const result = await importPlaybackReportingSession(
           playbackData,
           serverIdNum,
         );
-        if (imported) {
+        if (result.success) {
           importedCount++;
+        } else {
+          skippedCount++;
+          if (errors.length < maxErrors) {
+            errors.push({
+              reason: result.reason,
+              itemName: playbackData.itemName,
+              timestamp: playbackData.timestamp,
+            });
+          }
         }
-      } catch {
+      } catch (error) {
         errorCount++;
+        if (errors.length < maxErrors) {
+          const errorMsg =
+            error instanceof Error ? error.message : "Unknown error";
+          errors.push({
+            reason: errorMsg.slice(0, 150),
+            itemName: playbackData.itemName,
+            timestamp: playbackData.timestamp,
+          });
+        }
       }
     }
 
@@ -310,6 +339,8 @@ export async function importFromPlaybackReporting(
       importedCount,
       totalCount,
       errorCount,
+      skippedCount,
+      errors: errors.length > 0 ? errors : undefined,
     };
   } catch (error) {
     return {
@@ -323,12 +354,17 @@ export async function importFromPlaybackReporting(
 // Session Import
 // =============================================================================
 
+interface ImportResult {
+  success: boolean;
+  reason: string;
+}
+
 async function importPlaybackReportingSession(
   playbackData: PlaybackReportingData,
   serverId: number,
-): Promise<boolean> {
+): Promise<ImportResult> {
   if (!playbackData.timestamp) {
-    return false;
+    return { success: false, reason: "Missing timestamp" };
   }
 
   // Parse timestamp using our custom parser first, fallback to Date
@@ -339,16 +375,23 @@ async function importPlaybackReportingSession(
   } else {
     sessionTime = new Date(playbackData.timestamp);
     if (Number.isNaN(sessionTime.getTime())) {
-      return false;
+      return {
+        success: false,
+        reason: `Invalid timestamp: ${playbackData.timestamp}`,
+      };
     }
   }
 
   // Skip sessions with no duration or invalid duration
-  if (
-    playbackData.durationSeconds === undefined ||
-    playbackData.durationSeconds <= 0
-  ) {
-    return false;
+  if (playbackData.durationSeconds === undefined) {
+    return { success: false, reason: "Missing duration" };
+  }
+
+  if (playbackData.durationSeconds <= 0) {
+    return {
+      success: false,
+      reason: `Invalid duration: ${playbackData.durationSeconds}s`,
+    };
   }
 
   let finalItemId = playbackData.itemId || null;
@@ -394,9 +437,10 @@ async function importPlaybackReportingSession(
     }
   }
 
-  const endTime = new Date(
-    sessionTime.getTime() + playbackData.durationSeconds * 1000,
-  );
+  // Round duration to integer (database column is integer)
+  const durationSeconds = Math.round(playbackData.durationSeconds);
+
+  const endTime = new Date(sessionTime.getTime() + durationSeconds * 1000);
 
   // Parse play method using new function
   const playParsed = parsePlayMethod(playbackData.playMethod || "");
@@ -415,7 +459,7 @@ async function importPlaybackReportingSession(
   }
 
   const sessionId = randomUUID();
-  const runtimeTicks = playbackData.durationSeconds * 10000000;
+  const runtimeTicks = durationSeconds * 10000000;
   const positionTicks = runtimeTicks;
 
   const sessionData: NewSession = {
@@ -430,7 +474,7 @@ async function importPlaybackReportingSession(
     clientName: playbackData.clientName || "Unknown Client",
     deviceName: playbackData.deviceName || "Unknown Device",
     playMethod: playbackData.playMethod || "Unknown",
-    playDuration: playbackData.durationSeconds,
+    playDuration: durationSeconds,
     startTime: sessionTime,
     endTime: endTime,
     lastActivityDate: endTime,
@@ -482,7 +526,16 @@ async function importPlaybackReportingSession(
     transcodeReasons: null,
   };
 
-  await db.insert(sessions).values(sessionData).onConflictDoNothing();
+  try {
+    await db.insert(sessions).values(sessionData).onConflictDoNothing();
+  } catch (dbError) {
+    const errorMsg =
+      dbError instanceof Error ? dbError.message : "Unknown database error";
+    return {
+      success: false,
+      reason: `DB error: ${errorMsg.slice(0, 100)}`,
+    };
+  }
 
-  return true;
+  return { success: true, reason: "Imported" };
 }
