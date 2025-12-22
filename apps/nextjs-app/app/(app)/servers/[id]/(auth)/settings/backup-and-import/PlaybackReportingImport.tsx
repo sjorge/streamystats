@@ -32,11 +32,21 @@ import {
 } from "@/lib/importPlaybackReporting";
 
 // Form submit button with loading state
-function SubmitButton({ hasFile }: { hasFile: boolean }) {
+function SubmitButton({
+  hasFile,
+  disabled,
+}: {
+  hasFile: boolean;
+  disabled?: boolean;
+}) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending || !hasFile} className="w-full">
+    <Button
+      type="submit"
+      disabled={pending || !hasFile || disabled}
+      className="w-full"
+    >
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -52,11 +62,16 @@ function SubmitButton({ hasFile }: { hasFile: boolean }) {
   );
 }
 
+interface PlaybackReportingImportProps {
+  serverId: number;
+  lastSyncCompleted: Date | null;
+}
+
 export default function PlaybackReportingImport({
   serverId,
-}: {
-  serverId: number;
-}) {
+  lastSyncCompleted,
+}: PlaybackReportingImportProps) {
+  const hasCompletedInitialSync = lastSyncCompleted !== null;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -195,7 +210,10 @@ export default function PlaybackReportingImport({
           )}
 
           <div className="flex flex-col items-start justify-start">
-            <SubmitButton hasFile={!!selectedFile} />
+            <SubmitButton
+              hasFile={!!selectedFile}
+              disabled={!hasCompletedInitialSync}
+            />
           </div>
         </form>
 
