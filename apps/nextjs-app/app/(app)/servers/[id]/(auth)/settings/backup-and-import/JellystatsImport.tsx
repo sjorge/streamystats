@@ -36,7 +36,16 @@ interface ImportResult {
   error?: string;
 }
 
-export default function JellystatsImport({ serverId }: { serverId: number }) {
+interface JellystatsImportProps {
+  serverId: number;
+  lastSyncCompleted: Date | null;
+}
+
+export default function JellystatsImport({
+  serverId,
+  lastSyncCompleted,
+}: JellystatsImportProps) {
+  const hasCompletedInitialSync = lastSyncCompleted !== null;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -178,7 +187,9 @@ export default function JellystatsImport({ serverId }: { serverId: number }) {
           <div className="flex flex-col items-start justify-start">
             <Button
               type="submit"
-              disabled={isUploading || !selectedFile}
+              disabled={
+                isUploading || !selectedFile || !hasCompletedInitialSync
+              }
               className="w-full"
             >
               {isUploading ? (
