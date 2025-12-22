@@ -579,13 +579,6 @@ class SyncScheduler {
             continue;
           }
 
-          if (
-            server.embeddingProvider === "openai-compatible" &&
-            !server.embeddingApiKey
-          ) {
-            continue;
-          }
-
           const remainingCount = await db
             .select({ count: sql<number>`count(*)` })
             .from(items)

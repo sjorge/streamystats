@@ -388,13 +388,7 @@ export const startEmbedding = async ({ serverId }: { serverId: number }) => {
       );
     }
 
-    // API key is required for openai-compatible but optional for ollama
-    if (
-      server.embeddingProvider === "openai-compatible" &&
-      !server.embeddingApiKey
-    ) {
-      throw new Error("API key is required for OpenAI-compatible providers");
-    }
+    // API key is optional for both providers - local providers like LM Studio don't require one
 
     // Check if configured dimension matches existing embeddings
     const existingDimension = await getExistingEmbeddingDimension({ serverId });

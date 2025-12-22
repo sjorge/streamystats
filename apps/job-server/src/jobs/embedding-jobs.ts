@@ -361,12 +361,9 @@ export async function generateItemEmbeddingsJob(
     if (provider === "openai-compatible") {
       // Use OpenAI SDK with custom baseURL for any OpenAI-compatible API
       // Supports: OpenAI, Azure OpenAI, Together AI, Fireworks, Anyscale, LocalAI, LM Studio, vLLM, etc.
-      if (!config.apiKey) {
-        throw new Error("API key not provided for OpenAI-compatible provider");
-      }
-
+      // API key is optional for local providers like LM Studio - use dummy value if not provided
       const client = new OpenAI({
-        apiKey: config.apiKey,
+        apiKey: config.apiKey || "not-needed",
         baseURL: config.baseUrl,
         timeout: TIMEOUT_CONFIG.DEFAULT,
         maxRetries: DEFAULT_MAX_RETRIES,

@@ -47,16 +47,6 @@ app.post("/start-embedding", async (c) => {
       );
     }
 
-    if (
-      serverConfig.embeddingProvider === "openai-compatible" &&
-      !serverConfig.embeddingApiKey
-    ) {
-      return c.json(
-        { error: "API key is required for OpenAI-compatible providers" },
-        400
-      );
-    }
-
     const boss = await getJobQueue();
     const jobId = await boss.send("generate-item-embeddings", {
       serverId,
