@@ -272,7 +272,7 @@ export function parseTsvLine(line: string): PlaybackRow | null {
 /**
  * Validate hex32 format for userId/itemId
  */
-export function isValidHex32(value: string): boolean {
+function isValidHex32(value: string): boolean {
   return HEX32.test(value);
 }
 
