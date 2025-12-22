@@ -103,6 +103,22 @@ export const saveEmbeddingConfig = async ({
 
 export const clearEmbeddings = async ({ serverId }: { serverId: number }) => {
   try {
+    // Stop any running embedding job first
+    const jobServerUrl =
+      process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
+        ? process.env.JOB_SERVER_URL
+        : "http://localhost:3005";
+
+    try {
+      await fetch(`${jobServerUrl}/api/jobs/stop-embedding`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serverId }),
+      });
+    } catch {
+      // Non-critical: job might not be running
+    }
+
     // Clear all embeddings for items belonging to this server
     await db
       .update(items)
@@ -123,12 +139,6 @@ export const clearEmbeddings = async ({ serverId }: { serverId: number }) => {
     }
 
     // Clear the job server's in-memory embedding index cache
-    // This ensures the index is properly checked/recreated on next embedding generation
-    const jobServerUrl =
-      process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
-        ? process.env.JOB_SERVER_URL
-        : "http://localhost:3005";
-
     try {
       await fetch(`${jobServerUrl}/api/jobs/clear-embedding-cache`, {
         method: "POST",

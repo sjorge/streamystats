@@ -352,13 +352,29 @@ export async function generateItemEmbeddingsJob(
     .limit(1);
   const serverName = serverMeta[0]?.name ?? String(serverId);
 
-  const sendHeartbeat = () => {
+  const sendHeartbeat = async () => {
     const now = Date.now();
     if (now - lastHeartbeat > 30000) {
       console.info(
         `[embeddings] server=${serverName} serverId=${serverId} action=heartbeat processed=${totalProcessed} skipped=${totalSkipped} errors=${totalErrors}`
       );
       lastHeartbeat = now;
+
+      // Update job_results with heartbeat so UI knows job is still alive
+      await logJobResult(
+        job.id,
+        "generate-item-embeddings",
+        "processing",
+        {
+          serverId,
+          provider,
+          processed: totalProcessed,
+          skipped: totalSkipped,
+          errors: totalErrors,
+          lastHeartbeat: new Date().toISOString(),
+        },
+        Date.now() - startTime
+      );
     }
   };
 
@@ -378,7 +394,12 @@ export async function generateItemEmbeddingsJob(
       job.id,
       "generate-item-embeddings",
       "processing",
-      { serverId, provider, status: "starting" },
+      {
+        serverId,
+        provider,
+        status: "starting",
+        lastHeartbeat: new Date().toISOString(),
+      },
       0
     );
 
@@ -464,7 +485,7 @@ export async function generateItemEmbeddingsJob(
         break;
       }
 
-      sendHeartbeat();
+      await sendHeartbeat();
 
       // Process the batch
       if (provider === "openai-compatible" && openaiClient) {
