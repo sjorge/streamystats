@@ -292,8 +292,35 @@ export interface ParsedActivityName {
 }
 
 /**
+ * Centralized delimiters for activity name parsing.
+ * Keeps patterns in one place to simplify maintenance if Jellyfin changes wording.
+ */
+const ACTIVITY_DELIMITERS = {
+  playback: {
+    device: " on ",
+    action: " is playing ",
+  },
+  playbackStopped: {
+    device: " on ",
+    action: " has finished playing ",
+  },
+  sessionStarted: {
+    client: " from ",
+    action: " is online",
+  },
+  sessionEnded: {
+    client: " from ",
+    action: " has disconnected",
+  },
+  auth: {
+    action: " successfully authenticated",
+  },
+} as const;
+
+/**
  * Parse structured fields from activity name based on type.
  * Uses lastIndexOf to handle edge cases (e.g., titles containing " on ").
+ * Delimiter lengths are derived from constants to avoid magic numbers.
  *
  * Patterns:
  *   VideoPlayback:        "[user] is playing [title] on [device]"
@@ -313,63 +340,86 @@ export function parseActivityName(
     sessionClient: null,
   };
 
-  if (!activityName) return result;
+  if (!activityName || !activityType) return result;
 
-  // Playback events: extract device after last " on "
-  if (
-    activityType === "VideoPlayback" ||
-    activityType === "VideoPlaybackStopped"
-  ) {
-    const onIndex = activityName.lastIndexOf(" on ");
-    if (onIndex !== -1) {
-      result.playbackDevice = activityName.slice(onIndex + 4).trim() || null;
+  // VideoPlayback: "[user] is playing [title] on [device]"
+  if (activityType === "VideoPlayback") {
+    const { device, action } = ACTIVITY_DELIMITERS.playback;
+    const deviceIndex = activityName.lastIndexOf(device);
+    if (deviceIndex === -1) return result;
 
-      // Parse user and title from the prefix
-      const prefix = activityName.slice(0, onIndex);
-      if (activityType === "VideoPlayback") {
-        const playingIndex = prefix.indexOf(" is playing ");
-        if (playingIndex !== -1) {
-          result.userName = prefix.slice(0, playingIndex).trim() || null;
-          result.mediaTitle = prefix.slice(playingIndex + 12).trim() || null;
-        }
-      } else {
-        const finishedIndex = prefix.indexOf(" has finished playing ");
-        if (finishedIndex !== -1) {
-          result.userName = prefix.slice(0, finishedIndex).trim() || null;
-          result.mediaTitle = prefix.slice(finishedIndex + 22).trim() || null;
-        }
-      }
+    result.playbackDevice =
+      activityName.slice(deviceIndex + device.length).trim() || null;
+
+    const prefix = activityName.slice(0, deviceIndex);
+    const actionIndex = prefix.indexOf(action);
+    if (actionIndex !== -1) {
+      result.userName = prefix.slice(0, actionIndex).trim() || null;
+      result.mediaTitle =
+        prefix.slice(actionIndex + action.length).trim() || null;
     }
     return result;
   }
 
-  // Session events: extract client after " from "
-  if (activityType === "SessionStarted" || activityType === "SessionEnded") {
-    const fromIndex = activityName.lastIndexOf(" from ");
-    if (fromIndex !== -1) {
-      result.sessionClient = activityName.slice(fromIndex + 6).trim() || null;
+  // VideoPlaybackStopped: "[user] has finished playing [title] on [device]"
+  if (activityType === "VideoPlaybackStopped") {
+    const { device, action } = ACTIVITY_DELIMITERS.playbackStopped;
+    const deviceIndex = activityName.lastIndexOf(device);
+    if (deviceIndex === -1) return result;
 
-      const prefix = activityName.slice(0, fromIndex);
-      if (activityType === "SessionStarted") {
-        const onlineIndex = prefix.indexOf(" is online");
-        if (onlineIndex !== -1) {
-          result.userName = prefix.slice(0, onlineIndex).trim() || null;
-        }
-      } else {
-        const disconnectedIndex = prefix.indexOf(" has disconnected");
-        if (disconnectedIndex !== -1) {
-          result.userName = prefix.slice(0, disconnectedIndex).trim() || null;
-        }
-      }
+    result.playbackDevice =
+      activityName.slice(deviceIndex + device.length).trim() || null;
+
+    const prefix = activityName.slice(0, deviceIndex);
+    const actionIndex = prefix.indexOf(action);
+    if (actionIndex !== -1) {
+      result.userName = prefix.slice(0, actionIndex).trim() || null;
+      result.mediaTitle =
+        prefix.slice(actionIndex + action.length).trim() || null;
     }
     return result;
   }
 
-  // Authentication events: just extract user
+  // SessionStarted: "[user] is online from [client]"
+  if (activityType === "SessionStarted") {
+    const { client, action } = ACTIVITY_DELIMITERS.sessionStarted;
+    const clientIndex = activityName.lastIndexOf(client);
+    if (clientIndex === -1) return result;
+
+    result.sessionClient =
+      activityName.slice(clientIndex + client.length).trim() || null;
+
+    const prefix = activityName.slice(0, clientIndex);
+    const actionIndex = prefix.indexOf(action);
+    if (actionIndex !== -1) {
+      result.userName = prefix.slice(0, actionIndex).trim() || null;
+    }
+    return result;
+  }
+
+  // SessionEnded: "[user] has disconnected from [client]"
+  if (activityType === "SessionEnded") {
+    const { client, action } = ACTIVITY_DELIMITERS.sessionEnded;
+    const clientIndex = activityName.lastIndexOf(client);
+    if (clientIndex === -1) return result;
+
+    result.sessionClient =
+      activityName.slice(clientIndex + client.length).trim() || null;
+
+    const prefix = activityName.slice(0, clientIndex);
+    const actionIndex = prefix.indexOf(action);
+    if (actionIndex !== -1) {
+      result.userName = prefix.slice(0, actionIndex).trim() || null;
+    }
+    return result;
+  }
+
+  // AuthenticationSucceeded: "[user] successfully authenticated"
   if (activityType === "AuthenticationSucceeded") {
-    const authIndex = activityName.indexOf(" successfully authenticated");
-    if (authIndex !== -1) {
-      result.userName = activityName.slice(0, authIndex).trim() || null;
+    const { action } = ACTIVITY_DELIMITERS.auth;
+    const actionIndex = activityName.indexOf(action);
+    if (actionIndex !== -1) {
+      result.userName = activityName.slice(0, actionIndex).trim() || null;
     }
     return result;
   }
