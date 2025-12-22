@@ -1,16 +1,16 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
   "files": {
-    "experimentalScannerIgnores": [
-      "node_modules",
-      "**/node_modules/**",
-      ".husky",
-      ".expo",
-      ".github",
-      ".vscode",
-      "dist",
-      "server",
-      ".next"
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/.husky",
+      "!**/.expo",
+      "!**/.github",
+      "!**/.vscode",
+      "!**/dist",
+      "!**/server"
     ]
   },
   "linter": {
