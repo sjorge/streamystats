@@ -39,7 +39,7 @@ interface UserSecurityContentProps {
 
 export function UserSecurityContent({
   serverId,
-  userId,
+  userId: _userId,
   locations,
   locationHistory,
   fingerprint,

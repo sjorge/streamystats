@@ -1,12 +1,5 @@
 import type { NextRequest } from "next/server";
 
-type VersionResponse = {
-  currentVersion: string;
-  latestVersion: string;
-  hasUpdate: boolean;
-  buildTime?: number;
-};
-
 export async function GET(_req: NextRequest) {
   const currentVersion = process.env.NEXT_PUBLIC_VERSION || "latest";
   const currentSha = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7) || "";

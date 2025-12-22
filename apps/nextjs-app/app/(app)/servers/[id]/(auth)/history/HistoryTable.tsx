@@ -214,7 +214,7 @@ export function HistoryTable({
     },
     {
       accessorKey: "play_method",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button
             variant="ghost"
@@ -241,7 +241,7 @@ export function HistoryTable({
     },
     {
       accessorKey: "remote_end_point",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button
             variant="ghost"
@@ -259,7 +259,7 @@ export function HistoryTable({
     },
     {
       accessorKey: "client_name",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button
             variant="ghost"
@@ -277,7 +277,7 @@ export function HistoryTable({
     },
     {
       accessorKey: "device_name",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button
             variant="ghost"
@@ -295,7 +295,7 @@ export function HistoryTable({
     },
     {
       accessorKey: "session.createdAt",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button
             variant="ghost"

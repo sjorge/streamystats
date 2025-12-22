@@ -56,7 +56,7 @@ interface UnwatchedTableProps {
   data: UnwatchedItemsResponse;
 }
 
-export function UnwatchedTable({ server, data }: UnwatchedTableProps) {
+export function UnwatchedTable({ server: _server, data }: UnwatchedTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 

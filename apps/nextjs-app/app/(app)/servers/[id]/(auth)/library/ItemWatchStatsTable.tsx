@@ -416,8 +416,8 @@ export function ItemWatchStatsTable({
 const MemoizedTableRow = React.memo(
   ({
     row,
-    server,
-    columns,
+    server: _server,
+    columns: _columns,
   }: {
     row: Row<ItemWatchStats>;
     server: Server;

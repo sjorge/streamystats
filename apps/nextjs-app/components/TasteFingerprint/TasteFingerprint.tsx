@@ -404,6 +404,8 @@ export function TasteFingerprint({
   return (
     <div className="flex flex-col items-center gap-4">
       <div
+        role="img"
+        aria-label="Taste fingerprint visualization"
         className="relative rounded-2xl overflow-hidden shadow-2xl"
         style={{ backgroundColor: "#0A0A0A" }}
         onMouseEnter={handleMouseEnter}

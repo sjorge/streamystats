@@ -18,7 +18,7 @@ interface CustomValueLabelProps extends CustomBarLabelProps {
 }
 
 // Minimum width for label to fit inside the bar
-const _MIN_WIDTH_FOR_INSIDE = 40;
+const MIN_WIDTH_FOR_INSIDE = 40;
 const PADDING = 8;
 
 export const CustomBarLabel: React.FC<CustomBarLabelProps> = ({

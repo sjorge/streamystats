@@ -13,6 +13,7 @@ import {
   Sparkles,
   Tv,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -90,13 +91,15 @@ function ItemCard({ item, serverId, serverUrl }: ItemCardProps) {
       href={`/servers/${serverId}/library/${item.id}`}
       className="inline-flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border hover:bg-accent transition-colors group max-w-xs"
     >
-      <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-muted">
+      <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-muted relative">
         {imageUrl && !imageError ? (
-          <img
+          <Image
             src={imageUrl}
             alt={item.name}
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
             onError={() => setImageError(true)}
+            unoptimized
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -150,7 +153,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
     [serverId],
   );
 
-  const { messages, sendMessage, addToolOutput, status, error } = useChat({
+  const { messages, sendMessage, status, error } = useChat({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   });

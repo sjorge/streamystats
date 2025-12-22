@@ -166,7 +166,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   const {
     data: progress,
     error,
-    isLoading,
+    isLoading: _isLoading,
     refetch,
   } = useQuery<EmbeddingProgress>({
     queryKey: ["embedding-progress", server.id],

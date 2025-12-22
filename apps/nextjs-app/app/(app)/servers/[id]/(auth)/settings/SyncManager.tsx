@@ -18,7 +18,10 @@ interface SyncManagerProps {
   serverName: string;
 }
 
-export function SyncManager({ serverId, serverName }: SyncManagerProps) {
+export function SyncManager({
+  serverId,
+  serverName: _serverName,
+}: SyncManagerProps) {
   const [isTriggering, setIsTriggering] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<{
     success: boolean;

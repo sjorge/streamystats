@@ -318,7 +318,7 @@ export function SeasonalRecommendations({
             <ScrollArea dir="ltr" className="w-full py-1">
               <div className="flex gap-4 flex-nowrap px-4 w-max">
                 {items.map((recommendation) => {
-                  const { item, matchReason } = recommendation;
+                  const { item } = recommendation;
 
                   return (
                     <div

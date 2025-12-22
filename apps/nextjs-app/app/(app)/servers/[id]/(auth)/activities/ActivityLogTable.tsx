@@ -109,7 +109,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
   const columns: ColumnDef<Activity>[] = [
     {
       accessorKey: "name",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button variant="ghost" onClick={() => handleSortChange("name")}>
             Name
@@ -141,7 +141,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
     },
     {
       accessorKey: "type",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button variant="ghost" onClick={() => handleSortChange("type")}>
             Type
@@ -153,7 +153,7 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
     },
     {
       accessorKey: "date",
-      header: ({ column }) => {
+      header: () => {
         return (
           <Button variant="ghost" onClick={() => handleSortChange("date")}>
             Date
