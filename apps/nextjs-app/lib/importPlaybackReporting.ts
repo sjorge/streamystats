@@ -10,7 +10,17 @@ import {
 } from "@streamystats/database/schema";
 import { eq } from "drizzle-orm";
 
-// Types for import state
+// =============================================================================
+// Constants
+// =============================================================================
+
+const INT32_MIN = -2147483648;
+const HEX32 = /^[0-9a-f]{32}$/i;
+
+// =============================================================================
+// Types
+// =============================================================================
+
 export interface ImportState {
   type: "success" | "error" | "info" | null;
   message: string;
@@ -19,9 +29,42 @@ export interface ImportState {
   errorCount?: number;
 }
 
-// Interface for Playback Reporting TSV data
+export type ItemType = "Movie" | "Episode" | (string & {});
+export type PlayMode = "DirectPlay" | "DirectStream" | "Transcode" | "Other";
+export type PositionKind = "seconds" | "milliseconds" | "invalid";
+
+export interface PlayMethodParsed {
+  mode: PlayMode;
+  video?: string;
+  audio?: string;
+}
+
+export interface PlaybackRow {
+  timestampRaw: string;
+  timestampMs?: number;
+  userId: string;
+  itemId: string;
+  itemType: ItemType;
+  itemName: string;
+  itemNameRaw: string;
+  playMethodRaw: string;
+  play: PlayMethodParsed;
+  client: string;
+  deviceName: string;
+  positionSeconds?: number;
+  positionSecondsRaw: number;
+  positionKind: PositionKind;
+}
+
+export interface EpisodeInfo {
+  seriesName: string | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+}
+
+// Internal interface for DB mapping (kept for compatibility)
 interface PlaybackReportingData {
-  timestamp: string; // Only timestamp is required
+  timestamp: string;
   userId?: string;
   itemId?: string;
   itemType?: string;
@@ -32,7 +75,242 @@ interface PlaybackReportingData {
   durationSeconds?: number;
 }
 
-// Helper to get a value from multiple possible keys, returning undefined if none found
+// =============================================================================
+// Pure Parsing Functions
+// =============================================================================
+
+/**
+ * Parse .NET-style timestamp with variable fractional precision (0-7 digits).
+ * Format: "YYYY-MM-DD HH:mm:ss.fffffff"
+ * Returns milliseconds since epoch or undefined if invalid.
+ */
+export function parseDotNetTimestamp(raw: string): number | undefined {
+  const s = raw.trim();
+  const spaceIdx = s.indexOf(" ");
+  if (spaceIdx < 0) return undefined;
+
+  const datePart = s.slice(0, spaceIdx);
+  const timePart = s.slice(spaceIdx + 1);
+
+  const dateParts = datePart.split("-");
+  if (dateParts.length !== 3) return undefined;
+
+  const year = Number(dateParts[0]);
+  const month = Number(dateParts[1]);
+  const day = Number(dateParts[2]);
+
+  const [timeOnly, frac] = timePart.split(".");
+  const timeParts = timeOnly.split(":");
+  if (timeParts.length !== 3) return undefined;
+
+  const hours = Number(timeParts[0]);
+  const minutes = Number(timeParts[1]);
+  const seconds = Number(timeParts[2]);
+
+  // Convert fractional part to milliseconds (pad/truncate to 3 digits)
+  const fracStr = (frac ?? "").trim();
+  const msStr = (fracStr + "000").slice(0, 3);
+  const ms = Number(msStr);
+
+  const dt = new Date(year, month - 1, day, hours, minutes, seconds, ms);
+  const result = dt.getTime();
+  return Number.isFinite(result) ? result : undefined;
+}
+
+/**
+ * Parse play method string into structured object.
+ * Handles: "DirectPlay", "DirectStream", "Transcode (v:h264 a:eac3)", "Transcode (v:direct a:aac)"
+ */
+export function parsePlayMethod(raw: string): PlayMethodParsed {
+  const s = raw.trim();
+
+  if (s === "DirectPlay") {
+    return { mode: "DirectPlay" };
+  }
+
+  if (s === "DirectStream") {
+    return { mode: "DirectStream" };
+  }
+
+  if (s.startsWith("Transcode")) {
+    const openParen = s.indexOf("(");
+    const closeParen = s.lastIndexOf(")");
+
+    if (openParen >= 0 && closeParen > openParen) {
+      const inner = s.slice(openParen + 1, closeParen);
+      const parts = inner.split(" ");
+
+      let video: string | undefined;
+      let audio: string | undefined;
+
+      for (const part of parts) {
+        if (part.startsWith("v:")) {
+          video = part.slice(2);
+        } else if (part.startsWith("a:")) {
+          audio = part.slice(2);
+        }
+      }
+
+      return { mode: "Transcode", video, audio };
+    }
+
+    return { mode: "Transcode" };
+  }
+
+  return { mode: "Other" };
+}
+
+/**
+ * Normalize position value with heuristic for ms vs seconds detection.
+ * INT32_MIN (-2147483648) is treated as invalid sentinel.
+ * Values >= 86400 (24h) are assumed to be milliseconds if resulting seconds < 6h.
+ */
+export function normalizePosition(rawNum: number): {
+  positionSeconds?: number;
+  positionKind: PositionKind;
+} {
+  if (!Number.isFinite(rawNum) || rawNum === INT32_MIN) {
+    return { positionKind: "invalid" };
+  }
+
+  // Values >= 24h in seconds likely mean milliseconds
+  if (rawNum >= 86400) {
+    const asSeconds = rawNum / 1000;
+    // Only accept if result is plausible (< 6 hours)
+    if (asSeconds > 0 && asSeconds < 21600) {
+      return { positionSeconds: asSeconds, positionKind: "milliseconds" };
+    }
+    return { positionKind: "invalid" };
+  }
+
+  return { positionSeconds: rawNum, positionKind: "seconds" };
+}
+
+/**
+ * Parse episode info from item name.
+ * Handles patterns like: "Series Name - s01e05 - Episode Title"
+ */
+export function parseEpisodeInfo(itemName: string): EpisodeInfo {
+  const result: EpisodeInfo = {
+    seriesName: null,
+    seasonNumber: null,
+    episodeNumber: null,
+  };
+
+  // Match pattern: "Series Name - sXXeYY" or "Series Name - sXXeYY - Episode Title"
+  const match = itemName.match(/^(.+?)\s*-\s*s(\d+)e(\d+)/i);
+
+  if (match) {
+    result.seriesName = match[1].trim();
+    result.seasonNumber = Number.parseInt(match[2], 10);
+    result.episodeNumber = Number.parseInt(match[3], 10);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single TSV line using end-to-front strategy.
+ * This is robust against itemName containing tabs.
+ *
+ * Expected format (9 columns):
+ * timestamp | userId | itemId | itemType | itemName | playMethod | client | deviceName | position
+ */
+export function parseTsvLine(line: string): PlaybackRow | null {
+  const trimmed = line.trimEnd();
+  if (!trimmed) return null;
+
+  const parts = trimmed.split("\t");
+  if (parts.length < 9) return null;
+
+  // Parse from the end (robust if itemName contains tabs)
+  const positionStr = parts[parts.length - 1]!.trim();
+  const deviceName = parts[parts.length - 2]!.trim();
+  const client = parts[parts.length - 3]!.trim();
+  const playMethodRaw = parts[parts.length - 4]!.trim();
+
+  // Fixed fields from the start
+  const timestampRaw = parts[0]!.trim();
+  const userId = parts[1]!.trim();
+  const itemId = parts[2]!.trim();
+  const itemType = parts[3]!.trim() as ItemType;
+
+  // Middle becomes itemName (handles tabs in title)
+  const nameParts: string[] = [];
+  for (let i = 4; i <= parts.length - 5; i++) {
+    nameParts.push(parts[i]!);
+  }
+  const itemNameRaw = nameParts.join("\t");
+  const itemName = itemNameRaw.trim();
+
+  // Parse position
+  const positionSecondsRaw = Number(positionStr);
+  const { positionSeconds, positionKind } = normalizePosition(
+    Number.isFinite(positionSecondsRaw) ? positionSecondsRaw : INT32_MIN,
+  );
+
+  return {
+    timestampRaw,
+    timestampMs: parseDotNetTimestamp(timestampRaw),
+    userId,
+    itemId,
+    itemType,
+    itemName,
+    itemNameRaw,
+    playMethodRaw,
+    play: parsePlayMethod(playMethodRaw),
+    client,
+    deviceName,
+    positionSeconds,
+    positionSecondsRaw: Number.isFinite(positionSecondsRaw)
+      ? positionSecondsRaw
+      : 0,
+    positionKind,
+  };
+}
+
+/**
+ * Validate hex32 format for userId/itemId
+ */
+export function isValidHex32(value: string): boolean {
+  return HEX32.test(value);
+}
+
+// =============================================================================
+// TSV Parsing
+// =============================================================================
+
+function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
+  const lines = text.split("\n");
+  const data: PlaybackReportingData[] = [];
+
+  for (const line of lines) {
+    const row = parseTsvLine(line);
+    if (!row) continue;
+
+    // Skip rows with invalid position (INT32_MIN sentinel)
+    if (row.positionKind === "invalid") continue;
+
+    data.push({
+      timestamp: row.timestampRaw,
+      userId: row.userId,
+      itemId: row.itemId,
+      itemType: row.itemType,
+      itemName: row.itemName,
+      playMethod: row.playMethodRaw,
+      clientName: row.client,
+      deviceName: row.deviceName,
+      durationSeconds: row.positionSeconds,
+    });
+  }
+
+  return data;
+}
+
+// =============================================================================
+// JSON Parsing
+// =============================================================================
+
 function getValue(
   record: Record<string, unknown>,
   ...keys: string[]
@@ -46,7 +324,6 @@ function getValue(
   return undefined;
 }
 
-// Helper to build PlaybackReportingData with only defined properties
 function buildPlaybackData(
   timestamp: string,
   record: Record<string, unknown>,
@@ -87,373 +364,39 @@ function buildPlaybackData(
   return data;
 }
 
-export async function importFromPlaybackReporting(
-  prevState: ImportState,
-  formData: FormData,
-): Promise<ImportState> {
-  console.info("Starting Playback Reporting import process");
-
-  // Internal validation function
-  function validatePlaybackReportingData(data: PlaybackReportingData[]): {
-    isValid: boolean;
-    error?: string;
-  } {
-    console.info(
-      `Validating playback reporting data with ${data.length} records`,
-    );
-
-    if (!Array.isArray(data)) {
-      const error = "Data must be an array";
-      console.error(`Validation failed: ${error}`);
-      return { isValid: false, error };
-    }
-
-    if (data.length === 0) {
-      const error = "Data array is empty";
-      console.error(`Validation failed: ${error}`);
-      return { isValid: false, error };
-    }
-
-    // Check first few items for required fields - only timestamp is truly required
-    const sampleSize = Math.min(5, data.length);
-    const requiredFields: (keyof PlaybackReportingData)[] = [
-      "timestamp", // Only timestamp is required
-    ];
-
-    console.info(
-      `Validating sample of ${sampleSize} records for required fields: ${requiredFields.join(
-        ", ",
-      )}`,
-    );
-
-    for (let i = 0; i < sampleSize; i++) {
-      const session = data[i];
-
-      if (typeof session !== "object" || session === null) {
-        const error = `Invalid session object at index ${i}`;
-        console.error(`Validation failed: ${error}`, { session });
-        return {
-          isValid: false,
-          error,
-        };
-      }
-
-      for (const field of requiredFields) {
-        if (!session[field] && session[field] !== 0) {
-          const error = `Missing required field "${field}" in session at index ${i}`;
-          console.error(`Validation failed: ${error}`, { session });
-          return {
-            isValid: false,
-            error,
-          };
-        }
-      }
-
-      // Validate timestamp
-      if (session.timestamp && Number.isNaN(Date.parse(session.timestamp))) {
-        const error = `Invalid timestamp format at index ${i}: ${session.timestamp}`;
-        console.error(`Validation failed: ${error}`, { session });
-        return {
-          isValid: false,
-          error,
-        };
-      }
-
-      // Validate duration is a valid number if present
-      if (
-        session.durationSeconds !== undefined &&
-        session.durationSeconds !== null &&
-        (typeof session.durationSeconds !== "number" ||
-          Number.isNaN(session.durationSeconds))
-      ) {
-        const error = `Invalid duration format at index ${i}: ${session.durationSeconds}`;
-        console.error(`Validation failed: ${error}`, { session });
-        return {
-          isValid: false,
-          error,
-        };
-      }
-    }
-
-    console.info("Data validation completed successfully");
-    return { isValid: true };
-  }
-
-  try {
-    const serverId = formData.get("serverId");
-    const file = formData.get("file") as File;
-
-    console.info("Processing import request", {
-      serverId,
-      fileName: file?.name,
-      fileSize: file?.size,
-      fileType: file?.type,
-    });
-
-    if (!serverId || !file) {
-      const error = "Server ID and file are required";
-      console.error(`Import failed: ${error}`, {
-        serverId: !!serverId,
-        file: !!file,
-      });
-      return {
-        type: "error",
-        message: error,
-      };
-    }
-
-    const serverIdNum = Number(serverId);
-    if (Number.isNaN(serverIdNum)) {
-      const error = "Invalid server ID";
-      console.error(`Import failed: ${error}`, { serverId });
-      return {
-        type: "error",
-        message: error,
-      };
-    }
-
-    console.info(`Reading file content for server ${serverIdNum}`);
-    const text = await file.text();
-    let data: PlaybackReportingData[];
-
-    // Check if file is JSON or TSV format
-    const isJson =
-      file.name.endsWith(".json") || file.type === "application/json";
-
-    console.info(`Detected file format: ${isJson ? "JSON" : "TSV"}`);
-
-    try {
-      if (isJson) {
-        // Parse JSON format
-        console.info("Parsing JSON format");
-        const jsonData = JSON.parse(text);
-        data = parsePlaybackReportingJson(jsonData);
-      } else {
-        // Parse TSV format
-        console.info("Parsing TSV format");
-        data = parsePlaybackReportingTsv(text);
-      }
-
-      console.info(`Successfully parsed ${data.length} records from file`);
-    } catch (error) {
-      const errorMessage = `Failed to parse file: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`;
-      console.error(errorMessage, {
-        error,
-        fileName: file.name,
-        fileType: file.type,
-        isJson,
-      });
-      return {
-        type: "error",
-        message: errorMessage,
-      };
-    }
-
-    // Validate data format
-    const validationResult = validatePlaybackReportingData(data);
-    if (!validationResult.isValid) {
-      const error = validationResult.error || "Invalid data format";
-      console.error(`Data validation failed: ${error}`);
-      return {
-        type: "error",
-        message: error,
-      };
-    }
-
-    // Process import
-    console.info(
-      `Starting import of ${data.length} sessions for server ${serverIdNum}`,
-    );
-    let importedCount = 0;
-    const totalCount = data.length;
-    let errorCount = 0;
-
-    for (let i = 0; i < data.length; i++) {
-      const playbackData = data[i];
-      try {
-        const imported = await importPlaybackReportingSession(
-          playbackData,
-          serverIdNum,
-        );
-        if (imported) {
-          importedCount++;
-          if (importedCount % 100 === 0) {
-            console.info(
-              `Import progress: ${importedCount}/${totalCount} sessions imported`,
-            );
-          }
-        } else {
-          console.warn(`Session ${i + 1} was skipped during import`, {
-            playbackData,
-          });
-        }
-      } catch (error) {
-        errorCount++;
-        console.error(`Failed to import session ${i + 1}:`, {
-          error: error instanceof Error ? error.message : "Unknown error",
-          playbackData,
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        // Continue with other sessions
-      }
-    }
-
-    const successMessage = `Successfully imported ${importedCount} of ${totalCount} sessions from Playback Reporting`;
-    console.info(successMessage, {
-      importedCount,
-      totalCount,
-      errorCount,
-      successRate: Math.round((importedCount / totalCount) * 100),
-    });
-
-    return {
-      type: "success",
-      message: successMessage,
-      importedCount: importedCount,
-      totalCount: totalCount,
-      errorCount: errorCount,
-    };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Import failed";
-    console.error("Playback Reporting import failed with unexpected error:", {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    return {
-      type: "error",
-      message: errorMessage,
-    };
-  }
-}
-
-function parsePlaybackReportingTsv(text: string): PlaybackReportingData[] {
-  console.info("Starting TSV parsing");
-  const lines = text.split("\n").filter((line) => line.trim());
-  const data: PlaybackReportingData[] = [];
-  let skippedLines = 0;
-
-  console.info(`Processing ${lines.length} lines from TSV file`);
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const columns = line.split("\t");
-
-    // Expected format: timestamp, userId, itemId, itemType, itemName, playMethod, clientName, deviceName, durationSeconds
-    if (columns.length < 9) {
-      skippedLines++;
-      console.warn(
-        `Skipping line ${i + 1}: insufficient columns (${columns.length}/9)`,
-        { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
-      );
-      continue;
-    }
-
-    try {
-      const [
-        timestamp,
-        userId,
-        itemId,
-        itemType,
-        itemName,
-        playMethod,
-        clientName,
-        deviceName,
-        durationSecondsStr,
-      ] = columns;
-
-      const parsedDuration = Number.parseInt(durationSecondsStr, 10);
-      if (Number.isNaN(parsedDuration) || parsedDuration < 0) {
-        skippedLines++;
-        console.warn(
-          `Skipping line ${i + 1}: invalid duration "${durationSecondsStr}"`,
-          { line: line.substring(0, 100) + (line.length > 100 ? "..." : "") },
-        );
-        continue;
-      }
-
-      const record: Record<string, unknown> = {
-        userId,
-        itemId,
-        itemType,
-        itemName,
-        playMethod,
-        clientName,
-        deviceName,
-      };
-
-      data.push(buildPlaybackData(timestamp.trim(), record, parsedDuration));
-    } catch (error) {
-      skippedLines++;
-      console.warn(`Error parsing line ${i + 1}:`, {
-        error: error instanceof Error ? error.message : "Unknown error",
-        line: line.substring(0, 100) + (line.length > 100 ? "..." : ""),
-      });
-    }
-  }
-
-  console.info(
-    `TSV parsing completed: ${data.length} valid records, ${skippedLines} skipped lines`,
-  );
-  return data;
-}
-
 function parsePlaybackReportingJson(
   jsonData: unknown,
 ): PlaybackReportingData[] {
-  console.info("Starting JSON parsing", {
-    dataType: typeof jsonData,
-    isArray: Array.isArray(jsonData),
-  });
-
-  // Handle different JSON formats that might come from Playback Reporting
   if (Array.isArray(jsonData)) {
-    console.info(`Processing JSON array with ${jsonData.length} items`);
     return jsonData
-      .map((item: unknown, index) => {
+      .map((item: unknown) => {
         if (typeof item !== "object" || item === null) {
-          throw new Error(`Invalid item at index ${index}: not an object`);
+          return null;
         }
 
         const record = item as Record<string, unknown>;
-        try {
-          const timestamp =
-            getValue(record, "timestamp", "date", "time") ||
-            new Date().toISOString();
+        const timestamp =
+          getValue(record, "timestamp", "date", "time") ||
+          new Date().toISOString();
 
-          const durationValue =
-            getValue(
-              record,
-              "durationSeconds",
-              "duration_seconds",
-              "Duration",
-            ) || "0";
-          const parsedDuration = Number.parseInt(durationValue, 10);
+        const durationValue =
+          getValue(
+            record,
+            "durationSeconds",
+            "duration_seconds",
+            "Duration",
+          ) || "0";
+        const parsedDuration = Number.parseInt(durationValue, 10);
 
-          if (Number.isNaN(parsedDuration) || parsedDuration < 0) {
-            console.warn(
-              `Skipping JSON item at index ${index}: invalid duration "${parsedDuration}"`,
-            );
-            return null;
-          }
-
-          return buildPlaybackData(timestamp, record, parsedDuration);
-        } catch (error) {
-          console.error(`Error parsing JSON item at index ${index}:`, {
-            error: error instanceof Error ? error.message : "Unknown error",
-            item,
-          });
-          throw error;
+        if (Number.isNaN(parsedDuration) || parsedDuration < 0) {
+          return null;
         }
+
+        return buildPlaybackData(timestamp, record, parsedDuration);
       })
       .filter((item): item is PlaybackReportingData => item !== null);
   }
 
-  // If it's not an array, try to extract from a nested structure
   if (
     typeof jsonData === "object" &&
     jsonData !== null &&
@@ -461,345 +404,309 @@ function parsePlaybackReportingJson(
   ) {
     const obj = jsonData as Record<string, unknown>;
     if (obj.sessions || obj.data) {
-      console.info("Found nested data structure, extracting sessions/data");
       return parsePlaybackReportingJson(obj.sessions || obj.data);
     }
   }
 
-  console.error("Unrecognized JSON format", {
-    jsonData:
-      typeof jsonData === "object" &&
-      jsonData !== null &&
-      !Array.isArray(jsonData)
-        ? Object.keys(jsonData)
-        : jsonData,
-  });
   throw new Error("Unrecognized JSON format");
 }
+
+// =============================================================================
+// Validation
+// =============================================================================
+
+function validatePlaybackReportingData(data: PlaybackReportingData[]): {
+  isValid: boolean;
+  error?: string;
+} {
+  if (!Array.isArray(data)) {
+    return { isValid: false, error: "Data must be an array" };
+  }
+
+  if (data.length === 0) {
+    return { isValid: false, error: "Data array is empty" };
+  }
+
+  const sampleSize = Math.min(5, data.length);
+
+  for (let i = 0; i < sampleSize; i++) {
+    const session = data[i];
+
+    if (typeof session !== "object" || session === null) {
+      return { isValid: false, error: `Invalid session object at index ${i}` };
+    }
+
+    if (!session.timestamp) {
+      return {
+        isValid: false,
+        error: `Missing required field "timestamp" in session at index ${i}`,
+      };
+    }
+
+    // Use our custom timestamp parser for validation
+    const parsed = parseDotNetTimestamp(session.timestamp);
+    if (parsed === undefined && Number.isNaN(Date.parse(session.timestamp))) {
+      return {
+        isValid: false,
+        error: `Invalid timestamp format at index ${i}: ${session.timestamp}`,
+      };
+    }
+  }
+
+  return { isValid: true };
+}
+
+// =============================================================================
+// Main Import Function
+// =============================================================================
+
+export async function importFromPlaybackReporting(
+  prevState: ImportState,
+  formData: FormData,
+): Promise<ImportState> {
+  try {
+    const serverId = formData.get("serverId");
+    const file = formData.get("file") as File;
+
+    if (!serverId || !file) {
+      return {
+        type: "error",
+        message: "Server ID and file are required",
+      };
+    }
+
+    const serverIdNum = Number(serverId);
+    if (Number.isNaN(serverIdNum)) {
+      return {
+        type: "error",
+        message: "Invalid server ID",
+      };
+    }
+
+    const text = await file.text();
+    let data: PlaybackReportingData[];
+
+    const isJson =
+      file.name.endsWith(".json") || file.type === "application/json";
+
+    try {
+      data = isJson
+        ? parsePlaybackReportingJson(JSON.parse(text))
+        : parsePlaybackReportingTsv(text);
+    } catch (error) {
+      return {
+        type: "error",
+        message: `Failed to parse file: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      };
+    }
+
+    const validationResult = validatePlaybackReportingData(data);
+    if (!validationResult.isValid) {
+      return {
+        type: "error",
+        message: validationResult.error || "Invalid data format",
+      };
+    }
+
+    let importedCount = 0;
+    const totalCount = data.length;
+    let errorCount = 0;
+
+    for (const playbackData of data) {
+      try {
+        const imported = await importPlaybackReportingSession(
+          playbackData,
+          serverIdNum,
+        );
+        if (imported) {
+          importedCount++;
+        }
+      } catch {
+        errorCount++;
+      }
+    }
+
+    return {
+      type: "success",
+      message: `Successfully imported ${importedCount} of ${totalCount} sessions from Playback Reporting`,
+      importedCount,
+      totalCount,
+      errorCount,
+    };
+  } catch (error) {
+    return {
+      type: "error",
+      message: error instanceof Error ? error.message : "Import failed",
+    };
+  }
+}
+
+// =============================================================================
+// Session Import
+// =============================================================================
 
 async function importPlaybackReportingSession(
   playbackData: PlaybackReportingData,
   serverId: number,
 ): Promise<boolean> {
-  // Only validate timestamp as required - allow missing users or items
   if (!playbackData.timestamp) {
-    console.warn("Skipping session: missing timestamp", { playbackData });
     return false;
   }
 
-  // Skip sessions with negative duration
-  if (
-    playbackData.durationSeconds !== undefined &&
-    playbackData.durationSeconds < 0
-  ) {
-    console.warn("Skipping session: negative duration", { playbackData });
-    return false;
-  }
-
-  // Parse timestamp
+  // Parse timestamp using our custom parser first, fallback to Date
   let sessionTime: Date;
-  try {
+  const parsedMs = parseDotNetTimestamp(playbackData.timestamp);
+  if (parsedMs !== undefined) {
+    sessionTime = new Date(parsedMs);
+  } else {
     sessionTime = new Date(playbackData.timestamp);
     if (Number.isNaN(sessionTime.getTime())) {
-      throw new Error("Invalid date");
+      return false;
     }
-  } catch (error) {
-    console.warn(
-      `Skipping session: invalid timestamp "${playbackData.timestamp}"`,
-      { playbackData, error },
-    );
+  }
+
+  // Skip sessions with no duration or invalid duration
+  if (
+    playbackData.durationSeconds === undefined ||
+    playbackData.durationSeconds <= 0
+  ) {
     return false;
   }
 
-  try {
-    // Check if referenced entities exist in the database and handle missing references
-    let finalItemId = playbackData.itemId || null;
-    let finalUserId = playbackData.userId || null;
-    let userName = "Unknown User"; // Default fallback
-    const missingReferences: string[] = [];
+  let finalItemId = playbackData.itemId || null;
+  let finalUserId = playbackData.userId || null;
+  let userName = "Unknown User";
+  const missingReferences: string[] = [];
 
-    // Check if itemId exists in items table
-    if (playbackData.itemId) {
-      try {
-        const existingItem = await db
-          .select({ id: items.id })
-          .from(items)
-          .where(eq(items.id, playbackData.itemId))
-          .limit(1);
+  // Check if itemId exists
+  if (playbackData.itemId) {
+    try {
+      const existingItem = await db
+        .select({ id: items.id })
+        .from(items)
+        .where(eq(items.id, playbackData.itemId))
+        .limit(1);
 
-        if (existingItem.length === 0) {
-          missingReferences.push(
-            `itemId '${playbackData.itemId}' not found in items table - setting to null`,
-          );
-          finalItemId = null; // Set to null instead of failing
-          console.warn("Item reference not found, setting to null:", {
-            missingItemId: playbackData.itemId,
-            itemName: playbackData.itemName,
-            itemType: playbackData.itemType,
-          });
-        }
-      } catch (error) {
-        console.error("Error checking itemId existence:", {
-          itemId: playbackData.itemId,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-        missingReferences.push(
-          `Failed to verify itemId '${playbackData.itemId}', setting to null: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-        );
-        finalItemId = null; // Set to null on error
+      if (existingItem.length === 0) {
+        missingReferences.push(`itemId '${playbackData.itemId}' not found`);
+        finalItemId = null;
       }
+    } catch {
+      finalItemId = null;
     }
-
-    // Check if userId exists in users table and fetch the user name
-    if (playbackData.userId) {
-      try {
-        const existingUser = await db
-          .select({ id: users.id, name: users.name })
-          .from(users)
-          .where(eq(users.id, playbackData.userId))
-          .limit(1);
-
-        if (existingUser.length === 0) {
-          missingReferences.push(
-            `userId '${playbackData.userId}' not found in users table - setting to null`,
-          );
-          finalUserId = null; // Set to null instead of failing
-          console.warn("User reference not found, setting to null:", {
-            missingUserId: playbackData.userId,
-          });
-        } else {
-          // User exists, use their actual name
-          userName = existingUser[0].name;
-          console.debug("Found user name for playback reporting session:", {
-            userId: playbackData.userId,
-            userName: userName,
-          });
-        }
-      } catch (error) {
-        console.error("Error checking userId existence:", {
-          userId: playbackData.userId,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-        missingReferences.push(
-          `Failed to verify userId '${playbackData.userId}', setting to null: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-        );
-        finalUserId = null; // Set to null on error
-      }
-    }
-
-    // Log missing references but continue with the import
-    if (missingReferences.length > 0) {
-      console.info("Handling missing foreign key references:", {
-        originalItemId: playbackData.itemId,
-        originalUserId: playbackData.userId,
-        finalItemId,
-        finalUserId,
-        missingReferences,
-        itemName: playbackData.itemName,
-        timestamp: playbackData.timestamp,
-      });
-    }
-
-    // Calculate end time based on duration
-    const endTime = new Date(
-      sessionTime.getTime() + (playbackData.durationSeconds || 0) * 1000,
-    );
-
-    // Determine if transcoding based on play method
-    const playMethod = playbackData.playMethod?.toLowerCase();
-    const isTranscoded = playMethod?.includes("transcode") ?? false;
-
-    let videoCodec = null;
-    let audioCodec = null;
-    if (isTranscoded && playMethod) {
-      const videoCodecIdx = playMethod.indexOf("v:");
-      if (videoCodecIdx !== -1) {
-        videoCodec = playMethod.substring(
-          videoCodecIdx + 2, // Skip "v:"
-          playMethod.indexOf(" ", videoCodecIdx),
-        );
-      }
-      const audioCodecIdx = playMethod.indexOf("a:");
-      if (audioCodecIdx !== -1) {
-        audioCodec = playMethod.substring(
-          audioCodecIdx + 2, // Skip "a:"
-          playMethod.indexOf(")", audioCodecIdx),
-        );
-      }
-    }
-    const isVideoDirect = videoCodec === "direct";
-    const isAudioDirect = audioCodec === "direct";
-
-    // Extract series information from item name if it's an episode
-    let seriesName: string | null = null;
-    let seasonInfo: string | null = null;
-    if (
-      playbackData.itemType?.toLowerCase() === "episode" &&
-      playbackData.itemName
-    ) {
-      // Try to extract series name from patterns like "Series Name - s01e01 - Episode Title"
-      const seriesMatch = playbackData.itemName.match(/^(.+?)\s*-\s*s\d+e\d+/i);
-      if (seriesMatch) {
-        seriesName = seriesMatch[1].trim();
-      }
-
-      // Extract season info
-      const seasonMatch = playbackData.itemName.match(/s(\d+)e\d+/i);
-      if (seasonMatch) {
-        seasonInfo = `Season ${seasonMatch[1]}`;
-      }
-    }
-
-    // Generate a unique session ID
-    const sessionId = randomUUID();
-
-    // Convert play duration to position ticks (assuming full playback)
-    // Jellyfin uses 10,000,000 ticks per second
-    const runtimeTicks = (playbackData.durationSeconds || 0) * 10000000;
-    const positionTicks = runtimeTicks; // Assume full playback for completed sessions
-
-    // Create session data - use the validated/nullified itemId and userId
-    const sessionData: NewSession = {
-      id: sessionId,
-      serverId: serverId,
-      userId: finalUserId, // Use the validated userId (could be null)
-      itemId: finalItemId, // Use the validated itemId (could be null)
-      userName: userName, // Fetched from users table or "Unknown User" as fallback
-      userServerId: finalUserId, // Use the same validated userId
-
-      // Item information
-      itemName: playbackData.itemName || "Unknown Item",
-      seriesName: seriesName,
-
-      // Device information
-      clientName: playbackData.clientName || "Unknown Client",
-      deviceName: playbackData.deviceName || "Unknown Device",
-
-      // Playback information
-      playMethod: playbackData.playMethod || "Unknown",
-      playDuration: playbackData.durationSeconds || 0,
-
-      // Timing information
-      startTime: sessionTime,
-      endTime: endTime,
-      lastActivityDate: endTime,
-
-      // Playback position
-      runtimeTicks: runtimeTicks,
-      positionTicks: positionTicks,
-      percentComplete: playbackData.durationSeconds ? 100 : 0, // Assume completed sessions if duration exists
-
-      // Playback state - assume completed sessions
-      completed: true,
-      isPaused: false,
-      isMuted: false,
-      isActive: false,
-
-      // Transcoding information
-      isTranscoded: isTranscoded,
-      transcodingIsVideoDirect: isVideoDirect,
-      transcodingVideoCodec: isVideoDirect ? null : videoCodec,
-      transcodingIsAudioDirect: isAudioDirect,
-      transcodingAudioCodec: isAudioDirect ? null : audioCodec,
-
-      // Store the original playback reporting data
-      rawData: {
-        source: "playback_reporting",
-        originalData: playbackData,
-        importedAt: new Date().toISOString(),
-        missingReferences:
-          missingReferences.length > 0 ? missingReferences : undefined,
-      },
-
-      // Timestamps
-      createdAt: sessionTime,
-      updatedAt: new Date(),
-
-      // Fields not available in Playback Reporting data - set to null
-      deviceId: null,
-      applicationVersion: null,
-      remoteEndPoint: null,
-      seriesId: null,
-      seasonId: null,
-      lastPlaybackCheckIn: null,
-      volumeLevel: null,
-      audioStreamIndex: null,
-      subtitleStreamIndex: null,
-      mediaSourceId: null,
-      repeatMode: null,
-      playbackOrder: null,
-      videoCodec: null,
-      audioCodec: null,
-      resolutionWidth: null,
-      resolutionHeight: null,
-      videoBitRate: null,
-      audioBitRate: null,
-      audioChannels: null,
-      audioSampleRate: null,
-      videoRangeType: null,
-      transcodingWidth: null,
-      transcodingHeight: null,
-      transcodingContainer: null,
-      transcodeReasons: null,
-    };
-
-    await db.insert(sessions).values(sessionData).onConflictDoNothing();
-
-    console.debug("Successfully imported session", {
-      sessionId,
-      itemName: playbackData.itemName,
-      originalUserId: playbackData.userId,
-      finalUserId,
-      userName,
-      originalItemId: playbackData.itemId,
-      finalItemId,
-      duration: playbackData.durationSeconds,
-      timestamp: playbackData.timestamp,
-      hadMissingReferences: missingReferences.length > 0,
-    });
-
-    return true;
-  } catch (error) {
-    // Enhanced error logging with foreign key constraint details
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    const stack = error instanceof Error ? error.stack : undefined;
-
-    console.error("Database error while importing session:", {
-      error: errorMessage,
-      stack,
-      playbackData,
-      serverId,
-      foreignKeyAnalysis: {
-        itemId: playbackData.itemId,
-        userId: playbackData.userId,
-        itemName: playbackData.itemName,
-        itemType: playbackData.itemType,
-        isForeignKeyError: errorMessage.includes("foreign key constraint"),
-        constraintName:
-          errorMessage.match(/constraint "([^"]+)"/)?.[1] || "unknown",
-      },
-    });
-
-    // If this is a foreign key constraint error, provide additional context
-    if (errorMessage.includes("foreign key constraint")) {
-      console.error("Foreign key constraint violation details:", {
-        constraintViolated:
-          errorMessage.match(/constraint "([^"]+)"/)?.[1] || "unknown",
-        attemptedValues: {
-          itemId: playbackData.itemId,
-          userId: playbackData.userId,
-          serverId: serverId,
-        },
-        suggestion:
-          "Even after checking for missing references, a foreign key constraint was violated. This might indicate a constraint on serverId or another field that wasn't checked.",
-      });
-    }
-
-    throw error; // Re-throw to be caught by the caller
   }
+
+  // Check if userId exists
+  if (playbackData.userId) {
+    try {
+      const existingUser = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(eq(users.id, playbackData.userId))
+        .limit(1);
+
+      if (existingUser.length === 0) {
+        missingReferences.push(`userId '${playbackData.userId}' not found`);
+        finalUserId = null;
+      } else {
+        userName = existingUser[0].name;
+      }
+    } catch {
+      finalUserId = null;
+    }
+  }
+
+  const endTime = new Date(
+    sessionTime.getTime() + playbackData.durationSeconds * 1000,
+  );
+
+  // Parse play method using new function
+  const playParsed = parsePlayMethod(playbackData.playMethod || "");
+  const isTranscoded = playParsed.mode === "Transcode";
+  const isVideoDirect = playParsed.video === "direct";
+  const isAudioDirect = playParsed.audio === "direct";
+
+  // Extract series info for episodes
+  let seriesName: string | null = null;
+  if (
+    playbackData.itemType?.toLowerCase() === "episode" &&
+    playbackData.itemName
+  ) {
+    const episodeInfo = parseEpisodeInfo(playbackData.itemName);
+    seriesName = episodeInfo.seriesName;
+  }
+
+  const sessionId = randomUUID();
+  const runtimeTicks = playbackData.durationSeconds * 10000000;
+  const positionTicks = runtimeTicks;
+
+  const sessionData: NewSession = {
+    id: sessionId,
+    serverId: serverId,
+    userId: finalUserId,
+    itemId: finalItemId,
+    userName: userName,
+    userServerId: finalUserId,
+    itemName: playbackData.itemName || "Unknown Item",
+    seriesName: seriesName,
+    clientName: playbackData.clientName || "Unknown Client",
+    deviceName: playbackData.deviceName || "Unknown Device",
+    playMethod: playbackData.playMethod || "Unknown",
+    playDuration: playbackData.durationSeconds,
+    startTime: sessionTime,
+    endTime: endTime,
+    lastActivityDate: endTime,
+    runtimeTicks: runtimeTicks,
+    positionTicks: positionTicks,
+    percentComplete: 100,
+    completed: true,
+    isPaused: false,
+    isMuted: false,
+    isActive: false,
+    isTranscoded: isTranscoded,
+    transcodingIsVideoDirect: isVideoDirect,
+    transcodingVideoCodec: isVideoDirect ? null : (playParsed.video ?? null),
+    transcodingIsAudioDirect: isAudioDirect,
+    transcodingAudioCodec: isAudioDirect ? null : (playParsed.audio ?? null),
+    rawData: {
+      source: "playback_reporting",
+      originalData: playbackData,
+      importedAt: new Date().toISOString(),
+      missingReferences:
+        missingReferences.length > 0 ? missingReferences : undefined,
+    },
+    createdAt: sessionTime,
+    updatedAt: new Date(),
+    deviceId: null,
+    applicationVersion: null,
+    remoteEndPoint: null,
+    seriesId: null,
+    seasonId: null,
+    lastPlaybackCheckIn: null,
+    volumeLevel: null,
+    audioStreamIndex: null,
+    subtitleStreamIndex: null,
+    mediaSourceId: null,
+    repeatMode: null,
+    playbackOrder: null,
+    videoCodec: null,
+    audioCodec: null,
+    resolutionWidth: null,
+    resolutionHeight: null,
+    videoBitRate: null,
+    audioBitRate: null,
+    audioChannels: null,
+    audioSampleRate: null,
+    videoRangeType: null,
+    transcodingWidth: null,
+    transcodingHeight: null,
+    transcodingContainer: null,
+    transcodeReasons: null,
+  };
+
+  await db.insert(sessions).values(sessionData).onConflictDoNothing();
+
+  return true;
 }
