@@ -42,7 +42,7 @@ const postgres_1 = __importDefault(require("postgres"));
 const dotenv = __importStar(require("dotenv"));
 const schema = __importStar(require("./schema"));
 // Ensure environment variables are loaded
-dotenv.config();
+dotenv.config({ quiet: true });
 const getConnectionString = () => {
     return process.env.DATABASE_URL;
 };

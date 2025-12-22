@@ -2,7 +2,11 @@ import { Hono } from "hono";
 import { getJobQueue } from "../../jobs/queue";
 import { db, servers } from "@streamystats/database";
 import { eq } from "drizzle-orm";
-import { clearEmbeddingIndexCache } from "../../jobs/embedding-jobs";
+import {
+  clearEmbeddingIndexCache,
+  clearStopFlag,
+  setStopFlag,
+} from "../../jobs/embedding-jobs";
 import { cancelJobsByName } from "./utils";
 
 const app = new Hono();
@@ -47,6 +51,9 @@ app.post("/start-embedding", async (c) => {
       );
     }
 
+    // Clear the stop flag before starting
+    await clearStopFlag(serverId);
+
     const boss = await getJobQueue();
     const jobId = await boss.send("generate-item-embeddings", {
       serverId,
@@ -79,6 +86,10 @@ app.post("/stop-embedding", async (c) => {
       return c.json({ error: "Server ID is required" }, 400);
     }
 
+    // Set stop flag - the running job will check this and stop
+    await setStopFlag(serverId);
+
+    // Also cancel any queued jobs that haven't started yet
     const cancelledCount = await cancelJobsByName(
       "generate-item-embeddings",
       serverId
@@ -86,7 +97,7 @@ app.post("/stop-embedding", async (c) => {
 
     return c.json({
       success: true,
-      message: `Embedding jobs stopped successfully. ${cancelledCount} jobs cancelled.`,
+      message: `Stop flag set. ${cancelledCount} queued jobs cancelled.`,
       cancelledCount,
     });
   } catch (error) {
@@ -121,4 +132,3 @@ app.post("/clear-embedding-cache", async (c) => {
 });
 
 export default app;
-
