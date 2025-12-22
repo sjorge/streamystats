@@ -4,7 +4,7 @@ import * as dotenv from "dotenv";
 import * as schema from "./schema";
 
 // Ensure environment variables are loaded
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const getConnectionString = () => {
   return process.env.DATABASE_URL!;
