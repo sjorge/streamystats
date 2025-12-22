@@ -66,8 +66,6 @@ export const CodecUsageCard = ({
     );
   };
 
-  const _maxCount = Math.max(...codecData.map((d) => d.count));
-
   const total = codecData.reduce((sum, item) => sum + item.count, 0);
   const totalVideoCodec = videoCodecs.reduce(
     (sum, item) => sum + item.count,

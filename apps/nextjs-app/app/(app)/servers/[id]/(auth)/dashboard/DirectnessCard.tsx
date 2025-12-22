@@ -49,8 +49,6 @@ export const DirectnessCard = ({ data }: DirectnessCardProps) => {
     }))
     .filter((item) => item.count > 0);
 
-  const _maxCount = Math.max(...directnessData.map((d) => d.count));
-
   const total = directnessData.reduce((sum, item) => sum + item.count, 0);
   const directnessDataWithPercent = directnessData.map((item) => ({
     ...item,

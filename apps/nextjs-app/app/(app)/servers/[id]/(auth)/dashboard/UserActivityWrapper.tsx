@@ -15,13 +15,10 @@ export const UserActivityWrapper: React.FC<Props> = async ({
   startDate,
   endDate,
 }) => {
-  const _startDate = startDate || getDefaultStartDate();
-  const _endDate = setEndDateToEndOfDay(endDate);
-
   const data = await getUserActivityPerDay({
     serverId: server.id,
-    startDate: _startDate,
-    endDate: _endDate,
+    startDate: startDate || getDefaultStartDate(),
+    endDate: setEndDateToEndOfDay(endDate),
   });
 
   return <UserActivityChart data={data} />;

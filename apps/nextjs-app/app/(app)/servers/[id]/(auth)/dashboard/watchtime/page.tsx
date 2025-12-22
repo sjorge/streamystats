@@ -53,8 +53,6 @@ export default async function WatchtimePage({
     );
   }
 
-  const _endDate = setEndDateToEndOfDay(endDateParam);
-
   return (
     <Container className="flex flex-col">
       <PageTitle title="Watchtime Statistics" />
@@ -63,7 +61,7 @@ export default async function WatchtimePage({
         <WatchtimeStats
           server={server}
           startDate={startDateParam}
-          endDate={_endDate}
+          endDate={setEndDateToEndOfDay(endDateParam)}
         />
       </Suspense>
     </Container>

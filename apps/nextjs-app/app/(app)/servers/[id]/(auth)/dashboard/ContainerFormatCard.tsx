@@ -60,8 +60,6 @@ export const ContainerFormatCard = ({ data }: ContainerFormatCardProps) => {
     );
   };
 
-  const _maxCount = Math.max(...containerData.map((d) => d.count));
-
   const total = containerData.reduce((sum, item) => sum + item.count, 0);
   const containerDataWithPercent = containerData.map((item) => ({
     ...item,

@@ -108,8 +108,6 @@ export const BitrateDistributionCard = ({
   const mostCommonCategory =
     categoriesWithData.length > 0 ? categoriesWithData[0].range : "N/A";
 
-  const _maxCount = Math.max(...bitrateData.map((d) => d.count));
-
   const total = bitrateData.reduce((sum, item) => sum + item.count, 0);
   const bitrateDataWithPercent: BitrateRangeWithPercent[] = bitrateData.map(
     (item) => ({

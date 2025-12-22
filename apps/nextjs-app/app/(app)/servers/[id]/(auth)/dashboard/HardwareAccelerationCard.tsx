@@ -84,8 +84,6 @@ export const HardwareAccelerationCard = ({ data }: Props) => {
     );
   }
 
-  const _maxCount = Math.max(...hwAccelData.map((d) => d.count));
-
   const total = hwAccelData.reduce((sum, item) => sum + item.count, 0);
   const hwAccelDataWithPercent = hwAccelData.map((item) => ({
     ...item,

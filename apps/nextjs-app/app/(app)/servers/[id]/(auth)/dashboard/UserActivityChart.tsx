@@ -297,12 +297,13 @@ export const UserActivityChart: React.FC<Props> = ({ data }) => {
   const startDateParam = searchParams.get("userActivityStartDate");
   const endDateParam = searchParams.get("userActivityEndDate");
 
-  const _startDate = startDateParam || getDefaultStartDate();
-  const _endDate = setEndDateToEndOfDay(endDateParam);
-
   // Initialize state with defaults first, then update if params exist
-  const [startDate, setStartDate] = React.useState<Date>(new Date(_startDate));
-  const [endDate, setEndDate] = React.useState<Date>(new Date(_endDate));
+  const [startDate, setStartDate] = React.useState<Date>(
+    new Date(startDateParam || getDefaultStartDate()),
+  );
+  const [endDate, setEndDate] = React.useState<Date>(
+    new Date(setEndDateToEndOfDay(endDateParam)),
+  );
 
   // Format date for query params
   const formatDateForParams = (date: Date) => {

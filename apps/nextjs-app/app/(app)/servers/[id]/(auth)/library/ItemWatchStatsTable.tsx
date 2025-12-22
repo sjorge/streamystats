@@ -16,7 +16,6 @@ import {
 import { ArrowUpDown, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "nextjs-toploader/app";
 import * as React from "react";
 import { useDebounce } from "use-debounce";
 import { Button } from "@/components/ui/button";
@@ -58,7 +57,6 @@ export function ItemWatchStatsTable({
   data,
   libraries,
 }: ItemWatchStatsTableProps) {
-  const _router = useRouter();
   const searchParams = useSearchParams();
 
   // Get current values from URL query params

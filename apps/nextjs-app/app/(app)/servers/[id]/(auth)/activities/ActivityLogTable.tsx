@@ -14,7 +14,7 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { useDebounce } from "use-debounce";
 import JellyfinAvatar from "@/components/JellyfinAvatar";
@@ -53,7 +53,6 @@ export interface ActivityLogTableProps {
 }
 
 export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
-  const _router = useRouter();
   const searchParams = useSearchParams();
   const { updateQueryParams } = useQueryParams();
 

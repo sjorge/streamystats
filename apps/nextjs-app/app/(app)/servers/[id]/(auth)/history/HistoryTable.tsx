@@ -15,7 +15,6 @@ import {
 import { ArrowUpDown, ChevronDown, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "nextjs-toploader/app";
 import * as React from "react";
 import { useEffect } from "react";
 import { useDebounce } from "use-debounce";
@@ -66,7 +65,6 @@ export function HistoryTable({
   clientNames,
   playMethods,
 }: HistoryTableProps) {
-  const _router = useRouter();
   const searchParams = useSearchParams();
   const { updateQueryParams, isLoading } = useQueryParams();
 

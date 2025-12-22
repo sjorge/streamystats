@@ -87,8 +87,6 @@ export const TranscodingReasonsCard = ({
     return Math.min(Math.max(minHeight, dataLength * heightPerBar), maxHeight);
   };
 
-  const _maxCount = Math.max(...reasonsData.map((d) => d.count));
-
   const total = reasonsData.reduce((sum, item) => sum + item.count, 0);
   const reasonsDataWithPercent = reasonsData.map((item) => ({
     ...item,

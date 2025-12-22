@@ -33,7 +33,7 @@ interface Props {
 }
 
 // Helper function to categorize resolution by width
-function categorizeResolution(width: number, _height: number): string {
+function categorizeResolution(width: number): string {
   // Common resolution categories based on width
   if (width >= 3840) return "4K (3840+)";
   if (width >= 2560) return "1440p (2560+)";
@@ -56,8 +56,7 @@ function processResolutionDistribution(
 
   for (let i = 0; i < minLength; i++) {
     const width = widthDist[i];
-    const height = heightDist[i];
-    const category = categorizeResolution(width, height);
+    const category = categorizeResolution(width);
 
     ranges[category] = (ranges[category] || 0) + 1;
   }
@@ -101,11 +100,6 @@ export const ResolutionStatisticsCard = ({ width, height }: Props) => {
       color: "hsl(var(--background))",
     },
   } satisfies ChartConfig;
-
-  const _maxCount =
-    resolutionWidthData.length > 0
-      ? Math.max(...resolutionWidthData.map((d) => d.count))
-      : 0;
 
   const total = resolutionWidthData.reduce((sum, item) => sum + item.count, 0);
 
