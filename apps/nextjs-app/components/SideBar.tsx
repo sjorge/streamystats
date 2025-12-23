@@ -11,6 +11,7 @@ import {
   Clock,
   EyeOff,
   Library,
+  type LucideIcon,
   MessageSquare,
   Monitor,
   Settings,
@@ -32,6 +33,12 @@ import {
   CollapsibleTrigger,
 } from "./ui/collapsible";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -45,6 +52,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "./ui/sidebar";
 
 const dashboard_items = [
@@ -126,6 +134,75 @@ const settings_items = [
   },
 ];
 
+interface CollapsibleMenuProps {
+  icon: LucideIcon;
+  title: string;
+  items: { title: string; url: string; icon: LucideIcon }[];
+  serverId: string;
+}
+
+function CollapsibleMenu({
+  icon: Icon,
+  title,
+  items,
+  serverId,
+}: CollapsibleMenuProps) {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  if (isCollapsed) {
+    return (
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton>
+              <Icon />
+              <span>{title}</span>
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" sideOffset={4}>
+            {items.map((item) => (
+              <DropdownMenuItem key={item.title} asChild>
+                <Link href={`/servers/${serverId}${item.url}`}>
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.title}</span>
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    );
+  }
+
+  return (
+    <Collapsible defaultOpen className="group/collapsible">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton>
+            <Icon />
+            <span>{title}</span>
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {items.map((item) => (
+              <SidebarMenuSubItem key={item.title}>
+                <SidebarMenuSubButton asChild>
+                  <Link href={`/servers/${serverId}${item.url}`}>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
 interface Props {
   servers: Server[];
   me?: User;
@@ -181,30 +258,12 @@ export const SideBar: React.FC<Props> = ({
           <SidebarGroupLabel>Home</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <Collapsible defaultOpen className="group/collapsible">
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton>
-                      <TrendingUp />
-                      <span>Dashboard</span>
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {dashboard_items.map((item) => (
-                        <SidebarMenuSubItem key={item.title}>
-                          <SidebarMenuSubButton asChild>
-                            <Link href={`/servers/${id}${item.url}`}>
-                              <item.icon className="h-4 w-4" />
-                              <span>{item.title}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
+              <CollapsibleMenu
+                icon={TrendingUp}
+                title="Dashboard"
+                items={dashboard_items}
+                serverId={id}
+              />
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
@@ -234,30 +293,12 @@ export const SideBar: React.FC<Props> = ({
                   </SidebarMenuItem>
                 ))}
 
-                <Collapsible defaultOpen className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton>
-                        <Settings />
-                        <span>Settings</span>
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {settings_items.map((item) => (
-                          <SidebarMenuSubItem key={item.title}>
-                            <SidebarMenuSubButton asChild>
-                              <Link href={`/servers/${id}${item.url}`}>
-                                <item.icon className="h-4 w-4" />
-                                <span>{item.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
+                <CollapsibleMenu
+                  icon={Settings}
+                  title="Settings"
+                  items={settings_items}
+                  serverId={id}
+                />
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
