@@ -65,8 +65,10 @@ export function ClientFilters({
   const [range, setRange] = React.useState<DateRange | undefined>(rangeFromUrl);
 
   React.useEffect(() => {
-    setRange(rangeFromUrl);
-  }, [rangeFromUrl]);
+    if (!datePickerOpen) {
+      setRange(rangeFromUrl);
+    }
+  }, [rangeFromUrl, datePickerOpen]);
 
   const commitRangeToUrl = React.useCallback(
     (next: DateRange) => {
@@ -80,18 +82,21 @@ export function ClientFilters({
     [updateQueryParams],
   );
 
-  const handleDateSelect = React.useCallback(
-    (next: DateRange | undefined) => {
-      if (!next) return;
-      setRange(next);
+  const handleDateSelect = React.useCallback((next: DateRange | undefined) => {
+    setRange(next);
+  }, []);
 
-      if (next.from && next.to) {
-        commitRangeToUrl(next);
-        setDatePickerOpen(false);
-      }
-    },
-    [commitRangeToUrl],
-  );
+  const applyRange = () => {
+    if (range?.from && range?.to) {
+      commitRangeToUrl(range);
+      setDatePickerOpen(false);
+    }
+  };
+
+  const cancelRange = () => {
+    setRange(rangeFromUrl);
+    setDatePickerOpen(false);
+  };
 
   const applyPreset = React.useCallback(
     (days: number) => {
@@ -100,6 +105,7 @@ export function ClientFilters({
       const next = { from, to } satisfies DateRange;
       setRange(next);
       commitRangeToUrl(next);
+      setDatePickerOpen(false);
     },
     [commitRangeToUrl],
   );
@@ -109,45 +115,40 @@ export function ClientFilters({
   const apply90d = React.useCallback(() => applyPreset(90), [applyPreset]);
 
   const dateRangeLabel = React.useMemo(() => {
-    const from = parseDateParam(searchParams.get("startDate"));
-    const to = parseDateParam(searchParams.get("endDate"));
-
-    if (!from && !to) return "All time";
-    if (!from || !to) return "Pick a date range";
-    return `${format(from, "MMM dd, yyyy")} – ${format(to, "MMM dd, yyyy")}`;
-  }, [searchParams]);
+    if (!rangeFromUrl?.from) return "Date range";
+    if (!rangeFromUrl.to) return format(rangeFromUrl.from, "MMM dd, yyyy");
+    return `${format(rangeFromUrl.from, "MMM dd, yyyy")} – ${format(rangeFromUrl.to, "MMM dd, yyyy")}`;
+  }, [rangeFromUrl]);
 
   const selectedUserId = searchParams.get("userId") || "all";
-  const handleUserChange = React.useCallback(
-    (value: string) => {
-      updateQueryParams({
-        userId: value === "all" ? null : value,
-      });
-    },
-    [updateQueryParams],
-  );
 
-  const hasFilters = React.useMemo(() => {
-    return !!(
-      searchParams.get("startDate") ||
-      searchParams.get("endDate") ||
-      searchParams.get("userId")
-    );
-  }, [searchParams]);
+  const handleUserChange = (value: string) => {
+    updateQueryParams({
+      userId: value === "all" ? null : value,
+    });
+  };
 
-  const clearFilters = React.useCallback(() => {
+  const clearFilters = () => {
     updateQueryParams({
       startDate: null,
       endDate: null,
       userId: null,
     });
-  }, [updateQueryParams]);
+  };
 
   return (
     <div className="flex flex-col gap-4 mb-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+          <Popover
+            open={datePickerOpen}
+            onOpenChange={(open) => {
+              setDatePickerOpen(open);
+              if (!open) {
+                setRange(rangeFromUrl);
+              }
+            }}
+          >
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -162,6 +163,8 @@ export function ClientFilters({
               <Calendar
                 mode="range"
                 captionLayout="dropdown"
+                fromYear={2010}
+                toYear={new Date().getFullYear()}
                 numberOfMonths={2}
                 defaultMonth={range?.from || new Date()}
                 selected={range}
@@ -169,6 +172,14 @@ export function ClientFilters({
                 initialFocus
                 disabled={disableFutureDays}
               />
+              <div className="flex items-center justify-end gap-2 p-3 border-t">
+                <Button variant="ghost" size="sm" onClick={cancelRange}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={applyRange}>
+                  Apply
+                </Button>
+              </div>
             </PopoverContent>
           </Popover>
 
@@ -178,7 +189,7 @@ export function ClientFilters({
               onValueChange={handleUserChange}
               disabled={isLoading}
             >
-              <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px] ml-0 sm:ml-2">
                 <SelectValue placeholder="All users" />
               </SelectTrigger>
               <SelectContent>
@@ -221,17 +232,18 @@ export function ClientFilters({
           >
             90d
           </Button>
-          {hasFilters && (
+
+          {(searchParams.get("startDate") ||
+            searchParams.get("endDate") ||
+            searchParams.get("userId")) && (
             <Button
-              type="button"
               variant="ghost"
-              size="sm"
-              disabled={isLoading}
+              size="icon"
               onClick={clearFilters}
-              className="gap-2"
+              title="Clear filters"
+              disabled={isLoading}
             >
               <X className="h-4 w-4" />
-              Clear
             </Button>
           )}
         </div>
