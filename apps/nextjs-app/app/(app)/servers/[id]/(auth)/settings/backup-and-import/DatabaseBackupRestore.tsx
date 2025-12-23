@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { fetch } from "@/lib/utils";
 
 interface DatabaseBackupRestoreProps {
@@ -124,105 +125,142 @@ export default function DatabaseBackupRestore({
   const handleImportClick = () => importMutation.mutate();
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Streamystats Backup & Restore</CardTitle>
-          <CardDescription>
-            Export or restore your Streamystats data.
-            <br />
-            <b>Only works with the new version of Streamystats.</b>
-          </CardDescription>
-        </CardHeader>
+    <Card>
+      <CardHeader>
+        <CardTitle>Streamystats Backup & Restore</CardTitle>
+        <CardDescription>
+          Export or restore your Streamystats data. Only works with the new
+          version of Streamystats.
+        </CardDescription>
+      </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* EXPORT */}
-          <div className="space-y-2">
-            <h3 className="">Export Backup</h3>
-            {exportMutation.isError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>
-                  {exportMutation.error instanceof Error
-                    ? exportMutation.error.message
-                    : "Export failed"}
-                </AlertDescription>
-              </Alert>
+      <CardContent className="space-y-8">
+        {/* EXPORT */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Download className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-semibold">Export Backup</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Download a complete backup of your Streamystats database as a JSON
+            file.
+          </p>
+          {exportMutation.isError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                {exportMutation.error instanceof Error
+                  ? exportMutation.error.message
+                  : "Export failed"}
+              </AlertDescription>
+            </Alert>
+          )}
+          <Button
+            onClick={handleExportClick}
+            disabled={exportMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            {exportMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Downloading...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Download Backup
+              </>
             )}
+          </Button>
+        </div>
+
+        <Separator />
+
+        {/* IMPORT */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-semibold">Import Backup</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Restore your Streamystats database from a previously exported backup
+            file.
+          </p>
+          {importMutation.isError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                {importMutation.error instanceof Error
+                  ? importMutation.error.message
+                  : "Import failed"}
+              </AlertDescription>
+            </Alert>
+          )}
+          {importSuccess && (
+            <Alert variant="default" className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertTitle className="text-green-700 dark:text-green-300">
+                Success
+              </AlertTitle>
+              <AlertDescription className="text-green-600 dark:text-green-400">
+                {importSuccess.message}
+                {importSuccess.imported_count &&
+                  importSuccess.total_count && (
+                    <p className="mt-1">
+                      Successfully imported {importSuccess.imported_count} of{" "}
+                      {importSuccess.total_count} sessions.
+                    </p>
+                  )}
+              </AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="backup-file"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Backup File
+              </label>
+              <Input
+                id="backup-file"
+                type="file"
+                accept=".json"
+                disabled={!hasCompletedInitialSync}
+                onChange={handleFileChange}
+                className="cursor-pointer"
+              />
+              {file && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              )}
+            </div>
+
             <Button
-              onClick={handleExportClick}
-              disabled={exportMutation.isPending}
+              onClick={handleImportClick}
+              disabled={
+                importMutation.isPending || !file || !hasCompletedInitialSync
+              }
               className="flex items-center gap-2"
             >
-              <Download className="h-4 w-4" />
-              {exportMutation.isPending ? "Downloading..." : "Download"}
+              {importMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Upload and Import
+                </>
+              )}
             </Button>
           </div>
-
-          {/* IMPORT */}
-          <div className="space-y-2">
-            <h3 className="">Import Backup</h3>
-            {importMutation.isError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>
-                  {importMutation.error instanceof Error
-                    ? importMutation.error.message
-                    : "Import failed"}
-                </AlertDescription>
-              </Alert>
-            )}
-            {importSuccess && (
-              <Alert variant="default" className="bg-green-50 border-green-200">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <AlertTitle className="text-green-700">Success</AlertTitle>
-                <AlertDescription className="text-green-600">
-                  {importSuccess.message}
-                  {importSuccess.imported_count &&
-                    importSuccess.total_count && (
-                      <p>
-                        Successfully imported {importSuccess.imported_count} of{" "}
-                        {importSuccess.total_count} sessions.
-                      </p>
-                    )}
-                </AlertDescription>
-              </Alert>
-            )}
-            <div className="flex flex-col items-start gap-4">
-              <div className="w-full">
-                <Input
-                  type="file"
-                  accept=".json"
-                  disabled={!hasCompletedInitialSync}
-                  onChange={handleFileChange}
-                />
-              </div>
-
-              <Button
-                onClick={handleImportClick}
-                disabled={
-                  importMutation.isPending || !file || !hasCompletedInitialSync
-                }
-                className="flex items-center gap-2"
-              >
-                {importMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    Upload and Import
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
