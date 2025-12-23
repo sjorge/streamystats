@@ -25,7 +25,6 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { getUser } from "@/lib/db/users";
 import { ServerSelector } from "./ServerSelector";
-import { ShowAdminStatisticsSwitch } from "./ShowAdminStatisticsSwitch";
 import { UserMenu } from "./UserMenu";
 import {
   Collapsible,
@@ -265,9 +264,6 @@ export const SideBar: React.FC<Props> = ({
         )}
       </SidebarContent>
       <SidebarFooter>
-        <ShowAdminStatisticsSwitch
-          isAdmin={fullUser?.isAdministrator || false}
-        />
         <UserMenu
           me={fullUser || undefined}
           serverUrl={servers.find((s) => s.id === Number.parseInt(id, 10))?.url}

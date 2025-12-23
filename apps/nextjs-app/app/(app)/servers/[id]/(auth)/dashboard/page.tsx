@@ -9,8 +9,7 @@ import { getServer } from "@/lib/db/server";
 import { getSimilarSeries } from "@/lib/db/similar-series-statistics";
 import { getSimilarStatistics } from "@/lib/db/similar-statistics";
 import { getMostWatchedItems } from "@/lib/db/statistics";
-import { getMe } from "@/lib/db/users";
-import { showAdminStatistics } from "@/utils/adminTools";
+import { getMe, isUserAdmin } from "@/lib/db/users";
 import { ActiveSessions } from "./ActiveSessions";
 import { MostWatchedItems } from "./MostWatchedItems";
 import { SeasonalRecommendations } from "./SeasonalRecommendations";
@@ -60,11 +59,11 @@ async function DashboardContent({
     redirect("/not-found");
   }
 
-  const sas = await showAdminStatistics();
+  const isAdmin = await isUserAdmin();
 
   return (
     <>
-      {sas && (
+      {isAdmin && (
         <div className="mb-8">
           <ActiveSessions server={server} />
         </div>
@@ -89,7 +88,7 @@ async function GeneralStats({
   userActivityEndDate: string;
 }) {
   const me = await getMe();
-  const sas = await showAdminStatistics();
+  const isAdmin = await isUserAdmin();
 
   const [similarData, similarSeriesData, data, seasonalData] =
     await Promise.all([
@@ -97,7 +96,7 @@ async function GeneralStats({
       getSimilarSeries(server.id),
       getMostWatchedItems({
         serverId: server.id,
-        userId: sas ? undefined : me?.id,
+        userId: isAdmin ? undefined : me?.id,
       }),
       getSeasonalRecommendations(server.id),
     ]);
@@ -111,7 +110,7 @@ async function GeneralStats({
       <SimilarMovieStatistics data={similarData} server={server} />
       <SimilarSeriesStatistics data={similarSeriesData} server={server} />
       <MostWatchedItems data={data} server={server} />
-      {sas ? (
+      {isAdmin ? (
         <>
           <UserLeaderboard server={server} />
           <UserActivityWrapper

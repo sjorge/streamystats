@@ -20,7 +20,7 @@ import { ViewerDetailsDialog } from "./ViewerDetailsDialog";
 interface ItemMetadataProps {
   item: Item;
   statistics: ItemDetailsResponse;
-  showAdminStats?: boolean;
+  isAdmin?: boolean;
   serverId: number;
   itemId: string;
 }
@@ -78,7 +78,7 @@ function KeyValueRow({
 export function ItemMetadata({
   item,
   statistics,
-  showAdminStats = false,
+  isAdmin = false,
   serverId,
   itemId,
 }: ItemMetadataProps) {
@@ -92,7 +92,7 @@ export function ItemMetadata({
     usersWatched,
   } = statistics;
 
-  const canViewAnalytics = showAdminStats && usersWatched.length > 0;
+  const canViewAnalytics = isAdmin && usersWatched.length > 0;
   const openViewersDialog = useCallback(() => {
     setShowViewersDialog(true);
   }, []);

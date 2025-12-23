@@ -3,9 +3,8 @@ import { Clock } from "lucide-react";
 import { redirect } from "next/navigation";
 import type React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getMe, getTotalWatchTime } from "@/lib/db/users";
+import { getMe, getTotalWatchTime, isUserAdmin } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
-import { showAdminStatistics } from "@/utils/adminTools";
 
 interface Props {
   server: Server;
@@ -19,7 +18,7 @@ const TotalWatchTime: React.FC<Props> = async ({
   endDate,
 }) => {
   const me = await getMe();
-  const sas = await showAdminStatistics();
+  const isAdmin = await isUserAdmin();
 
   if (!me) {
     redirect("/not-found");
@@ -27,7 +26,7 @@ const TotalWatchTime: React.FC<Props> = async ({
 
   const d1 = await getTotalWatchTime({
     serverId: server.id,
-    userId: sas ? undefined : me.id,
+    userId: isAdmin ? undefined : me.id,
     startDate,
     endDate,
   });

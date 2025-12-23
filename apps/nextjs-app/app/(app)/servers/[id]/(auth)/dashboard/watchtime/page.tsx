@@ -13,8 +13,8 @@ import {
   getUserStatsSummaryForServer,
   getWatchTimePerHour,
   getWatchTimePerWeekDay,
+  isUserAdmin,
 } from "@/lib/db/users";
-import { showAdminStatistics } from "@/utils/adminTools";
 import Graph from "../Graph";
 import TotalWatchTime from "../TotalWatchTime";
 import { WatchTimePerHour } from "../WatchTimePerHour";
@@ -78,25 +78,25 @@ async function WatchtimeStats({
   endDate: string;
 }) {
   const me = await getMe();
-  const sas = await showAdminStatistics();
+  const isAdmin = await isUserAdmin();
 
   if (!me) {
     redirect("/not-found");
   }
 
-  const scopedUserId = sas ? undefined : me.id;
+  const scopedUserId = isAdmin ? undefined : me.id;
 
   const [d1, d2, mostWatchedDay, mostActiveUsersDay, topUsers] =
     await Promise.all([
       getWatchTimePerWeekDay({
         serverId: server.id,
-        userId: sas ? undefined : me.id,
+        userId: isAdmin ? undefined : me.id,
         startDate,
         endDate,
       }),
       getWatchTimePerHour({
         serverId: server.id,
-        userId: sas ? undefined : me.id,
+        userId: isAdmin ? undefined : me.id,
         startDate,
         endDate,
       }),
@@ -106,14 +106,14 @@ async function WatchtimeStats({
         startDate,
         endDate,
       }),
-      sas
+      isAdmin
         ? getMostActiveUsersDay({
             serverId: server.id,
             startDate,
             endDate,
           })
         : Promise.resolve(null),
-      sas
+      isAdmin
         ? getUserStatsSummaryForServer({
             serverId: server.id,
             startDate,
@@ -127,7 +127,7 @@ async function WatchtimeStats({
       <WatchtimeHighlights
         mostWatchedDay={mostWatchedDay}
         mostActiveUsersDay={mostActiveUsersDay}
-        showAdminStats={sas}
+        isAdmin={isAdmin}
       />
       <div className="flex md:flex-row flex-col gap-2">
         <TotalWatchTime
@@ -149,7 +149,9 @@ async function WatchtimeStats({
         title="Watch Time Per Hour"
         subtitle="Showing total watch time for each hour of the day"
       />
-      {sas ? <WatchtimeTopUsersTable server={server} users={topUsers} /> : null}
+      {isAdmin ? (
+        <WatchtimeTopUsersTable server={server} users={topUsers} />
+      ) : null}
     </div>
   );
 }

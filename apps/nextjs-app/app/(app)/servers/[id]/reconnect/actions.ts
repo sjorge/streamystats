@@ -62,13 +62,6 @@ export const updateServerConnectionAction = async ({
         },
       );
 
-      c.set("show-admin-statistics", result.isAdmin ? "true" : "false", {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge,
-        secure,
-      });
     }
 
     return result;

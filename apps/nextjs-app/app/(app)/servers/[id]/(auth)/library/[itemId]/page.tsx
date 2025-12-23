@@ -8,8 +8,7 @@ import {
   getSimilarItemsForItem,
   type RecommendationItem,
 } from "@/lib/db/similar-statistics";
-import { getMe } from "@/lib/db/users";
-import { showAdminStatistics } from "@/utils/adminTools";
+import { getMe, isUserAdmin } from "@/lib/db/users";
 import { ItemHeader } from "./ItemHeader";
 import { ItemMetadata } from "./ItemMetadata";
 import { SeasonsAndEpisodes } from "./SeasonsAndEpisodes";
@@ -28,11 +27,11 @@ export default async function ItemDetailsPage({
   }
 
   const me = await getMe();
-  const showAdmin = await showAdminStatistics();
+  const isAdmin = await isUserAdmin();
 
   const itemDetails = await getItemDetails({
     itemId,
-    userId: showAdmin ? undefined : me?.id,
+    userId: isAdmin ? undefined : me?.id,
   });
 
   if (!itemDetails) {
@@ -66,7 +65,7 @@ export default async function ItemDetailsPage({
         <ItemMetadata
           item={itemDetails.item}
           statistics={itemDetails}
-          showAdminStats={showAdmin}
+          isAdmin={isAdmin}
           serverId={id}
           itemId={itemId}
         />

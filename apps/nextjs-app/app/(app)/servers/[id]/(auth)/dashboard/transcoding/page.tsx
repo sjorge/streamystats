@@ -6,8 +6,7 @@ import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getServer } from "@/lib/db/server";
 import { getTranscodingStatistics } from "@/lib/db/transcoding-statistics";
-import { getMe } from "@/lib/db/users";
-import { showAdminStatistics } from "@/utils/adminTools";
+import { getMe, isUserAdmin } from "@/lib/db/users";
 import { TranscodingStatistics } from "../TranscodingStatistics";
 
 export default async function TranscodingPage({
@@ -33,13 +32,13 @@ export default async function TranscodingPage({
 }
 
 async function TranscodingStats({ server }: { server: Server }) {
-  const sas = await showAdminStatistics();
+  const isAdmin = await isUserAdmin();
   const me = await getMe();
   const ts = await getTranscodingStatistics(
     server.id,
     undefined,
     undefined,
-    sas ? undefined : me?.id,
+    isAdmin ? undefined : me?.id,
   );
 
   return (

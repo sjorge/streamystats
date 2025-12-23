@@ -23,7 +23,6 @@ import {
   isUserAdmin,
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
-import { showAdminStatistics } from "@/utils/adminTools";
 import { HistoryTable } from "../../history/HistoryTable";
 import { GenreStatsGraph } from "./GenreStatsGraph";
 import { TopItemsList } from "./TopItems";
@@ -56,10 +55,7 @@ export default async function User({
     redirect("/");
   }
 
-  const [showAdminStats, isAdmin] = await Promise.all([
-    showAdminStatistics(),
-    isUserAdmin(),
-  ]);
+  const isAdmin = await isUserAdmin();
 
   // Get additional user statistics and history
   const currentPage = Number.parseInt(page, 10);
@@ -78,7 +74,7 @@ export default async function User({
     getUserWatchStats({ serverId: server.id, userId: user.id }),
     getWatchTimePerWeekDay({
       serverId: server.id,
-      userId: showAdminStats ? undefined : user.id,
+      userId: user.id,
     }),
     getUserHistory(server.id, user.id, {
       page: currentPage,
