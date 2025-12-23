@@ -12,13 +12,13 @@ function formatDateLabel(dateStr: string): string {
 export function WatchtimeHighlights({
   mostWatchedDay,
   mostActiveUsersDay,
-  showAdminStats,
+  isAdmin,
 }: {
   mostWatchedDay: MostWatchedDay | null;
   mostActiveUsersDay: MostActiveUsersDay | null;
-  showAdminStats: boolean;
+  isAdmin: boolean;
 }) {
-  const gridCols = showAdminStats ? "md:grid-cols-2" : "md:grid-cols-1";
+  const gridCols = isAdmin ? "md:grid-cols-2" : "md:grid-cols-1";
 
   return (
     <div className={`grid grid-cols-1 ${gridCols} gap-2`}>
@@ -44,7 +44,7 @@ export function WatchtimeHighlights({
         </CardContent>
       </Card>
 
-      {showAdminStats ? (
+      {isAdmin ? (
         <Card>
           <CardHeader className="space-y-0 pb-0">
             <CardTitle className="text-sm font-medium">

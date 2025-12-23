@@ -88,7 +88,6 @@ export async function destroySession(): Promise<void> {
   c.delete(SESSION_COOKIE);
   c.delete("streamystats-token");
   c.delete("streamystats-user");
-  c.delete("show-admin-statistics");
 }
 
 /**
