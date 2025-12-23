@@ -7,7 +7,9 @@ import {
   count,
   desc,
   eq,
+  gte,
   ilike,
+  lte,
   or,
   type SQL,
 } from "drizzle-orm";
@@ -18,6 +20,10 @@ interface PaginationOptions {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   search?: string;
+  type?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  userId?: string;
 }
 
 interface PaginatedResult<T> {
@@ -40,20 +46,42 @@ export const getActivities = async (
     sortBy,
     sortOrder = "desc",
     search,
+    type,
+    dateFrom,
+    dateTo,
+    userId,
   } = options;
   const offset = (page - 1) * pageSize;
 
   // Build where condition
-  const baseWhere = eq(activities.serverId, Number(serverId));
-  const whereCondition = search
-    ? and(
-        baseWhere,
-        or(
-          ilike(activities.name, `%${search}%`),
-          ilike(activities.type, `%${search}%`),
-        ),
-      )
-    : baseWhere;
+  const conditions: SQL[] = [eq(activities.serverId, Number(serverId))];
+
+  if (search) {
+    conditions.push(
+      or(
+        ilike(activities.name, `%${search}%`),
+        ilike(activities.type, `%${search}%`),
+      )!,
+    );
+  }
+
+  if (type && type !== "all") {
+    conditions.push(eq(activities.type, type));
+  }
+
+  if (userId && userId !== "all") {
+    conditions.push(eq(activities.userId, userId));
+  }
+
+  if (dateFrom) {
+    conditions.push(gte(activities.date, dateFrom));
+  }
+
+  if (dateTo) {
+    conditions.push(lte(activities.date, dateTo));
+  }
+
+  const whereCondition = and(...conditions);
 
   // Get the total count
   const [totalResult] = await db
@@ -61,7 +89,7 @@ export const getActivities = async (
     .from(activities)
     .where(whereCondition);
 
-  const total = totalResult.count;
+  const total = totalResult?.count || 0;
   const totalPages = Math.ceil(total / pageSize);
 
   // Determine sort order
@@ -78,6 +106,9 @@ export const getActivities = async (
         break;
       case "date":
         sortColumn = activities.date;
+        break;
+      case "severity":
+        sortColumn = activities.severity;
         break;
       default:
         sortColumn = activities.date; // fallback
@@ -106,4 +137,16 @@ export const getActivities = async (
       totalPages,
     },
   };
+};
+
+export const getUniqueActivityTypes = async (
+  serverId: number | string,
+): Promise<string[]> => {
+  const result = await db
+    .selectDistinct({ type: activities.type })
+    .from(activities)
+    .where(eq(activities.serverId, Number(serverId)))
+    .orderBy(activities.type);
+
+  return result.map((r) => r.type).filter(Boolean);
 };

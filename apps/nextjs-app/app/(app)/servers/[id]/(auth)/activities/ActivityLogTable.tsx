@@ -1,6 +1,6 @@
 "use client";
 
-import type { Activity, Server } from "@streamystats/database/schema";
+import type { Activity, Server, User } from "@streamystats/database/schema";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { usePersistantState } from "@/hooks/usePersistantState";
 import { useQueryParams } from "@/hooks/useQueryParams";
+import { ActivityFilters } from "./ActivityFilters";
 
 interface PaginatedActivities {
   data: Activity[];
@@ -50,9 +51,16 @@ interface PaginatedActivities {
 export interface ActivityLogTableProps {
   server: Server;
   data: PaginatedActivities;
+  users: User[];
+  activityTypes: string[];
 }
 
-export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
+export function ActivityLogTable({
+  server,
+  data,
+  users,
+  activityTypes,
+}: ActivityLogTableProps) {
   const searchParams = useSearchParams();
   const { updateQueryParams } = useQueryParams();
 
@@ -169,21 +177,28 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
         </div>
       ),
     },
-    // {
-    //   accessorKey: "severity",
-    //   header: "Severity",
-    //   cell: ({ row }) => <div>{row.getValue("severity")}</div>,
-    // },
-    // {
-    //   accessorKey: "short_overview",
-    //   header: "Overview",
-    //   cell: ({ row }) => <div>{row.getValue("short_overview")}</div>,
-    // },
-    // {
-    //   id: "actions",
-    //   enableHiding: false,
-    //   cell: ({ row }) => { ... }
-    // },
+    {
+      accessorKey: "severity",
+      header: () => (
+        <Button variant="ghost" onClick={() => handleSortChange("severity")}>
+          Severity
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => <div>{row.getValue("severity")}</div>,
+    },
+    {
+      accessorKey: "shortOverview",
+      header: "Overview",
+      cell: ({ row }) => (
+        <div
+          className="max-w-[400px] truncate"
+          title={row.getValue("shortOverview")}
+        >
+          {row.getValue("shortOverview")}
+        </div>
+      ),
+    },
   ];
 
   const table = useReactTable({
@@ -213,39 +228,42 @@ export function ActivityLogTable({ server, data }: ActivityLogTableProps) {
 
   return (
     <div className="w-full">
-      <div className="flex items-center mb-2">
-        <Input
-          placeholder="Search activities..."
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          className="max-w-sm"
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="flex flex-col gap-4 mb-4">
+        <ActivityFilters users={users} activityTypes={activityTypes} />
+        <div className="flex items-center justify-between">
+          <Input
+            placeholder="Search activities..."
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            className="max-w-sm"
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto">
+                Columns <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="rounded-md border">

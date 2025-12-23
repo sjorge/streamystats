@@ -58,11 +58,13 @@ export function WatchtimeDateRangeFilter({
     return getDefaultRange();
   }, [searchParams]);
 
-  const [range, setRange] = React.useState<DateRange>(rangeFromUrl);
+  const [range, setRange] = React.useState<DateRange | undefined>(rangeFromUrl);
 
   React.useEffect(() => {
-    setRange(rangeFromUrl);
-  }, [rangeFromUrl]);
+    if (!open) {
+      setRange(rangeFromUrl);
+    }
+  }, [rangeFromUrl, open]);
 
   const commitRangeToUrl = React.useCallback(
     (next: DateRange) => {
@@ -76,18 +78,21 @@ export function WatchtimeDateRangeFilter({
     [updateQueryParams],
   );
 
-  const handleSelect = React.useCallback(
-    (next: DateRange | undefined) => {
-      if (!next) return;
-      setRange(next);
+  const handleSelect = React.useCallback((next: DateRange | undefined) => {
+    setRange(next);
+  }, []);
 
-      if (next.from && next.to) {
-        commitRangeToUrl(next);
-        setOpen(false);
-      }
-    },
-    [commitRangeToUrl],
-  );
+  const applyRange = () => {
+    if (range?.from && range?.to) {
+      commitRangeToUrl(range);
+      setOpen(false);
+    }
+  };
+
+  const cancelRange = () => {
+    setRange(rangeFromUrl);
+    setOpen(false);
+  };
 
   const applyPreset = React.useCallback(
     (days: number) => {
@@ -96,6 +101,7 @@ export function WatchtimeDateRangeFilter({
       const next = { from, to } satisfies DateRange;
       setRange(next);
       commitRangeToUrl(next);
+      setOpen(false);
     },
     [commitRangeToUrl],
   );
@@ -105,15 +111,23 @@ export function WatchtimeDateRangeFilter({
   const apply90d = React.useCallback(() => applyPreset(90), [applyPreset]);
 
   const label = React.useMemo(() => {
-    if (!range?.from) return "Pick a date range";
-    if (!range.to) return format(range.from, "MMM dd, yyyy");
-    return `${format(range.from, "MMM dd, yyyy")} – ${format(range.to, "MMM dd, yyyy")}`;
-  }, [range?.from, range?.to]);
+    if (!rangeFromUrl?.from) return "Pick a date range";
+    if (!rangeFromUrl.to) return format(rangeFromUrl.from, "MMM dd, yyyy");
+    return `${format(rangeFromUrl.from, "MMM dd, yyyy")} – ${format(rangeFromUrl.to, "MMM dd, yyyy")}`;
+  }, [rangeFromUrl]);
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover
+          open={open}
+          onOpenChange={(newOpen) => {
+            setOpen(newOpen);
+            if (!newOpen) {
+              setRange(rangeFromUrl);
+            }
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               variant="outline"
@@ -128,6 +142,8 @@ export function WatchtimeDateRangeFilter({
             <Calendar
               mode="range"
               captionLayout="dropdown"
+              fromYear={2010}
+              toYear={new Date().getFullYear()}
               numberOfMonths={2}
               defaultMonth={range?.from}
               selected={range}
@@ -135,6 +151,14 @@ export function WatchtimeDateRangeFilter({
               initialFocus
               disabled={disableFutureDays}
             />
+            <div className="flex items-center justify-end gap-2 p-3 border-t">
+              <Button variant="ghost" size="sm" onClick={cancelRange}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={applyRange}>
+                Apply
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
 

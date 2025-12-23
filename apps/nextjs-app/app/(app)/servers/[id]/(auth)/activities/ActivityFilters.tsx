@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useQueryParams } from "@/hooks/useQueryParams";
 import { cn } from "@/lib/utils";
+import type { User } from "@streamystats/database/schema";
 
 const DATE_PARAM_FORMAT = "yyyy-MM-dd";
 
@@ -35,19 +36,15 @@ function formatDateParam(date: Date): string {
   return format(date, DATE_PARAM_FORMAT);
 }
 
-interface HistoryFiltersProps {
-  users: { id: string; name: string }[];
-  deviceNames: string[];
-  clientNames: string[];
-  playMethods: string[];
+interface ActivityFiltersProps {
+  users: User[];
+  activityTypes: string[];
 }
 
-export function HistoryFilters({
+export function ActivityFilters({
   users,
-  deviceNames,
-  clientNames,
-  playMethods,
-}: HistoryFiltersProps) {
+  activityTypes,
+}: ActivityFiltersProps) {
   const searchParams = useSearchParams();
   const { updateQueryParams, isLoading } = useQueryParams();
 
@@ -113,10 +110,7 @@ export function HistoryFilters({
       searchParams.get("startDate") ||
       searchParams.get("endDate") ||
       searchParams.get("userId") ||
-      searchParams.get("itemType") ||
-      searchParams.get("deviceName") ||
-      searchParams.get("clientName") ||
-      searchParams.get("playMethod")
+      searchParams.get("type")
     );
   }, [searchParams]);
 
@@ -125,16 +119,13 @@ export function HistoryFilters({
       startDate: null,
       endDate: null,
       userId: null,
-      itemType: null,
-      deviceName: null,
-      clientName: null,
-      playMethod: null,
+      type: null,
       page: "1",
     });
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 pb-4">
+    <div className="flex flex-wrap items-center gap-2 pb-2">
       <Popover
         open={datePickerOpen}
         onOpenChange={(open) => {
@@ -199,83 +190,22 @@ export function HistoryFilters({
       </Select>
 
       <Select
-        value={searchParams.get("itemType") || "all"}
-        onValueChange={(value) => handleFilterChange("itemType", value)}
+        value={searchParams.get("type") || "all"}
+        onValueChange={(value) => handleFilterChange("type", value)}
         disabled={isLoading}
       >
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="All types" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All types</SelectItem>
-          <SelectItem value="Movie">Movie</SelectItem>
-          <SelectItem value="Series">Series</SelectItem>
-          <SelectItem value="Episode">Episode</SelectItem>
-          <SelectItem value="Audio">Audio</SelectItem>
-          <SelectItem value="MusicAlbum">Music Album</SelectItem>
-          <SelectItem value="MusicArtist">Music Artist</SelectItem>
+          {activityTypes.map((type) => (
+            <SelectItem key={type} value={type}>
+              {type}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
-
-      {deviceNames.length > 0 && (
-        <Select
-          value={searchParams.get("deviceName") || "all"}
-          onValueChange={(value) => handleFilterChange("deviceName", value)}
-          disabled={isLoading}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All devices" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All devices</SelectItem>
-            {deviceNames.map((device) => (
-              <SelectItem key={device} value={device}>
-                {device}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {clientNames.length > 0 && (
-        <Select
-          value={searchParams.get("clientName") || "all"}
-          onValueChange={(value) => handleFilterChange("clientName", value)}
-          disabled={isLoading}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All clients" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All clients</SelectItem>
-            {clientNames.map((client) => (
-              <SelectItem key={client} value={client}>
-                {client}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {playMethods.length > 0 && (
-        <Select
-          value={searchParams.get("playMethod") || "all"}
-          onValueChange={(value) => handleFilterChange("playMethod", value)}
-          disabled={isLoading}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All methods" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All methods</SelectItem>
-            {playMethods.map((method) => (
-              <SelectItem key={method} value={method}>
-                {method}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
 
       {hasFilters && (
         <Button

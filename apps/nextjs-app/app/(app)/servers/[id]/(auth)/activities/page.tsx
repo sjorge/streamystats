@@ -3,9 +3,11 @@ import { Suspense } from "react";
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getActivities } from "@/lib/db/activities";
+import { getActivities, getUniqueActivityTypes } from "@/lib/db/activities";
 import { getServer } from "@/lib/db/server";
+import { getUsers } from "@/lib/db/users";
 import { ActivityLogTable } from "./ActivityLogTable";
+import { parseISO } from "date-fns";
 
 export default async function ActivitiesPage({
   params,
@@ -17,10 +19,23 @@ export default async function ActivitiesPage({
     sort_by?: string;
     sort_order?: string;
     search?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
   }>;
 }) {
   const { id } = await params;
-  const { page, sort_by, sort_order, search } = await searchParams;
+  const {
+    page,
+    sort_by,
+    sort_order,
+    search,
+    type,
+    startDate,
+    endDate,
+    userId,
+  } = await searchParams;
 
   const server = await getServer({ serverId: id });
 
@@ -28,11 +43,20 @@ export default async function ActivitiesPage({
     redirect("/setup");
   }
 
+  const [users, activityTypes] = await Promise.all([
+    getUsers({ serverId: server.id }),
+    getUniqueActivityTypes(server.id),
+  ]);
+
   const activities = await getActivities(server.id, {
     page: page ? Number.parseInt(page, 10) : 1,
     sortBy: sort_by || undefined,
     sortOrder: (sort_order as "asc" | "desc") || undefined,
     search: search || undefined,
+    type: type || undefined,
+    dateFrom: startDate ? parseISO(startDate) : undefined,
+    dateTo: endDate ? parseISO(endDate) : undefined,
+    userId: userId || undefined,
   });
 
   return (
@@ -46,7 +70,12 @@ export default async function ActivitiesPage({
           </div>
         }
       >
-        <ActivityLogTable server={server} data={activities} />
+        <ActivityLogTable
+          server={server}
+          data={activities}
+          users={users}
+          activityTypes={activityTypes}
+        />
       </Suspense>
     </Container>
   );
