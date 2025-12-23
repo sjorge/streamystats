@@ -1,8 +1,47 @@
-import { db, sessions } from "@streamystats/database";
+import {
+  activities,
+  activityLocations,
+  anomalyEvents,
+  db,
+  hiddenRecommendations,
+  sessions,
+  userFingerprints,
+} from "@streamystats/database";
 import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { getServer } from "@/lib/db/server";
+
+type JellyfinSystemInfo = {
+  Id?: string;
+};
+
+function normalizeUrl(url: string) {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+async function tryFetchJellyfinSystemInfo({
+  url,
+  apiKey,
+}: {
+  url: string;
+  apiKey: string;
+}): Promise<JellyfinSystemInfo | null> {
+  try {
+    const res = await fetch(`${normalizeUrl(url)}/System/Info`, {
+      method: "GET",
+      headers: {
+        "X-Emby-Token": apiKey,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as JellyfinSystemInfo;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(
   _request: NextRequest,
@@ -14,6 +53,13 @@ export async function GET(
     if (error) return error;
 
     const { serverId } = await params;
+    const serverIdNum = Number(serverId);
+    if (Number.isNaN(serverIdNum)) {
+      return new Response(JSON.stringify({ error: "Invalid server id" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     const server = await getServer({ serverId });
     if (!server) {
@@ -23,37 +69,106 @@ export async function GET(
       });
     }
 
-    // Export all session and related data for this server
-    console.log(`Starting export for server ${server.id} (${server.name})`);
+    const jellyfinInfo = await tryFetchJellyfinSystemInfo({
+      url: server.url,
+      apiKey: server.apiKey,
+    });
+
+    const [
+      exportedSessions,
+      exportedActivities,
+      exportedHiddenRecommendations,
+      exportedUserFingerprints,
+      exportedAnomalyEvents,
+      exportedActivityLocations,
+    ] = await Promise.all([
+      db.query.sessions.findMany({
+        where: eq(sessions.serverId, serverIdNum),
+      }),
+      db.query.activities.findMany({
+        where: eq(activities.serverId, serverIdNum),
+      }),
+      db.query.hiddenRecommendations.findMany({
+        where: eq(hiddenRecommendations.serverId, serverIdNum),
+      }),
+      db.query.userFingerprints.findMany({
+        where: eq(userFingerprints.serverId, serverIdNum),
+      }),
+      db.query.anomalyEvents.findMany({
+        where: eq(anomalyEvents.serverId, serverIdNum),
+      }),
+      db
+        .select({
+          id: activityLocations.id,
+          activityId: activityLocations.activityId,
+          ipAddress: activityLocations.ipAddress,
+          countryCode: activityLocations.countryCode,
+          country: activityLocations.country,
+          region: activityLocations.region,
+          city: activityLocations.city,
+          latitude: activityLocations.latitude,
+          longitude: activityLocations.longitude,
+          timezone: activityLocations.timezone,
+          isPrivateIp: activityLocations.isPrivateIp,
+          createdAt: activityLocations.createdAt,
+        })
+        .from(activityLocations)
+        .innerJoin(activities, eq(activityLocations.activityId, activities.id))
+        .where(eq(activities.serverId, serverIdNum)),
+    ]);
 
     const exportData = {
       exportInfo: {
         timestamp: new Date().toISOString(),
         serverName: server.name,
         serverId: server.id,
-        version: "streamystats-v2",
-        exportType: "sessions-only",
+        version: "streamystats-v3",
+        exportType: "server-backup",
       },
 
-      // Core session data - all sessions for this server
-      sessions: await db.query.sessions.findMany({
-        where: eq(sessions.serverId, Number(serverId)),
-      }),
+      counts: {
+        sessions: exportedSessions.length,
+        activities: exportedActivities.length,
+        activityLocations: exportedActivityLocations.length,
+        hiddenRecommendations: exportedHiddenRecommendations.length,
+        userFingerprints: exportedUserFingerprints.length,
+        anomalyEvents: exportedAnomalyEvents.length,
+      },
 
-      // Server info
+      // Server (safe-to-export) settings + Jellyfin identity hint
       server: {
         id: server.id,
         name: server.name,
         url: server.url,
+        localAddress: server.localAddress,
         version: server.version,
+        productName: server.productName,
+        operatingSystem: server.operatingSystem,
+        jellyfinSystemId: jellyfinInfo?.Id ?? null,
+
+        // Settings worth retaining on restore (exclude secrets like apiKey/chatApiKey/embeddingApiKey)
+        startupWizardCompleted: server.startupWizardCompleted,
+        autoGenerateEmbeddings: server.autoGenerateEmbeddings,
+        embeddingProvider: server.embeddingProvider,
+        embeddingBaseUrl: server.embeddingBaseUrl,
+        embeddingModel: server.embeddingModel,
+        embeddingDimensions: server.embeddingDimensions,
+        chatProvider: server.chatProvider,
+        chatBaseUrl: server.chatBaseUrl,
+        chatModel: server.chatModel,
+        disabledHolidays: server.disabledHolidays,
+        excludedUserIds: server.excludedUserIds,
+        excludedLibraryIds: server.excludedLibraryIds,
       },
+
+      // Data (server-scoped)
+      sessions: exportedSessions,
+      activities: exportedActivities,
+      activityLocations: exportedActivityLocations,
+      hiddenRecommendations: exportedHiddenRecommendations,
+      userFingerprints: exportedUserFingerprints,
+      anomalyEvents: exportedAnomalyEvents,
     };
-
-    const sessionCount = exportData.sessions.length;
-
-    console.log(
-      `Export completed for server ${server.name}: ${sessionCount} sessions`,
-    );
 
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().split("T")[0];
@@ -68,7 +183,7 @@ export async function GET(
       headers: {
         "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        "X-Export-Count": sessionCount.toString(),
+        "X-Export-Count": exportData.counts.sessions.toString(),
         "X-Export-Server": server.name,
       },
     });

@@ -8,6 +8,7 @@ import {
   Loader2,
   Upload,
 } from "lucide-react";
+import type React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -113,13 +114,22 @@ export default function DatabaseBackupRestore({
     },
   });
 
+  const handleExportClick = () => exportMutation.mutate();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFile(e.target.files?.[0] ?? null);
+    setImportSuccess(null);
+  };
+
+  const handleImportClick = () => importMutation.mutate();
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Streamystats Backup & Restore</CardTitle>
           <CardDescription>
-            Export or restore your playback session data.
+            Export or restore your Streamystats data.
             <br />
             <b>Only works with the new version of Streamystats.</b>
           </CardDescription>
@@ -128,7 +138,7 @@ export default function DatabaseBackupRestore({
         <CardContent className="space-y-6">
           {/* EXPORT */}
           <div className="space-y-2">
-            <h3 className="">Export Sessions</h3>
+            <h3 className="">Export Backup</h3>
             {exportMutation.isError && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -141,7 +151,7 @@ export default function DatabaseBackupRestore({
               </Alert>
             )}
             <Button
-              onClick={() => exportMutation.mutate()}
+              onClick={handleExportClick}
               disabled={exportMutation.isPending}
               className="flex items-center gap-2"
             >
@@ -152,7 +162,7 @@ export default function DatabaseBackupRestore({
 
           {/* IMPORT */}
           <div className="space-y-2">
-            <h3 className="">Import Sessions</h3>
+            <h3 className="">Import Backup</h3>
             {importMutation.isError && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -186,15 +196,12 @@ export default function DatabaseBackupRestore({
                   type="file"
                   accept=".json"
                   disabled={!hasCompletedInitialSync}
-                  onChange={(e) => {
-                    setFile(e.target.files?.[0] ?? null);
-                    setImportSuccess(null);
-                  }}
+                  onChange={handleFileChange}
                 />
               </div>
 
               <Button
-                onClick={() => importMutation.mutate()}
+                onClick={handleImportClick}
                 disabled={
                   importMutation.isPending || !file || !hasCompletedInitialSync
                 }
