@@ -61,7 +61,6 @@ export const updateServerConnectionAction = async ({
           secure,
         },
       );
-
     }
 
     return result;
