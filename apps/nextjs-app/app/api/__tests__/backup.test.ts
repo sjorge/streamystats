@@ -35,7 +35,9 @@ describe("backup export/import routes", () => {
           ],
         },
         hiddenRecommendations: {
-          findMany: async () => [{ id: 1, serverId: 1, userId: "u1", itemId: "i1" }],
+          findMany: async () => [
+            { id: 1, serverId: 1, userId: "u1", itemId: "i1" },
+          ],
         },
       },
     };
@@ -94,7 +96,9 @@ describe("backup export/import routes", () => {
     expect((body.counts as any).hiddenRecommendations).toBe(1);
 
     // server section includes identity hint, but must not include secrets
-    expect(((body.server as any).jellyfinSystemId as string) ?? null).toBe("sys-1");
+    expect(((body.server as any).jellyfinSystemId as string) ?? null).toBe(
+      "sys-1",
+    );
     expect((body.server as any).apiKey).toBeUndefined();
   });
 
@@ -136,6 +140,7 @@ describe("backup export/import routes", () => {
           };
           return {
             onConflictDoNothing: async () => run(),
+            // biome-ignore lint/suspicious/noThenProperty: Intentionally thenable for Drizzle mock
             then: (resolve: any, reject: any) => run().then(resolve, reject),
           };
         },
@@ -171,7 +176,10 @@ describe("backup export/import routes", () => {
 
     // Mock schema tables used only for db builder + eq()
     bunMock.module("@streamystats/database/schema", () => ({
-      hiddenRecommendations: { _name: "hiddenRecommendations", serverId: "hr.serverId" },
+      hiddenRecommendations: {
+        _name: "hiddenRecommendations",
+        serverId: "hr.serverId",
+      },
       items: { id: "items.id", serverId: "items.serverId" },
       users: { id: "users.id", serverId: "users.serverId" },
       servers: { id: "servers.id" },
@@ -257,7 +265,15 @@ describe("backup export/import routes", () => {
           updatedAt: new Date().toISOString(),
         },
       ],
-      hiddenRecommendations: [{ id: 1, serverId: 1, userId: "u1", itemId: "i1", createdAt: new Date().toISOString() }],
+      hiddenRecommendations: [
+        {
+          id: 1,
+          serverId: 1,
+          userId: "u1",
+          itemId: "i1",
+          createdAt: new Date().toISOString(),
+        },
+      ],
     };
 
     const file = new File([JSON.stringify(backup)], "backup.json", {
@@ -285,5 +301,3 @@ describe("backup export/import routes", () => {
     expect(deleted.length).toBeGreaterThan(0);
   });
 });
-
-

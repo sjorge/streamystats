@@ -218,4 +218,3 @@ export function SeasonsAndEpisodes({
     </Card>
   );
 }
-

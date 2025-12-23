@@ -12,6 +12,13 @@ import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -19,13 +26,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { fetch } from "@/lib/utils";
 
@@ -241,7 +241,8 @@ export default function JellystatsImport({
             <DialogHeader>
               <DialogTitle>How to export data from Jellystats</DialogTitle>
               <DialogDescription>
-                Follow these steps to export your playback history from Jellystats
+                Follow these steps to export your playback history from
+                Jellystats
               </DialogDescription>
             </DialogHeader>
             <div className="text-sm text-muted-foreground space-y-2">
@@ -256,8 +257,8 @@ export default function JellystatsImport({
                 <li>Scroll all the way to the end and start a backup</li>
                 <li>Navigate back to Backups</li>
                 <li>
-                  Select Actions on the backup you just took once it is
-                  visible and click Download
+                  Select Actions on the backup you just took once it is visible
+                  and click Download
                 </li>
                 <li>Upload it here</li>
               </ol>

@@ -31,4 +31,3 @@ export function useSecurityEvents(serverId: number) {
 
   useJobEvents({ onJobEvent: handleEvent });
 }
-

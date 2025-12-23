@@ -58,7 +58,9 @@ export default async function BackupAndImportSettings(props: {
               <FileUp className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Import from External Sources</h2>
+              <h2 className="text-xl font-semibold">
+                Import from External Sources
+              </h2>
               <p className="text-sm text-muted-foreground">
                 Import playback history from Jellystats or Playback Reporting
               </p>

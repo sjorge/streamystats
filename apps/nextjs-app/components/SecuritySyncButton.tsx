@@ -64,4 +64,3 @@ export function SecuritySyncButton({ serverId }: SecuritySyncButtonProps) {
     </Button>
   );
 }
-

@@ -2,8 +2,8 @@ import { db } from "@streamystats/database";
 import {
   hiddenRecommendations,
   items,
-  servers,
   type NewSession,
+  servers,
   sessions,
   users,
 } from "@streamystats/database/schema";
@@ -274,10 +274,12 @@ export async function POST(req: NextRequest) {
       const update: Partial<typeof servers.$inferInsert> = {};
 
       if (typeof importData.server.startupWizardCompleted === "boolean") {
-        update.startupWizardCompleted = importData.server.startupWizardCompleted;
+        update.startupWizardCompleted =
+          importData.server.startupWizardCompleted;
       }
       if (typeof importData.server.autoGenerateEmbeddings === "boolean") {
-        update.autoGenerateEmbeddings = importData.server.autoGenerateEmbeddings;
+        update.autoGenerateEmbeddings =
+          importData.server.autoGenerateEmbeddings;
       }
 
       if (importData.server.embeddingProvider !== undefined) {
@@ -290,7 +292,8 @@ export async function POST(req: NextRequest) {
         update.embeddingModel = importData.server.embeddingModel ?? null;
       }
       if (importData.server.embeddingDimensions !== undefined) {
-        update.embeddingDimensions = importData.server.embeddingDimensions ?? null;
+        update.embeddingDimensions =
+          importData.server.embeddingDimensions ?? null;
       }
 
       if (importData.server.chatProvider !== undefined) {

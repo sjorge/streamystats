@@ -13,6 +13,13 @@ import { useFormStatus } from "react-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -20,13 +27,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   type ImportState,
@@ -248,9 +248,12 @@ export default function PlaybackReportingImport({
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>How to export data from Playback Reporting</DialogTitle>
+              <DialogTitle>
+                How to export data from Playback Reporting
+              </DialogTitle>
               <DialogDescription>
-                Follow these steps to export your playback history from Playback Reporting
+                Follow these steps to export your playback history from Playback
+                Reporting
               </DialogDescription>
             </DialogHeader>
             <div className="text-sm text-muted-foreground space-y-2">

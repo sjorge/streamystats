@@ -199,20 +199,22 @@ export default function DatabaseBackupRestore({
             </Alert>
           )}
           {importSuccess && (
-            <Alert variant="default" className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800">
+            <Alert
+              variant="default"
+              className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+            >
               <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
               <AlertTitle className="text-green-700 dark:text-green-300">
                 Success
               </AlertTitle>
               <AlertDescription className="text-green-600 dark:text-green-400">
                 {importSuccess.message}
-                {importSuccess.imported_count &&
-                  importSuccess.total_count && (
-                    <p className="mt-1">
-                      Successfully imported {importSuccess.imported_count} of{" "}
-                      {importSuccess.total_count} sessions.
-                    </p>
-                  )}
+                {importSuccess.imported_count && importSuccess.total_count && (
+                  <p className="mt-1">
+                    Successfully imported {importSuccess.imported_count} of{" "}
+                    {importSuccess.total_count} sessions.
+                  </p>
+                )}
               </AlertDescription>
             </Alert>
           )}
@@ -234,7 +236,8 @@ export default function DatabaseBackupRestore({
               />
               {file && (
                 <p className="text-sm text-muted-foreground">
-                  Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)}{" "}
+                  MB)
                 </p>
               )}
             </div>
