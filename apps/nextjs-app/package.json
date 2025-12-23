@@ -8,6 +8,7 @@
     "start": "bun --bun next start",
     "start:standalone": "bun run .next/standalone/apps/nextjs-app/server.js",
     "dev:node": "next dev --turbopack",
+    "test": "bun test",
     "migrate": "node-pg-migrate -T ts --tsconfig ./tsconfig.json",
     "migrate:up": "node-pg-migrate -T ts --tsconfig ./tsconfig.json up",
     "migrate:down": "node-pg-migrate -T ts --tsconfig ./tsconfig.json down",

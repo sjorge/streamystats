@@ -1,11 +1,22 @@
 import { Hono } from "hono";
 import { getJobQueue, JobTypes } from "../../jobs/queue";
 import { JELLYFIN_JOB_NAMES } from "../../jellyfin/workers";
+import { GEOLOCATION_JOB_NAMES } from "../../jobs/geolocation-jobs";
+import { SECURITY_SYNC_JOB_NAME } from "../../jobs/security-sync-job";
 import { db, jobResults } from "@streamystats/database";
 import { eq, desc } from "drizzle-orm";
 import { cancelJobsByName } from "./utils";
 
 const app = new Hono();
+
+// All job types that can be associated with a server
+const ALL_SERVER_JOB_TYPES = [
+  JobTypes.SYNC_SERVER_DATA,
+  JobTypes.GENERATE_ITEM_EMBEDDINGS,
+  ...Object.values(JELLYFIN_JOB_NAMES),
+  ...Object.values(GEOLOCATION_JOB_NAMES),
+  SECURITY_SYNC_JOB_NAME,
+];
 
 app.post("/cancel-by-type", async (c) => {
   try {
@@ -40,6 +51,53 @@ app.post("/cancel-by-type", async (c) => {
     });
   } catch (error) {
     console.error("Error cancelling jobs by type:", error);
+    return c.json(
+      {
+        error: "Failed to cancel jobs",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      500
+    );
+  }
+});
+
+app.post("/cancel-all-for-server", async (c) => {
+  try {
+    const { serverId } = await c.req.json();
+
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
+    }
+
+    const numericServerId = Number(serverId);
+    if (!Number.isFinite(numericServerId)) {
+      return c.json({ error: "Server ID must be a valid number" }, 400);
+    }
+
+    let totalCancelled = 0;
+    const cancelledByType: Record<string, number> = {};
+
+    for (const jobType of ALL_SERVER_JOB_TYPES) {
+      try {
+        const cancelled = await cancelJobsByName(jobType, numericServerId);
+        if (cancelled > 0) {
+          cancelledByType[jobType] = cancelled;
+          totalCancelled += cancelled;
+        }
+      } catch {
+        // Continue cancelling other job types even if one fails
+      }
+    }
+
+    return c.json({
+      success: true,
+      message: `Cancelled ${totalCancelled} jobs for server ${numericServerId}`,
+      totalCancelled,
+      cancelledByType,
+      serverId: numericServerId,
+    });
+  } catch (error) {
+    console.error("Error cancelling all jobs for server:", error);
     return c.json(
       {
         error: "Failed to cancel jobs",
