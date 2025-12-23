@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Loader, Play, Square } from "lucide-react";
 import { useState } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -137,7 +137,9 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   const [baseUrl, setBaseUrl] = useState(
     server.embeddingBaseUrl || PROVIDER_PRESETS.openai.baseUrl,
   );
-  const [apiKey, setApiKey] = useState(server.embeddingApiKey || "");
+  // Don't pre-fill API key for security - just track if one exists
+  const [apiKey, setApiKey] = useState("");
+  const hasExistingApiKey = Boolean(server.embeddingApiKey);
   const [model, setModel] = useState(
     server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel,
   );
@@ -158,10 +160,6 @@ export function EmbeddingsManager({ server }: { server: Server }) {
     server.autoGenerateEmbeddings || false,
   );
   const [isUpdatingAutoEmbed, setIsUpdatingAutoEmbed] = useState(false);
-  const [actionResult, setActionResult] = useState<{
-    type: "success" | "error" | "info";
-    message: string;
-  } | null>(null);
 
   const {
     data: progress,
@@ -192,7 +190,6 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
-    setActionResult(null);
     try {
       await saveEmbeddingConfig({
         serverId: server.id,
@@ -204,16 +201,10 @@ export function EmbeddingsManager({ server }: { server: Server }) {
           dimensions,
         },
       });
-      setActionResult({
-        type: "success",
-        message: "Embedding configuration saved",
-      });
+      toast.success("Embedding configuration saved");
       refetch();
     } catch (_error) {
-      setActionResult({
-        type: "error",
-        message: "Failed to save embedding configuration",
-      });
+      toast.error("Failed to save embedding configuration");
     } finally {
       setIsSaving(false);
     }
@@ -222,7 +213,9 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   // Check if current provider has valid configuration
   const hasValidConfig = () => {
     const preset = PROVIDER_PRESETS[selectedPreset];
-    if (preset.requiresApiKey && !apiKey) {
+    // API key is valid if: already saved OR newly entered
+    const hasApiKey = hasExistingApiKey || !!apiKey;
+    if (preset.requiresApiKey && !hasApiKey) {
       return false;
     }
     return !!baseUrl && !!model;
@@ -237,22 +230,14 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleStartEmbedding = async () => {
     setIsStarting(true);
-    setActionResult(null);
     try {
       await startEmbedding({ serverId: server.id });
-      setActionResult({
-        type: "success",
-        message: "Embedding process started",
-      });
+      toast.success("Embedding process started");
       refetch();
     } catch (err) {
-      setActionResult({
-        type: "error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to start embedding process",
-      });
+      toast.error(
+        err instanceof Error ? err.message : "Failed to start embedding process",
+      );
     } finally {
       setIsStarting(false);
     }
@@ -260,29 +245,20 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleStopEmbedding = async () => {
     setIsStopping(true);
-    setActionResult(null);
     try {
       await stopEmbedding({ serverId: server.id });
-      setActionResult({
-        type: "success",
-        message: "Embedding process stopped",
-      });
+      toast.success("Embedding process stopped");
       refetch();
     } catch (err) {
-      setActionResult({
-        type: "error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to stop embedding process",
-      });
+      toast.error(
+        err instanceof Error ? err.message : "Failed to stop embedding process",
+      );
     } finally {
       setIsStopping(false);
     }
   };
 
   const _handleCleanupStaleJobs = async () => {
-    setActionResult(null);
     try {
       const jobServerUrl =
         process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
@@ -303,30 +279,20 @@ export function EmbeddingsManager({ server }: { server: Server }) {
       const result = await response.json();
 
       if (result.cleanedJobs > 0) {
-        setActionResult({
-          type: "success",
-          message: `Cleaned up ${result.cleanedJobs} stale embedding job(s)`,
-        });
+        toast.success(`Cleaned up ${result.cleanedJobs} stale embedding job(s)`);
       } else {
-        setActionResult({
-          type: "info",
-          message: "No stale embedding jobs to cleanup",
-        });
+        toast.info("No stale embedding jobs to cleanup");
       }
 
       refetch();
     } catch (error) {
       console.error("Error cleaning up stale jobs:", error);
-      setActionResult({
-        type: "error",
-        message: "Failed to cleanup stale jobs",
-      });
+      toast.error("Failed to cleanup stale jobs");
     }
   };
 
   const handleClearEmbeddings = async () => {
     setIsClearing(true);
-    setActionResult(null);
     try {
       // Stop any running embedding jobs first
       try {
@@ -335,17 +301,12 @@ export function EmbeddingsManager({ server }: { server: Server }) {
         // Ignore errors - job might not be running
       }
       await clearEmbeddings({ serverId: server.id });
-      setActionResult({
-        type: "success",
-        message: "Embeddings and vector index cleared",
-      });
+      toast.success("Embeddings and vector index cleared");
       refetch();
     } catch (err) {
-      setActionResult({
-        type: "error",
-        message:
-          err instanceof Error ? err.message : "Failed to clear embeddings",
-      });
+      toast.error(
+        err instanceof Error ? err.message : "Failed to clear embeddings",
+      );
     } finally {
       setIsClearing(false);
       setShowClearDialog(false);
@@ -354,19 +315,14 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
   const handleToggleAutoEmbeddings = async (checked: boolean) => {
     setIsUpdatingAutoEmbed(true);
-    setActionResult(null);
     try {
       await toggleAutoEmbeddings({ serverId: server.id, enabled: checked });
       setAutoEmbeddings(checked);
-      setActionResult({
-        type: "success",
-        message: `Auto-generate embeddings ${checked ? "enabled" : "disabled"}`,
-      });
+      toast.success(
+        `Auto-generate embeddings ${checked ? "enabled" : "disabled"}`,
+      );
     } catch (_error) {
-      setActionResult({
-        type: "error",
-        message: "Failed to update auto-embedding setting",
-      });
+      toast.error("Failed to update auto-embedding setting");
       // Reset to previous state
       setAutoEmbeddings(!checked);
     } finally {
@@ -409,15 +365,6 @@ export function EmbeddingsManager({ server }: { server: Server }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {actionResult ? (
-            <Alert
-              variant={
-                actionResult.type === "error" ? "destructive" : "default"
-              }
-            >
-              <AlertDescription>{actionResult.message}</AlertDescription>
-            </Alert>
-          ) : null}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="preset-select">Provider Preset</Label>
@@ -473,13 +420,20 @@ export function EmbeddingsManager({ server }: { server: Server }) {
                   id="api-key"
                   type="password"
                   placeholder={
-                    PROVIDER_PRESETS[selectedPreset].requiresApiKey
-                      ? "Required"
-                      : "Optional"
+                    hasExistingApiKey
+                      ? "API key saved (enter new key to replace)"
+                      : PROVIDER_PRESETS[selectedPreset].requiresApiKey
+                        ? "Required"
+                        : "Optional"
                   }
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
+                {hasExistingApiKey && !apiKey && (
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    An API key is already saved. Leave empty to keep it.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -547,6 +501,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
               )}
 
               <Button
+                type="button"
                 onClick={handleSaveConfig}
                 disabled={isSaving || !baseUrl || !model}
                 className="w-full"
@@ -577,6 +532,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
 
             <div className="flex gap-2 mt-4">
               <Button
+                type="button"
                 onClick={handleStartEmbedding}
                 disabled={
                   isStarting ||
@@ -598,6 +554,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
               </Button>
 
               <Button
+                type="button"
                 onClick={handleStopEmbedding}
                 disabled={isStopping || !isProcessRunning}
                 variant="secondary"
@@ -653,6 +610,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
               mismatches when changing embedding models.
             </p>
             <Button
+              type="button"
               variant="destructive"
               onClick={() => setShowClearDialog(true)}
               disabled={isClearing}

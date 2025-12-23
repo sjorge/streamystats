@@ -108,22 +108,60 @@ export const saveEmbeddingConfig = async ({
   config: EmbeddingConfig;
 }) => {
   try {
-    await db
-      .update(servers)
-      .set({
-        embeddingProvider: config.provider,
-        embeddingBaseUrl: config.baseUrl,
-        embeddingApiKey: config.apiKey || null,
-        embeddingModel: config.model,
-        embeddingDimensions: config.dimensions || 1536,
-      })
-      .where(eq(servers.id, serverId));
+    // Build update object - only include apiKey if explicitly provided
+    // This prevents accidentally wiping existing keys when other fields are updated
+    const updateData: Partial<typeof servers.$inferInsert> = {
+      embeddingProvider: config.provider,
+      embeddingBaseUrl: config.baseUrl,
+      embeddingModel: config.model,
+      embeddingDimensions: config.dimensions || 1536,
+    };
+
+    // Only update API key if a non-empty value is provided
+    // Empty string or undefined means "keep existing key"
+    if (config.apiKey && config.apiKey.trim().length > 0) {
+      updateData.embeddingApiKey = config.apiKey;
+    }
+
+    await db.update(servers).set(updateData).where(eq(servers.id, serverId));
   } catch (error) {
     console.error(
       `Error saving embedding config for server ${serverId}:`,
       error,
     );
     throw new Error("Failed to save embedding configuration");
+  }
+};
+
+export const clearEmbeddingApiKey = async ({
+  serverId,
+}: { serverId: number }) => {
+  try {
+    await db
+      .update(servers)
+      .set({ embeddingApiKey: null })
+      .where(eq(servers.id, serverId));
+  } catch (error) {
+    console.error(
+      `Error clearing embedding API key for server ${serverId}:`,
+      error,
+    );
+    throw new Error("Failed to clear embedding API key");
+  }
+};
+
+export const clearChatApiKey = async ({ serverId }: { serverId: number }) => {
+  try {
+    await db
+      .update(servers)
+      .set({ chatApiKey: null })
+      .where(eq(servers.id, serverId));
+  } catch (error) {
+    console.error(
+      `Error clearing chat API key for server ${serverId}:`,
+      error,
+    );
+    throw new Error("Failed to clear chat API key");
   }
 };
 
@@ -735,15 +773,21 @@ export const saveChatConfig = async ({
   config: ChatAIConfig;
 }) => {
   try {
-    await db
-      .update(servers)
-      .set({
-        chatProvider: config.provider,
-        chatBaseUrl: config.baseUrl,
-        chatApiKey: config.apiKey || null,
-        chatModel: config.model,
-      })
-      .where(eq(servers.id, serverId));
+    // Build update object - only include apiKey if explicitly provided
+    // This prevents accidentally wiping existing keys when other fields are updated
+    const updateData: Partial<typeof servers.$inferInsert> = {
+      chatProvider: config.provider,
+      chatBaseUrl: config.baseUrl,
+      chatModel: config.model,
+    };
+
+    // Only update API key if a non-empty value is provided
+    // Empty string or undefined means "keep existing key"
+    if (config.apiKey && config.apiKey.trim().length > 0) {
+      updateData.chatApiKey = config.apiKey;
+    }
+
+    await db.update(servers).set(updateData).where(eq(servers.id, serverId));
   } catch (error) {
     console.error(`Error saving chat config for server ${serverId}:`, error);
     throw new Error("Failed to save chat configuration");

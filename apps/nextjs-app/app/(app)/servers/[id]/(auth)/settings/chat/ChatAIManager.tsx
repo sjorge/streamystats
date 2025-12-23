@@ -2,7 +2,7 @@
 
 import { Loader, Zap } from "lucide-react";
 import { useState } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -121,7 +121,9 @@ export function ChatAIManager({ server }: { server: Server }) {
   const [baseUrl, setBaseUrl] = useState(
     server.chatBaseUrl || PROVIDER_PRESETS.openai.baseUrl,
   );
-  const [apiKey, setApiKey] = useState(server.chatApiKey || "");
+  // Don't pre-fill API key for security - just track if one exists
+  const [apiKey, setApiKey] = useState("");
+  const hasExistingApiKey = Boolean(server.chatApiKey);
   const [model, setModel] = useState(
     server.chatModel || PROVIDER_PRESETS.openai.defaultModel,
   );
@@ -133,10 +135,6 @@ export function ChatAIManager({ server }: { server: Server }) {
   const [isTesting, setIsTesting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
-  const [actionResult, setActionResult] = useState<{
-    type: "success" | "error" | "info";
-    message: string;
-  } | null>(null);
 
   const handlePresetChange = (preset: PresetKey) => {
     setSelectedPreset(preset);
@@ -152,7 +150,6 @@ export function ChatAIManager({ server }: { server: Server }) {
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
-    setActionResult(null);
     try {
       await saveChatConfig({
         serverId: server.id,
@@ -163,15 +160,9 @@ export function ChatAIManager({ server }: { server: Server }) {
           model,
         },
       });
-      setActionResult({
-        type: "success",
-        message: "AI Chat configuration saved",
-      });
+      toast.success("AI Chat configuration saved");
     } catch (_error) {
-      setActionResult({
-        type: "error",
-        message: "Failed to save AI Chat configuration",
-      });
+      toast.error("Failed to save AI Chat configuration");
     } finally {
       setIsSaving(false);
     }
@@ -179,7 +170,6 @@ export function ChatAIManager({ server }: { server: Server }) {
 
   const handleTestConnection = async () => {
     setIsTesting(true);
-    setActionResult(null);
     try {
       const result = await testChatConnection({
         config: {
@@ -189,15 +179,13 @@ export function ChatAIManager({ server }: { server: Server }) {
           model,
         },
       });
-      setActionResult({
-        type: result.success ? "success" : "error",
-        message: result.message,
-      });
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
     } catch (_error) {
-      setActionResult({
-        type: "error",
-        message: "Failed to test connection",
-      });
+      toast.error("Failed to test connection");
     } finally {
       setIsTesting(false);
     }
@@ -205,7 +193,9 @@ export function ChatAIManager({ server }: { server: Server }) {
 
   const hasValidConfig = () => {
     const preset = PROVIDER_PRESETS[selectedPreset];
-    if (preset.requiresApiKey && !apiKey) {
+    // API key is valid if: already saved OR newly entered
+    const hasApiKey = hasExistingApiKey || !!apiKey;
+    if (preset.requiresApiKey && !hasApiKey) {
       return false;
     }
     return !!baseUrl && !!model;
@@ -213,24 +203,18 @@ export function ChatAIManager({ server }: { server: Server }) {
 
   const handleClearConfig = async () => {
     setIsClearing(true);
-    setActionResult(null);
     try {
       await clearChatConfig({ serverId: server.id });
-      setActionResult({
-        type: "success",
-        message: "AI Chat configuration cleared",
-      });
+      toast.success("AI Chat configuration cleared");
       setBaseUrl(PROVIDER_PRESETS.openai.baseUrl);
       setApiKey("");
       setModel(PROVIDER_PRESETS.openai.defaultModel);
       setProvider("openai-compatible");
       setSelectedPreset("openai");
     } catch (err) {
-      setActionResult({
-        type: "error",
-        message:
-          err instanceof Error ? err.message : "Failed to clear configuration",
-      });
+      toast.error(
+        err instanceof Error ? err.message : "Failed to clear configuration",
+      );
     } finally {
       setIsClearing(false);
       setShowClearDialog(false);
@@ -248,15 +232,6 @@ export function ChatAIManager({ server }: { server: Server }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {actionResult ? (
-            <Alert
-              variant={
-                actionResult.type === "error" ? "destructive" : "default"
-              }
-            >
-              <AlertDescription>{actionResult.message}</AlertDescription>
-            </Alert>
-          ) : null}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="preset-select">Provider</Label>
@@ -312,13 +287,20 @@ export function ChatAIManager({ server }: { server: Server }) {
                   id="api-key"
                   type="password"
                   placeholder={
-                    PROVIDER_PRESETS[selectedPreset].requiresApiKey
-                      ? "Required"
-                      : "Optional"
+                    hasExistingApiKey
+                      ? "API key saved (enter new key to replace)"
+                      : PROVIDER_PRESETS[selectedPreset].requiresApiKey
+                        ? "Required"
+                        : "Optional"
                   }
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
+                {hasExistingApiKey && !apiKey && (
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    An API key is already saved. Leave empty to keep it.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -347,6 +329,7 @@ export function ChatAIManager({ server }: { server: Server }) {
 
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   onClick={handleSaveConfig}
                   disabled={isSaving || !baseUrl || !model}
                   className="flex-1"
@@ -354,6 +337,7 @@ export function ChatAIManager({ server }: { server: Server }) {
                   {isSaving ? "Saving..." : "Save Configuration"}
                 </Button>
                 <Button
+                  type="button"
                   onClick={handleTestConnection}
                   disabled={isTesting || !hasValidConfig()}
                   variant="outline"
@@ -381,6 +365,7 @@ export function ChatAIManager({ server }: { server: Server }) {
               Remove the AI Chat configuration from this server.
             </p>
             <Button
+              type="button"
               variant="destructive"
               onClick={() => setShowClearDialog(true)}
               disabled={isClearing || !server.chatProvider}
