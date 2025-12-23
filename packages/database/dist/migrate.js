@@ -43,7 +43,11 @@ const postgres_js_1 = require("drizzle-orm/postgres-js");
 const dotenv = __importStar(require("dotenv"));
 dotenv.config({ quiet: true });
 const getConnectionString = () => {
-    return process.env.DATABASE_URL;
+    const url = process.env.DATABASE_URL;
+    if (!url) {
+        throw new Error('DATABASE_URL environment variable is missing. Set DATABASE_URL (e.g. "postgresql://postgres:postgres@host:5432/streamystats").');
+    }
+    return url;
 };
 async function migrate() {
     const connectionString = getConnectionString();

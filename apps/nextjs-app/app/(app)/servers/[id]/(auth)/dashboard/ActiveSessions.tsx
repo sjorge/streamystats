@@ -60,6 +60,8 @@ export function ActiveSessions({ server }: { server: Server }) {
     queryKey: ["activeSessions", server.id],
     queryFn: () => getActiveSessions(server.id),
     refetchInterval: 5000, // Increased from 500ms to 5s to reduce load during connectivity issues
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     // Don't throw on error, handle it gracefully instead
     retry: 1,
     retryDelay: 3000,

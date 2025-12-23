@@ -7,7 +7,6 @@ import {
   BarChart,
   CartesianGrid,
   LabelList,
-  ResponsiveContainer,
   XAxis,
   YAxis,
 } from "recharts";
@@ -149,46 +148,41 @@ export const TranscodingReasonsCard = ({
           className="w-full aspect-auto"
           style={{ height: getChartHeight(reasonsDataWithPercent.length) }}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              accessibilityLayer
-              data={reasonsDataWithPercent}
+          <BarChart
+            accessibilityLayer
+            data={reasonsDataWithPercent}
+            layout="vertical"
+            margin={{
+              right: 16,
+              left: 0,
+              top: 5,
+              bottom: 5,
+            }}
+            barSize={getBarHeight(reasonsDataWithPercent.length)}
+          >
+            <CartesianGrid horizontal={false} />
+            <YAxis
+              dataKey="reason"
+              type="category"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={false}
+              hide
+            />
+            <XAxis dataKey="count" type="number" hide />
+            <ChartTooltip
+              cursor={false}
+              content={<ChartTooltipContent indicator="line" />}
+            />
+            <Bar
+              dataKey="count"
               layout="vertical"
-              margin={{
-                right: 16,
-                left: 0,
-                top: 5,
-                bottom: 5,
-              }}
-              barSize={getBarHeight(reasonsDataWithPercent.length)}
+              radius={4}
+              className="fill-blue-600"
             >
-              <CartesianGrid horizontal={false} />
-              <YAxis
-                dataKey="reason"
-                type="category"
-                tickLine={false}
-                tickMargin={10}
-                axisLine={false}
-                hide
-              />
-              <XAxis dataKey="count" type="number" hide />
-              <ChartTooltip
-                cursor={false}
-                content={<ChartTooltipContent indicator="line" />}
-              />
-              <Bar
-                dataKey="count"
-                layout="vertical"
-                radius={4}
-                className="fill-blue-600"
-              >
-                <LabelList
-                  dataKey="labelWithPercent"
-                  content={renderBarLabel}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              <LabelList dataKey="labelWithPercent" content={renderBarLabel} />
+            </Bar>
+          </BarChart>
         </ChartContainer>
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
