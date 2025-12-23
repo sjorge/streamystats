@@ -1,7 +1,9 @@
 import { db } from "@streamystats/database";
 import {
+  hiddenRecommendations,
   items,
   type NewSession,
+  servers,
   sessions,
   users,
 } from "@streamystats/database/schema";
@@ -9,6 +11,36 @@ import { eq } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { getServer } from "@/lib/db/server";
+
+type JellyfinSystemInfo = { Id?: string };
+
+function normalizeUrl(url: string) {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+async function tryFetchJellyfinSystemId({
+  url,
+  apiKey,
+}: {
+  url: string;
+  apiKey: string;
+}): Promise<string | null> {
+  try {
+    const res = await fetch(`${normalizeUrl(url)}/System/Info`, {
+      method: "GET",
+      headers: {
+        "X-Emby-Token": apiKey,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const payload = (await res.json()) as JellyfinSystemInfo;
+    return payload.Id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // Types for the import data format
 interface ExportInfo {
@@ -81,14 +113,40 @@ interface ImportSession {
   updatedAt: string;
 }
 
+interface ImportHiddenRecommendation {
+  id: number;
+  serverId: number;
+  userId: string;
+  itemId: string;
+  createdAt: string;
+}
+
 interface ImportData {
   exportInfo: ExportInfo;
   sessions: ImportSession[];
+  hiddenRecommendations?: ImportHiddenRecommendation[];
   server: {
     id: number;
     name: string;
     url: string;
     version?: string;
+    localAddress?: string | null;
+    productName?: string | null;
+    operatingSystem?: string | null;
+    jellyfinSystemId?: string | null;
+
+    startupWizardCompleted?: boolean;
+    autoGenerateEmbeddings?: boolean;
+    embeddingProvider?: string | null;
+    embeddingBaseUrl?: string | null;
+    embeddingModel?: string | null;
+    embeddingDimensions?: number | null;
+    chatProvider?: string | null;
+    chatBaseUrl?: string | null;
+    chatModel?: string | null;
+    disabledHolidays?: string[] | null;
+    excludedUserIds?: string[] | null;
+    excludedLibraryIds?: string[] | null;
   };
 }
 
@@ -158,37 +216,115 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate export version compatibility
-    if (importData.exportInfo.version !== "streamystats-v2") {
+    // Validate export version/type (single supported format)
+    const exportVersion = importData.exportInfo.version;
+    const exportType = importData.exportInfo.exportType;
+
+    if (exportVersion !== "streamystats") {
       return NextResponse.json(
         {
-          error: `Unsupported export version: ${importData.exportInfo.version}. Expected: streamystats-v2`,
+          error: `Unsupported export version: ${exportVersion}. Expected: streamystats`,
         },
         { status: 400 },
       );
     }
 
-    // Validate export type
-    if (importData.exportInfo.exportType !== "sessions-only") {
+    if (exportType !== "backup") {
       return NextResponse.json(
         {
-          error: `Unsupported export type: ${importData.exportInfo.exportType}. Expected: sessions-only`,
+          error: `Unsupported export type: ${exportType}. Expected: backup`,
         },
         { status: 400 },
       );
     }
 
-    console.log(
-      `Starting import for server ${targetServer.name} (${serverIdNum})`,
-    );
-    console.log(
-      `Import file from: ${importData.server.name} (original ID: ${importData.exportInfo.serverId})`,
-    );
-    console.log(`Sessions to import: ${importData.sessions.length}`);
+    const warnings: string[] = [];
+
+    // Optional: verify this backup targets the same Jellyfin server (preferred over URL matching)
+    const forceDifferentServer = formData.get("force") === "true";
+    const sourceJellyfinSystemId = importData.server?.jellyfinSystemId ?? null;
+    const targetJellyfinSystemId = await tryFetchJellyfinSystemId({
+      url: targetServer.url,
+      apiKey: targetServer.apiKey,
+    });
+
+    if (
+      sourceJellyfinSystemId &&
+      targetJellyfinSystemId &&
+      sourceJellyfinSystemId !== targetJellyfinSystemId &&
+      !forceDifferentServer
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Backup appears to be from a different Jellyfin server than the selected target. If you're sure, re-run import with force=true.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!sourceJellyfinSystemId || !targetJellyfinSystemId) {
+      warnings.push(
+        "Could not verify Jellyfin server identity (missing System/Info Id). Import proceeded without identity validation.",
+      );
+    }
+
+    // Restore server settings from the backup (never overwrite connection secrets)
+    if (exportType === "backup") {
+      const update: Partial<typeof servers.$inferInsert> = {};
+
+      if (typeof importData.server.startupWizardCompleted === "boolean") {
+        update.startupWizardCompleted =
+          importData.server.startupWizardCompleted;
+      }
+      if (typeof importData.server.autoGenerateEmbeddings === "boolean") {
+        update.autoGenerateEmbeddings =
+          importData.server.autoGenerateEmbeddings;
+      }
+
+      if (importData.server.embeddingProvider !== undefined) {
+        update.embeddingProvider = importData.server.embeddingProvider ?? null;
+      }
+      if (importData.server.embeddingBaseUrl !== undefined) {
+        update.embeddingBaseUrl = importData.server.embeddingBaseUrl ?? null;
+      }
+      if (importData.server.embeddingModel !== undefined) {
+        update.embeddingModel = importData.server.embeddingModel ?? null;
+      }
+      if (importData.server.embeddingDimensions !== undefined) {
+        update.embeddingDimensions =
+          importData.server.embeddingDimensions ?? null;
+      }
+
+      if (importData.server.chatProvider !== undefined) {
+        update.chatProvider = importData.server.chatProvider ?? null;
+      }
+      if (importData.server.chatBaseUrl !== undefined) {
+        update.chatBaseUrl = importData.server.chatBaseUrl ?? null;
+      }
+      if (importData.server.chatModel !== undefined) {
+        update.chatModel = importData.server.chatModel ?? null;
+      }
+
+      if (Array.isArray(importData.server.disabledHolidays)) {
+        update.disabledHolidays = importData.server.disabledHolidays;
+      }
+      if (Array.isArray(importData.server.excludedUserIds)) {
+        update.excludedUserIds = importData.server.excludedUserIds;
+      }
+      if (Array.isArray(importData.server.excludedLibraryIds)) {
+        update.excludedLibraryIds = importData.server.excludedLibraryIds;
+      }
+
+      if (Object.keys(update).length > 0) {
+        await db
+          .update(servers)
+          .set({ ...update, updatedAt: new Date() })
+          .where(eq(servers.id, serverIdNum));
+      }
+    }
 
     // Pre-fetch existing users and items for the target server to avoid FK violations
-    console.log("Pre-fetching existing users and items for FK validation...");
-
     const existingUsers = await db.query.users.findMany({
       where: eq(users.serverId, serverIdNum),
       columns: { id: true },
@@ -200,10 +336,36 @@ export async function POST(req: NextRequest) {
       columns: { id: true },
     });
     const existingItemIds = new Set(existingItems.map((i) => i.id));
+    // Restore hidden recommendations (non-Jellyfin derived user preferences)
+    let hiddenRecommendationsImported = 0;
+    let hiddenRecommendationsSkipped = 0;
 
-    console.log(
-      `Found ${existingUsers.length} existing users and ${existingItems.length} existing items on target server`,
-    );
+    if (!Array.isArray(importData.hiddenRecommendations)) {
+      warnings.push(
+        "Backup file is missing hiddenRecommendations. Skipped restoring hidden recommendations.",
+      );
+    } else {
+      await db
+        .delete(hiddenRecommendations)
+        .where(eq(hiddenRecommendations.serverId, serverIdNum));
+
+      const rows = importData.hiddenRecommendations
+        .filter((r) => existingItemIds.has(r.itemId))
+        .map((r) => ({
+          serverId: serverIdNum,
+          userId: r.userId,
+          itemId: r.itemId,
+          createdAt: new Date(r.createdAt),
+        })) satisfies Array<typeof hiddenRecommendations.$inferInsert>;
+
+      hiddenRecommendationsSkipped =
+        importData.hiddenRecommendations.length - rows.length;
+      hiddenRecommendationsImported = rows.length;
+
+      if (rows.length > 0) {
+        await db.insert(hiddenRecommendations).values(rows);
+      }
+    }
 
     // Process and import sessions
     let processedCount = 0;
@@ -358,9 +520,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const message = `Successfully imported ${importedCount} of ${processedCount} sessions from ${importData.server.name} to ${targetServer.name}`;
+    const message =
+      `Successfully imported ${importedCount} of ${processedCount} sessions` +
+      ` and restored ${hiddenRecommendationsImported} hidden recommendations` +
+      ` from ${importData.server.name} to ${targetServer.name}`;
 
-    console.log(`Import completed: ${message}`);
     if (errorCount > 0) {
       console.warn(`Import had ${errorCount} errors`);
     }
@@ -378,6 +542,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      export_version: importData.exportInfo.version,
+      export_type: importData.exportInfo.exportType,
+      imported: {
+        sessions: importedCount,
+        hidden_recommendations: hiddenRecommendationsImported,
+      },
+      skipped: {
+        sessions_processing_errors: errorCount,
+        hidden_recommendations: hiddenRecommendationsSkipped,
+      },
       imported_count: importedCount,
       total_count: processedCount,
       error_count: errorCount,

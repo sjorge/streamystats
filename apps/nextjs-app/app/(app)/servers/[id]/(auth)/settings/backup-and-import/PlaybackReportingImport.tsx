@@ -10,12 +10,6 @@ import {
 } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +19,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   type ImportState,
@@ -125,17 +127,14 @@ export default function PlaybackReportingImport({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
-          action={formAction}
-          className="space-y-4 flex flex-col items-start"
-        >
+        <form action={formAction} className="space-y-6">
           {/* Hidden input for server ID */}
           <input type="hidden" name="serverId" value={serverId} />
 
-          <div className="space-y-2 flex flex-col">
+          <div className="space-y-2">
             <label
               htmlFor="playback-reporting-file"
-              className="text-sm font-medium"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               Playback Reporting Export File
             </label>
@@ -147,26 +146,48 @@ export default function PlaybackReportingImport({
               accept=".json,application/json,.tsv,text/tab-separated-values,.txt"
               onChange={handleFileChange}
               className="cursor-pointer"
+              disabled={!hasCompletedInitialSync}
             />
             {selectedFile && (
               <p className="text-sm text-muted-foreground">
-                Selected file: {selectedFile.name} (
+                Selected: {selectedFile.name} (
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
               </p>
             )}
           </div>
 
           {state?.type && (
-            <Alert variant={state.type === "error" ? "destructive" : "default"}>
-              {state.type === "success" && <CheckCircle2 className="h-4 w-4" />}
+            <Alert
+              variant={state.type === "error" ? "destructive" : "default"}
+              className={
+                state.type === "success"
+                  ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+                  : ""
+              }
+            >
+              {state.type === "success" && (
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              )}
               {state.type === "error" && <AlertCircle className="h-4 w-4" />}
               {state.type === "info" && <Info className="h-4 w-4" />}
-              <AlertTitle>
+              <AlertTitle
+                className={
+                  state.type === "success"
+                    ? "text-green-700 dark:text-green-300"
+                    : undefined
+                }
+              >
                 {state.type === "success" && "Success"}
                 {state.type === "error" && "Error"}
                 {state.type === "info" && "Information"}
               </AlertTitle>
-              <AlertDescription>
+              <AlertDescription
+                className={
+                  state.type === "success"
+                    ? "text-green-600 dark:text-green-400"
+                    : undefined
+                }
+              >
                 {state.message}
                 {state.type === "success" &&
                   state.importedCount !== undefined &&
@@ -212,33 +233,40 @@ export default function PlaybackReportingImport({
             </Alert>
           )}
 
-          <div className="flex flex-col items-start justify-start">
-            <SubmitButton
-              hasFile={!!selectedFile}
-              disabled={!hasCompletedInitialSync}
-            />
-          </div>
+          <SubmitButton
+            hasFile={!!selectedFile}
+            disabled={!hasCompletedInitialSync}
+          />
         </form>
 
-        <Accordion type="single" collapsible className="mt-6">
-          <AccordionItem value="instructions">
-            <AccordionTrigger className="flex items-center text-sm font-medium">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="w-full mt-6">
               <HelpCircle className="mr-2 h-4 w-4" />
               How to export data from Playback Reporting
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="text-sm text-muted-foreground space-y-2 pt-2 pl-1">
-                <ol className="list-decimal pl-5 space-y-1.5">
-                  <li>Open your Jellyfin admin dashboard</li>
-                  <li>Go to the Playback Reporting plugin settings</li>
-                  <li>Click on Save Backup Data under the Backup section</li>
-                  <li>Download the exported file</li>
-                  <li>Upload it here</li>
-                </ol>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                How to export data from Playback Reporting
+              </DialogTitle>
+              <DialogDescription>
+                Follow these steps to export your playback history from Playback
+                Reporting
+              </DialogDescription>
+            </DialogHeader>
+            <div className="text-sm text-muted-foreground space-y-2">
+              <ol className="list-decimal pl-5 space-y-1.5">
+                <li>Open your Jellyfin admin dashboard</li>
+                <li>Go to the Playback Reporting plugin settings</li>
+                <li>Click on Save Backup Data under the Backup section</li>
+                <li>Download the exported file</li>
+                <li>Upload it here</li>
+              </ol>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

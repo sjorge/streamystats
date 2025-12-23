@@ -19,8 +19,31 @@ export const getServer = async ({
 };
 
 /**
+ * Cancels all queued jobs for a server
+ * @param serverId - The ID of the server
+ */
+const cancelServerJobs = async (serverId: number): Promise<void> => {
+  const jobServerUrl =
+    process.env.JOB_SERVER_URL && process.env.JOB_SERVER_URL !== "undefined"
+      ? process.env.JOB_SERVER_URL
+      : "http://localhost:3005";
+
+  try {
+    await fetch(`${jobServerUrl}/api/jobs/cancel-all-for-server`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serverId }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    // Non-critical: jobs will eventually expire or fail when server is missing
+  }
+};
+
+/**
  * Deletes a server and all its associated data
  * This will cascade delete all related users, libraries, activities, sessions, and items
+ * Also cancels any queued jobs for the server
  * @param serverId - The ID of the server to delete
  * @returns Promise<{ success: boolean; message: string }>
  */
@@ -45,6 +68,9 @@ export const deleteServer = async ({
     }
 
     const serverName = serverExists[0].name;
+
+    // Cancel any queued jobs for this server before deleting
+    await cancelServerJobs(serverId);
 
     await db.delete(servers).where(eq(servers.id, serverId));
 
