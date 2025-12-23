@@ -40,9 +40,9 @@ Recommendations use vector similarity (cosine distance) to find content similar 
 ## Roadmap
 
 - [x] Individual item statistics
-- [ ] More statistics
-- [ ] Only sync certain libraries
-- [ ] More AI tools for better chat
+- [x] More statistics
+- [x] Only sync certain libraries
+- [x] More AI tools for better chat
 
 ## 🚀 Getting started
 
