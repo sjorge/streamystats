@@ -1,18 +1,13 @@
 import { db } from "@streamystats/database";
 import {
-  activities,
-  activityLocations,
-  anomalyEvents,
   hiddenRecommendations,
   items,
   servers,
   type NewSession,
-  type NewUserFingerprint,
   sessions,
-  userFingerprints,
   users,
 } from "@streamystats/database/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { getServer } from "@/lib/db/server";
@@ -118,34 +113,6 @@ interface ImportSession {
   updatedAt: string;
 }
 
-interface ImportActivity {
-  id: string;
-  name: string;
-  shortOverview: string | null;
-  type: string;
-  date: string;
-  severity: string;
-  serverId: number;
-  userId: string | null;
-  itemId: string | null;
-  createdAt: string;
-}
-
-interface ImportActivityLocation {
-  id: number;
-  activityId: string;
-  ipAddress: string;
-  countryCode: string | null;
-  country: string | null;
-  region: string | null;
-  city: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  timezone: string | null;
-  isPrivateIp: boolean;
-  createdAt: string;
-}
-
 interface ImportHiddenRecommendation {
   id: number;
   serverId: number;
@@ -154,48 +121,10 @@ interface ImportHiddenRecommendation {
   createdAt: string;
 }
 
-interface ImportUserFingerprint {
-  id: number;
-  userId: string;
-  serverId: number;
-  knownDeviceIds: string[] | null;
-  knownCountries: string[] | null;
-  knownCities: string[] | null;
-  knownClients: string[] | null;
-  locationPatterns: any;
-  devicePatterns: any;
-  hourHistogram: Record<number, number> | null;
-  avgSessionsPerDay: number | null;
-  totalSessions: number | null;
-  lastCalculatedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface ImportAnomalyEvent {
-  id: number;
-  userId: string | null;
-  serverId: number;
-  activityId: string | null;
-  anomalyType: string;
-  severity: string;
-  details: any;
-  resolved: boolean;
-  resolvedAt: string | null;
-  resolvedBy: string | null;
-  resolutionNote: string | null;
-  createdAt: string;
-}
-
 interface ImportData {
   exportInfo: ExportInfo;
   sessions: ImportSession[];
-  activities?: ImportActivity[];
-  activityLocations?: ImportActivityLocation[];
   hiddenRecommendations?: ImportHiddenRecommendation[];
-  userFingerprints?: ImportUserFingerprint[];
-  anomalyEvents?: ImportAnomalyEvent[];
-  counts?: Record<string, number>;
   server: {
     id: number;
     name: string;
@@ -287,36 +216,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate export version compatibility
+    // Validate export version/type (single supported format)
     const exportVersion = importData.exportInfo.version;
     const exportType = importData.exportInfo.exportType;
 
-    const isV2 = exportVersion === "streamystats-v2";
-    const isV3 = exportVersion === "streamystats-v3";
-
-    if (!isV2 && !isV3) {
+    if (exportVersion !== "streamystats") {
       return NextResponse.json(
         {
-          error: `Unsupported export version: ${exportVersion}. Expected: streamystats-v2 or streamystats-v3`,
+          error: `Unsupported export version: ${exportVersion}. Expected: streamystats`,
         },
         { status: 400 },
       );
     }
 
-    // Validate export type
-    if (isV2 && exportType !== "sessions-only") {
+    if (exportType !== "backup") {
       return NextResponse.json(
         {
-          error: `Unsupported export type: ${exportType}. Expected: sessions-only`,
-        },
-        { status: 400 },
-      );
-    }
-
-    if (isV3 && exportType !== "sessions-only" && exportType !== "server-backup") {
-      return NextResponse.json(
-        {
-          error: `Unsupported export type: ${exportType}. Expected: sessions-only or server-backup`,
+          error: `Unsupported export type: ${exportType}. Expected: backup`,
         },
         { status: 400 },
       );
@@ -354,7 +270,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Restore server settings from the backup (never overwrite connection secrets)
-    if (isV3 && exportType === "server-backup") {
+    if (exportType === "backup") {
       const update: Partial<typeof servers.$inferInsert> = {};
 
       if (typeof importData.server.startupWizardCompleted === "boolean") {
@@ -417,225 +333,34 @@ export async function POST(req: NextRequest) {
       columns: { id: true },
     });
     const existingItemIds = new Set(existingItems.map((i) => i.id));
-
-    // Additional tables (streamystats-v3 server-backup)
-    let activitiesImported = 0;
-    let activityLocationsImported = 0;
-    let activityLocationsSkipped = 0;
+    // Restore hidden recommendations (non-Jellyfin derived user preferences)
     let hiddenRecommendationsImported = 0;
     let hiddenRecommendationsSkipped = 0;
-    let userFingerprintsUpserted = 0;
-    let userFingerprintsSkipped = 0;
-    let anomalyEventsImported = 0;
-    let anomalyEventsSkipped = 0;
 
-    let existingActivityIds = new Set<string>();
+    if (!Array.isArray(importData.hiddenRecommendations)) {
+      warnings.push(
+        "Backup file is missing hiddenRecommendations. Skipped restoring hidden recommendations.",
+      );
+    } else {
+      await db
+        .delete(hiddenRecommendations)
+        .where(eq(hiddenRecommendations.serverId, serverIdNum));
 
-    if (isV3 && exportType === "server-backup") {
-      const importActivities = Array.isArray(importData.activities)
-        ? importData.activities
-        : [];
-      const importLocations = Array.isArray(importData.activityLocations)
-        ? importData.activityLocations
-        : [];
-      const importRecommendations = Array.isArray(importData.hiddenRecommendations)
-        ? importData.hiddenRecommendations
-        : [];
-      const importFingerprints = Array.isArray(importData.userFingerprints)
-        ? importData.userFingerprints
-        : [];
-      const importAnomalies = Array.isArray(importData.anomalyEvents)
-        ? importData.anomalyEvents
-        : [];
-
-      // Activities (needed for activity_locations FK)
-      if (importActivities.length > 0) {
-        const batchSizeActivities = 250;
-        for (let i = 0; i < importActivities.length; i += batchSizeActivities) {
-          const batch = importActivities.slice(i, i + batchSizeActivities);
-          const rows = batch
-            .map((a) => {
-              const validUserId =
-                a.userId && existingUserIds.has(a.userId) ? a.userId : null;
-              return {
-                id: a.id,
-                name: a.name,
-                shortOverview: a.shortOverview,
-                type: a.type,
-                date: new Date(a.date),
-                severity: a.severity,
-                serverId: serverIdNum,
-                userId: validUserId,
-                itemId: a.itemId,
-                createdAt: new Date(a.createdAt),
-              } satisfies typeof activities.$inferInsert;
-            })
-            .filter((a) => a.id && a.name && a.type);
-
-          if (rows.length > 0) {
-            await db.insert(activities).values(rows).onConflictDoNothing();
-            activitiesImported += rows.length;
-          }
-        }
-      }
-
-      // Refresh activity ids for FK validation
-      const existingActivities = await db.query.activities.findMany({
-        where: eq(activities.serverId, serverIdNum),
-        columns: { id: true },
-      });
-      existingActivityIds = new Set(existingActivities.map((a) => a.id));
-
-      // Activity locations (replace by activityId to avoid duplicates)
-      if (importLocations.length > 0) {
-        const activityIds = Array.from(
-          new Set(importLocations.map((l) => l.activityId).filter(Boolean)),
-        ).filter((id) => existingActivityIds.has(id));
-
-        const chunkSize = 5000;
-        for (let i = 0; i < activityIds.length; i += chunkSize) {
-          const chunk = activityIds.slice(i, i + chunkSize);
-          await db
-            .delete(activityLocations)
-            .where(inArray(activityLocations.activityId, chunk));
-        }
-
-        const insertRows = importLocations
-          .filter((l) => existingActivityIds.has(l.activityId))
-          .map((l) => ({
-            activityId: l.activityId,
-            ipAddress: l.ipAddress,
-            countryCode: l.countryCode,
-            country: l.country,
-            region: l.region,
-            city: l.city,
-            latitude: l.latitude,
-            longitude: l.longitude,
-            timezone: l.timezone,
-            isPrivateIp: l.isPrivateIp,
-            createdAt: new Date(l.createdAt),
-          })) satisfies Array<typeof activityLocations.$inferInsert>;
-
-        activityLocationsSkipped = importLocations.length - insertRows.length;
-
-        if (insertRows.length > 0) {
-          const batchSizeLocations = 500;
-          for (let i = 0; i < insertRows.length; i += batchSizeLocations) {
-            await db
-              .insert(activityLocations)
-              .values(insertRows.slice(i, i + batchSizeLocations));
-          }
-          activityLocationsImported = insertRows.length;
-        }
-      }
-
-      // Hidden recommendations (replace per server; validate items FK)
-      if (importRecommendations.length > 0) {
-        await db
-          .delete(hiddenRecommendations)
-          .where(eq(hiddenRecommendations.serverId, serverIdNum));
-
-        const rows = importRecommendations
-          .filter((r) => existingItemIds.has(r.itemId))
-          .map((r) => ({
-            serverId: serverIdNum,
-            userId: r.userId,
-            itemId: r.itemId,
-            createdAt: new Date(r.createdAt),
-          })) satisfies Array<typeof hiddenRecommendations.$inferInsert>;
-
-        hiddenRecommendationsSkipped = importRecommendations.length - rows.length;
-        hiddenRecommendationsImported = rows.length;
-
-        if (rows.length > 0) {
-          await db.insert(hiddenRecommendations).values(rows);
-        }
-      }
-
-      // User fingerprints (upsert per (userId, serverId); validate users FK)
-      for (const fp of importFingerprints) {
-        if (!existingUserIds.has(fp.userId)) {
-          userFingerprintsSkipped++;
-          continue;
-        }
-
-        const fingerprintData: NewUserFingerprint = {
-          userId: fp.userId,
+      const rows = importData.hiddenRecommendations
+        .filter((r) => existingItemIds.has(r.itemId))
+        .map((r) => ({
           serverId: serverIdNum,
-          knownDeviceIds: fp.knownDeviceIds ?? [],
-          knownCountries: fp.knownCountries ?? [],
-          knownCities: fp.knownCities ?? [],
-          knownClients: fp.knownClients ?? [],
-          locationPatterns: fp.locationPatterns ?? [],
-          devicePatterns: fp.devicePatterns ?? [],
-          hourHistogram: fp.hourHistogram ?? {},
-          avgSessionsPerDay: fp.avgSessionsPerDay,
-          totalSessions: fp.totalSessions ?? 0,
-          lastCalculatedAt: fp.lastCalculatedAt ? new Date(fp.lastCalculatedAt) : null,
-          createdAt: new Date(fp.createdAt),
-          updatedAt: new Date(fp.updatedAt),
-        };
+          userId: r.userId,
+          itemId: r.itemId,
+          createdAt: new Date(r.createdAt),
+        })) satisfies Array<typeof hiddenRecommendations.$inferInsert>;
 
-        await db.insert(userFingerprints).values(fingerprintData).onConflictDoUpdate({
-          target: [userFingerprints.userId, userFingerprints.serverId],
-          set: {
-            knownDeviceIds: fingerprintData.knownDeviceIds,
-            knownCountries: fingerprintData.knownCountries,
-            knownCities: fingerprintData.knownCities,
-            knownClients: fingerprintData.knownClients,
-            locationPatterns: fingerprintData.locationPatterns,
-            devicePatterns: fingerprintData.devicePatterns,
-            hourHistogram: fingerprintData.hourHistogram,
-            avgSessionsPerDay: fingerprintData.avgSessionsPerDay,
-            totalSessions: fingerprintData.totalSessions,
-            lastCalculatedAt: fingerprintData.lastCalculatedAt,
-            updatedAt: fingerprintData.updatedAt ?? new Date(),
-          },
-        });
+      hiddenRecommendationsSkipped =
+        importData.hiddenRecommendations.length - rows.length;
+      hiddenRecommendationsImported = rows.length;
 
-        userFingerprintsUpserted++;
-      }
-
-      // Anomaly events (replace per server; nullify missing user/activity refs)
-      if (importAnomalies.length > 0) {
-        await db.delete(anomalyEvents).where(eq(anomalyEvents.serverId, serverIdNum));
-
-        const rows = importAnomalies
-          .map((a): (typeof anomalyEvents.$inferInsert | null) => {
-            const validUserId =
-              a.userId && existingUserIds.has(a.userId) ? a.userId : null;
-            const validActivityId =
-              a.activityId && existingActivityIds.has(a.activityId)
-                ? a.activityId
-                : null;
-
-            if (!a.details) return null;
-
-            return {
-              serverId: serverIdNum,
-              userId: validUserId,
-              activityId: validActivityId,
-              anomalyType: a.anomalyType,
-              severity: a.severity,
-              details: a.details,
-              resolved: a.resolved,
-              resolvedAt: a.resolvedAt ? new Date(a.resolvedAt) : null,
-              resolvedBy: a.resolvedBy ?? null,
-              resolutionNote: a.resolutionNote ?? null,
-              createdAt: new Date(a.createdAt),
-            } satisfies typeof anomalyEvents.$inferInsert;
-          })
-          .filter((x): x is typeof anomalyEvents.$inferInsert => x !== null);
-
-        anomalyEventsSkipped = importAnomalies.length - rows.length;
-        anomalyEventsImported = rows.length;
-
-        if (rows.length > 0) {
-          const batchSizeAnomalies = 500;
-          for (let i = 0; i < rows.length; i += batchSizeAnomalies) {
-            await db.insert(anomalyEvents).values(rows.slice(i, i + batchSizeAnomalies));
-          }
-        }
+      if (rows.length > 0) {
+        await db.insert(hiddenRecommendations).values(rows);
       }
     }
 
@@ -792,7 +517,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const message = `Successfully imported ${importedCount} of ${processedCount} sessions from ${importData.server.name} to ${targetServer.name}`;
+    const message =
+      `Successfully imported ${importedCount} of ${processedCount} sessions` +
+      ` and restored ${hiddenRecommendationsImported} hidden recommendations` +
+      ` from ${importData.server.name} to ${targetServer.name}`;
 
     if (errorCount > 0) {
       console.warn(`Import had ${errorCount} errors`);
@@ -816,18 +544,11 @@ export async function POST(req: NextRequest) {
       export_type: importData.exportInfo.exportType,
       imported: {
         sessions: importedCount,
-        activities: activitiesImported,
-        activity_locations: activityLocationsImported,
         hidden_recommendations: hiddenRecommendationsImported,
-        user_fingerprints: userFingerprintsUpserted,
-        anomaly_events: anomalyEventsImported,
       },
       skipped: {
         sessions_processing_errors: errorCount,
-        activity_locations: activityLocationsSkipped,
         hidden_recommendations: hiddenRecommendationsSkipped,
-        user_fingerprints: userFingerprintsSkipped,
-        anomaly_events: anomalyEventsSkipped,
       },
       imported_count: importedCount,
       total_count: processedCount,

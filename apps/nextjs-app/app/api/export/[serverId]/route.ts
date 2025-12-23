@@ -1,11 +1,7 @@
 import {
-  activities,
-  activityLocations,
-  anomalyEvents,
   db,
   hiddenRecommendations,
   sessions,
-  userFingerprints,
 } from "@streamystats/database";
 import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
@@ -74,47 +70,13 @@ export async function GET(
       apiKey: server.apiKey,
     });
 
-    const [
-      exportedSessions,
-      exportedActivities,
-      exportedHiddenRecommendations,
-      exportedUserFingerprints,
-      exportedAnomalyEvents,
-      exportedActivityLocations,
-    ] = await Promise.all([
+    const [exportedSessions, exportedHiddenRecommendations] = await Promise.all([
       db.query.sessions.findMany({
         where: eq(sessions.serverId, serverIdNum),
-      }),
-      db.query.activities.findMany({
-        where: eq(activities.serverId, serverIdNum),
       }),
       db.query.hiddenRecommendations.findMany({
         where: eq(hiddenRecommendations.serverId, serverIdNum),
       }),
-      db.query.userFingerprints.findMany({
-        where: eq(userFingerprints.serverId, serverIdNum),
-      }),
-      db.query.anomalyEvents.findMany({
-        where: eq(anomalyEvents.serverId, serverIdNum),
-      }),
-      db
-        .select({
-          id: activityLocations.id,
-          activityId: activityLocations.activityId,
-          ipAddress: activityLocations.ipAddress,
-          countryCode: activityLocations.countryCode,
-          country: activityLocations.country,
-          region: activityLocations.region,
-          city: activityLocations.city,
-          latitude: activityLocations.latitude,
-          longitude: activityLocations.longitude,
-          timezone: activityLocations.timezone,
-          isPrivateIp: activityLocations.isPrivateIp,
-          createdAt: activityLocations.createdAt,
-        })
-        .from(activityLocations)
-        .innerJoin(activities, eq(activityLocations.activityId, activities.id))
-        .where(eq(activities.serverId, serverIdNum)),
     ]);
 
     const exportData = {
@@ -122,17 +84,13 @@ export async function GET(
         timestamp: new Date().toISOString(),
         serverName: server.name,
         serverId: server.id,
-        version: "streamystats-v3",
-        exportType: "server-backup",
+        version: "streamystats",
+        exportType: "backup",
       },
 
       counts: {
         sessions: exportedSessions.length,
-        activities: exportedActivities.length,
-        activityLocations: exportedActivityLocations.length,
         hiddenRecommendations: exportedHiddenRecommendations.length,
-        userFingerprints: exportedUserFingerprints.length,
-        anomalyEvents: exportedAnomalyEvents.length,
       },
 
       // Server (safe-to-export) settings + Jellyfin identity hint
@@ -161,13 +119,9 @@ export async function GET(
         excludedLibraryIds: server.excludedLibraryIds,
       },
 
-      // Data (server-scoped)
+      // Data (server-scoped, non-Jellyfin derived)
       sessions: exportedSessions,
-      activities: exportedActivities,
-      activityLocations: exportedActivityLocations,
       hiddenRecommendations: exportedHiddenRecommendations,
-      userFingerprints: exportedUserFingerprints,
-      anomalyEvents: exportedAnomalyEvents,
     };
 
     // Generate filename with timestamp
