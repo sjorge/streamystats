@@ -17,8 +17,7 @@ const TotalWatchTime: React.FC<Props> = async ({
   startDate,
   endDate,
 }) => {
-  const me = await getMe();
-  const isAdmin = await isUserAdmin();
+  const [me, isAdmin] = await Promise.all([getMe(), isUserAdmin()]);
 
   if (!me) {
     redirect("/not-found");

@@ -66,8 +66,7 @@ async function ClientStats({
   endDate?: string;
   userId?: string;
 }) {
-  const isAdmin = await isUserAdmin();
-  const me = await getMe();
+  const [isAdmin, me] = await Promise.all([isUserAdmin(), getMe()]);
 
   // Determine which userId to use:
   // 1. If userId is provided in query params, use it

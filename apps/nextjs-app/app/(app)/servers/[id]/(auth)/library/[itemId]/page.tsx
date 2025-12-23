@@ -26,8 +26,7 @@ export default async function ItemDetailsPage({
     redirect("/not-found");
   }
 
-  const me = await getMe();
-  const isAdmin = await isUserAdmin();
+  const [me, isAdmin] = await Promise.all([getMe(), isUserAdmin()]);
 
   const itemDetails = await getItemDetails({
     itemId,

@@ -87,8 +87,7 @@ async function GeneralStats({
   userActivityStartDate: string;
   userActivityEndDate: string;
 }) {
-  const me = await getMe();
-  const isAdmin = await isUserAdmin();
+  const [me, isAdmin] = await Promise.all([getMe(), isUserAdmin()]);
 
   const [similarData, similarSeriesData, data, seasonalData] =
     await Promise.all([

@@ -15,8 +15,7 @@ export async function Graph({
   startDate,
   endDate,
 }: Props): Promise<JSX.Element> {
-  const isAdmin = await isUserAdmin();
-  const me = await getMe();
+  const [isAdmin, me] = await Promise.all([isUserAdmin(), getMe()]);
   const data = await getWatchTimePerType({
     serverId: server.id,
     startDate,

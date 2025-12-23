@@ -32,8 +32,7 @@ export default async function TranscodingPage({
 }
 
 async function TranscodingStats({ server }: { server: Server }) {
-  const isAdmin = await isUserAdmin();
-  const me = await getMe();
+  const [isAdmin, me] = await Promise.all([isUserAdmin(), getMe()]);
   const ts = await getTranscodingStatistics(
     server.id,
     undefined,
