@@ -51,6 +51,8 @@ ENV NODE_ENV=production
 ENV PORT=3005
 ENV HOST=0.0.0.0
 
+LABEL org.opencontainers.image.source="https://github.com/fredrikburmester/streamystats"
+
 EXPOSE 3005
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

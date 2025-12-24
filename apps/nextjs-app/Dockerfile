@@ -64,6 +64,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
+LABEL org.opencontainers.image.source="https://github.com/fredrikburmester/streamystats"
+
 # Copy standalone build
 COPY --from=nextjs-builder --chown=nextjs:nodejs /app/apps/nextjs-app/.next/standalone ./
 COPY --from=nextjs-builder --chown=nextjs:nodejs /app/apps/nextjs-app/.next/static ./apps/nextjs-app/.next/static
