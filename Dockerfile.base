@@ -19,3 +19,5 @@ COPY packages/database ./packages/database
 
 WORKDIR /app/packages/database
 RUN bun run build
+
+LABEL org.opencontainers.image.source="https://github.com/fredrikburmester/streamystats"

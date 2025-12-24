@@ -39,5 +39,7 @@ COPY --from=builder /app/packages/database/drizzle ./drizzle
 
 ENV NODE_ENV=production
 
+LABEL org.opencontainers.image.source="https://github.com/fredrikburmester/streamystats"
+
 # Run the binary
 CMD ["./migrate-bin"]

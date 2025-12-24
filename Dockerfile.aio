@@ -125,6 +125,8 @@ ENV POSTGRES_DB=streamystats
 ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/streamystats
 ENV PGDATA=/var/lib/postgresql/data
 
+LABEL org.opencontainers.image.source="https://github.com/fredrikburmester/streamystats"
+
 # Expose port (only web UI needed externally)
 EXPOSE 3000
 
