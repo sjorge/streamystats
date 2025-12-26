@@ -17,6 +17,13 @@ import { eq } from "drizzle-orm";
 import { formatError } from "../utils/format-error";
 import { shouldLog } from "../utils/log-throttle";
 
+// Timeout for individual poll operations (30 seconds)
+const POLL_TIMEOUT_MS = 30_000;
+// Max time a poll can run before watchdog considers it stuck (60 seconds)
+const WATCHDOG_THRESHOLD_MS = 60_000;
+// How often to log heartbeats showing poller is alive (5 minutes)
+const HEARTBEAT_LOG_INTERVAL_MS = 5 * 60_000;
+
 function log(
   prefix: string,
   data: Record<string, string | number | boolean | null | undefined>
@@ -33,6 +40,7 @@ function log(
 interface SessionPollerConfig {
   intervalMs?: number;
   enabled?: boolean;
+  pollTimeoutMs?: number;
 }
 
 interface SessionChanges {
@@ -46,6 +54,12 @@ class SessionPoller {
   private intervalId: NodeJS.Timeout | null = null;
   private config: Required<SessionPollerConfig>;
   private pollInProgress = false;
+  private pollStartedAt: number | null = null;
+  private lastSuccessfulPoll: number = 0;
+  private lastHeartbeatLog: number = 0;
+  private consecutiveFailures = 0;
+  private totalPollCount = 0;
+  private totalSuccessCount = 0;
   private serverBackoff: Map<number, { failures: number; nextAllowedAtMs: number }> =
     new Map();
 
@@ -56,6 +70,7 @@ class SessionPoller {
     this.config = {
       intervalMs: config.intervalMs || envIntervalMs || 5000, // 5 seconds default
       enabled: config.enabled ?? true,
+      pollTimeoutMs: config.pollTimeoutMs ?? POLL_TIMEOUT_MS,
     };
   }
 
@@ -71,25 +86,113 @@ class SessionPoller {
     log("session-poller", {
       action: "start",
       intervalMs: this.config.intervalMs,
+      pollTimeoutMs: this.config.pollTimeoutMs,
     });
 
-    // Initial poll
-    await this.pollSessions();
+    // Initial poll with timeout
+    await this.runPollWithTimeout();
 
-    // Schedule recurring polls
+    // Schedule recurring polls with watchdog
     this.intervalId = setInterval(async () => {
-      if (this.pollInProgress) return;
-      this.pollInProgress = true;
-      try {
-        await this.pollSessions();
-      } catch (error) {
-        console.error(`Error during session polling: ${formatError(error)}`);
-      } finally {
-        this.pollInProgress = false;
-      }
+      await this.runPollCycle();
     }, this.config.intervalMs);
 
     log("session-poller", { action: "started" });
+  }
+
+  /**
+   * Run a single poll cycle with watchdog checks
+   */
+  private async runPollCycle(): Promise<void> {
+    const now = Date.now();
+
+    // Watchdog: check if previous poll is stuck
+    if (this.pollInProgress && this.pollStartedAt) {
+      const pollDuration = now - this.pollStartedAt;
+      if (pollDuration > WATCHDOG_THRESHOLD_MS) {
+        console.error(
+          `[session-poller] action=watchdog-recovery pollStuckMs=${pollDuration} ` +
+            `lastSuccess=${now - this.lastSuccessfulPoll}ms ago`
+        );
+        // Force reset the stuck state
+        this.pollInProgress = false;
+        this.pollStartedAt = null;
+        this.consecutiveFailures++;
+      } else {
+        // Poll still running but within threshold, skip this cycle
+        return;
+      }
+    }
+
+    // Heartbeat logging
+    if (now - this.lastHeartbeatLog >= HEARTBEAT_LOG_INTERVAL_MS) {
+      this.lastHeartbeatLog = now;
+      log("session-poller", {
+        action: "heartbeat",
+        totalPolls: this.totalPollCount,
+        successRate: this.totalPollCount > 0
+          ? Math.round((this.totalSuccessCount / this.totalPollCount) * 100)
+          : 100,
+        trackedServers: this.trackedSessions.size,
+        trackedSessions: Array.from(this.trackedSessions.values()).reduce(
+          (sum, m) => sum + m.size,
+          0
+        ),
+        lastSuccessAgoMs: this.lastSuccessfulPoll > 0 ? now - this.lastSuccessfulPoll : 0,
+        backoffServers: this.serverBackoff.size,
+      });
+    }
+
+    await this.runPollWithTimeout();
+  }
+
+  /**
+   * Run poll with timeout protection
+   */
+  private async runPollWithTimeout(): Promise<void> {
+    if (this.pollInProgress) return;
+
+    this.pollInProgress = true;
+    this.pollStartedAt = Date.now();
+    this.totalPollCount++;
+
+    try {
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Poll timeout after ${this.config.pollTimeoutMs}ms`));
+        }, this.config.pollTimeoutMs);
+      });
+
+      // Race between poll and timeout
+      await Promise.race([this.pollSessions(), timeoutPromise]);
+
+      // Poll succeeded
+      this.lastSuccessfulPoll = Date.now();
+      this.totalSuccessCount++;
+      this.consecutiveFailures = 0;
+    } catch (error) {
+      this.consecutiveFailures++;
+      const errorMsg = formatError(error);
+
+      // Only log if not suppressed
+      if (shouldLog("session-poller:poll-error", 30_000)) {
+        console.error(
+          `[session-poller] action=poll-error consecutiveFailures=${this.consecutiveFailures} error=${errorMsg}`
+        );
+      }
+
+      // Alert if too many consecutive failures
+      if (this.consecutiveFailures >= 10 && this.consecutiveFailures % 10 === 0) {
+        console.error(
+          `[session-poller] action=degraded consecutiveFailures=${this.consecutiveFailures} ` +
+            `lastSuccessAgoMs=${Date.now() - this.lastSuccessfulPoll}`
+        );
+      }
+    } finally {
+      this.pollInProgress = false;
+      this.pollStartedAt = null;
+    }
   }
 
   /**
@@ -167,11 +270,13 @@ class SessionPoller {
     const prev = this.serverBackoff.get(serverId);
     const failures = (prev?.failures ?? 0) + 1;
 
-    const initialBackoffMs = 15_000;
-    const maxBackoffMs = 5 * 60_000;
+    // Less aggressive backoff: start at 10s, cap at 2 minutes
+    // This ensures we retry reasonably quickly while still reducing load on failing servers
+    const initialBackoffMs = 10_000;
+    const maxBackoffMs = 2 * 60_000;
     const backoffMs = Math.min(
       maxBackoffMs,
-      initialBackoffMs * 2 ** (failures - 1)
+      initialBackoffMs * Math.pow(1.5, failures - 1) // 1.5x growth instead of 2x
     );
 
     this.serverBackoff.set(serverId, {
@@ -179,7 +284,7 @@ class SessionPoller {
       nextAllowedAtMs: Date.now() + backoffMs,
     });
 
-    return backoffMs;
+    return Math.round(backoffMs);
   }
 
   /**
@@ -760,15 +865,35 @@ class SessionPoller {
    * Get poller status
    */
   getStatus() {
+    const now = Date.now();
     return {
       enabled: this.config.enabled,
       intervalMs: this.config.intervalMs,
+      pollTimeoutMs: this.config.pollTimeoutMs,
       isRunning: this.intervalId !== null,
+      pollInProgress: this.pollInProgress,
       trackedServers: this.trackedSessions.size,
       totalTrackedSessions: Array.from(this.trackedSessions.values()).reduce(
         (total, serverSessions) => total + serverSessions.size,
         0
       ),
+      // Health metrics
+      totalPollCount: this.totalPollCount,
+      totalSuccessCount: this.totalSuccessCount,
+      successRate: this.totalPollCount > 0
+        ? Math.round((this.totalSuccessCount / this.totalPollCount) * 100)
+        : 100,
+      consecutiveFailures: this.consecutiveFailures,
+      lastSuccessfulPollAgoMs: this.lastSuccessfulPoll > 0
+        ? now - this.lastSuccessfulPoll
+        : null,
+      serversInBackoff: this.serverBackoff.size,
+      // Health status
+      healthy:
+        this.intervalId !== null &&
+        this.consecutiveFailures < 10 &&
+        (this.lastSuccessfulPoll === 0 ||
+          now - this.lastSuccessfulPoll < 5 * 60_000),
     };
   }
 }

@@ -14,6 +14,17 @@ process.on("warning", (warning) => {
   console.warn(warning);
 });
 
+// Handle unhandled promise rejections to prevent silent failures
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[job-server] unhandledRejection:", reason);
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  console.error("[job-server] uncaughtException:", error);
+  // Don't exit - try to keep the server running for session tracking
+});
+
 const app = new Hono();
 
 const PORT = Number.parseInt(Bun.env.PORT || "3000", 10);
