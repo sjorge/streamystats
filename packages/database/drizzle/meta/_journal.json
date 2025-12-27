@@ -169,6 +169,13 @@
       "when": 1766846672311,
       "tag": "0023_closed_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1766861478488,
+      "tag": "0024_common_spot",
+      "breakpoints": true
     }
   ]
 }
