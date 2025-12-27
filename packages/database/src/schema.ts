@@ -12,6 +12,7 @@ import {
   index,
   unique,
   customType,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // Custom vector type that supports variable dimensions
@@ -494,6 +495,35 @@ export const sessions = pgTable(
   ]
 );
 
+// Active sessions table - durable storage for currently open sessions (poller state)
+export const activeSessions = pgTable(
+  "active_sessions",
+  {
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    sessionKey: text("session_key").notNull(),
+    payload: jsonb("payload").notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.serverId, table.sessionKey] }),
+    index("active_sessions_server_last_seen_idx").on(table.serverId, table.lastSeenAt),
+  ]
+);
+
+// Activity log cursor per server - used to catch up Jellyfin activity log entries between polls
+export const activityLogCursors = pgTable("activity_log_cursors", {
+  serverId: integer("server_id")
+    .primaryKey()
+    .references(() => servers.id, { onDelete: "cascade" }),
+  cursorDate: timestamp("cursor_date", { withTimezone: true }),
+  cursorId: text("cursor_id"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Hidden recommendations table - stores user's hidden recommendations
 export const hiddenRecommendations = pgTable("hidden_recommendations", {
   id: serial("id").primaryKey(),
@@ -817,6 +847,12 @@ export type NewItem = typeof items.$inferInsert;
 
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+
+export type ActiveSession = typeof activeSessions.$inferSelect;
+export type NewActiveSession = typeof activeSessions.$inferInsert;
+
+export type ActivityLogCursor = typeof activityLogCursors.$inferSelect;
+export type NewActivityLogCursor = typeof activityLogCursors.$inferInsert;
 
 export type HiddenRecommendation = typeof hiddenRecommendations.$inferSelect;
 export type NewHiddenRecommendation = typeof hiddenRecommendations.$inferInsert;

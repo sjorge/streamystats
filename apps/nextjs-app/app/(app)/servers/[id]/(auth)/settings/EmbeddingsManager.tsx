@@ -236,7 +236,9 @@ export function EmbeddingsManager({ server }: { server: Server }) {
       refetch();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to start embedding process",
+        err instanceof Error
+          ? err.message
+          : "Failed to start embedding process",
       );
     } finally {
       setIsStarting(false);
@@ -279,7 +281,9 @@ export function EmbeddingsManager({ server }: { server: Server }) {
       const result = await response.json();
 
       if (result.cleanedJobs > 0) {
-        toast.success(`Cleaned up ${result.cleanedJobs} stale embedding job(s)`);
+        toast.success(
+          `Cleaned up ${result.cleanedJobs} stale embedding job(s)`,
+        );
       } else {
         toast.info("No stale embedding jobs to cleanup");
       }

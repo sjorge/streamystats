@@ -349,6 +349,12 @@ export class JellyfinClient {
   private limiter: Bottleneck;
   private config: JellyfinConfig;
 
+  private static readonly RETRY_CONFIG = {
+    factor: 2,
+    minTimeout: 1000,
+    maxTimeout: 10_000,
+  } as const;
+
   constructor(config: JellyfinConfig) {
     this.config = {
       timeout: 60000,
@@ -373,29 +379,47 @@ export class JellyfinClient {
     });
   }
 
+  private async request<T>(
+    method: "get" | "post" | "put" | "delete",
+    url: string,
+    options?: {
+      params?: Record<string, unknown>;
+      data?: unknown;
+      timeoutMs?: number;
+      signal?: AbortSignal;
+      retries?: number;
+    }
+  ): Promise<T> {
+    const timeoutMs = options?.timeoutMs ?? this.config.timeout;
+    const retries = options?.retries ?? (this.config.maxRetries || 3);
+
+    const attempt = async () => {
+      const response: AxiosResponse<T> = await this.limiter.schedule(() =>
+        this.client.request<T>({
+          method,
+          url,
+          params: options?.params,
+          data: options?.data,
+          timeout: timeoutMs,
+          signal: options?.signal,
+        })
+      );
+      return response.data;
+    };
+
+    if (retries <= 0) return attempt();
+    return pRetry(attempt, { retries, ...JellyfinClient.RETRY_CONFIG });
+  }
+
   private async makeRequest<T>(
     method: "get" | "post" | "put" | "delete",
     url: string,
     options: { params?: any; data?: any } = {}
   ): Promise<T> {
-    return pRetry(
-      async () => {
-        const response: AxiosResponse<T> = await this.limiter.schedule(() =>
-          this.client[method](
-            url,
-            method === "get" ? { params: options.params } : options.data,
-            method !== "get" ? { params: options.params } : undefined
-          )
-        );
-        return response.data;
-      },
-      {
-        retries: this.config.maxRetries || 3,
-        factor: 2,
-        minTimeout: 1000,
-        maxTimeout: 10000,
-      }
-    );
+    return this.request<T>(method, url, {
+      params: options.params,
+      data: options.data,
+    });
   }
 
   async getUsers(): Promise<JellyfinUser[]> {
@@ -567,16 +591,21 @@ export class JellyfinClient {
 
   async getActivities(
     startIndex: number,
-    limit: number
+    limit: number,
+    options?: {
+      timeoutMs?: number;
+      signal?: AbortSignal;
+      retries?: number;
+    }
   ): Promise<JellyfinActivity[]> {
-    const response = await this.makeRequest<{ Items: JellyfinActivity[] }>(
+    const response = await this.request<{ Items: JellyfinActivity[] }>(
       "get",
       "/System/ActivityLog/Entries",
       {
-        params: {
-          startIndex,
-          limit,
-        },
+        params: { startIndex, limit },
+        timeoutMs: options?.timeoutMs,
+        signal: options?.signal,
+        retries: options?.retries,
       }
     );
 
@@ -615,8 +644,22 @@ export class JellyfinClient {
     }
   }
 
-  async getSessions(): Promise<JellyfinSession[]> {
-    return this.makeRequest<JellyfinSession[]>("get", "/Sessions");
+  /**
+   * Get active sessions.
+   *
+   * NOTE: This is used by the session poller and needs to fail fast.
+   * We intentionally support per-call timeout/signal and allow overriding retries.
+   */
+  async getSessions(options?: {
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    retries?: number;
+  }): Promise<JellyfinSession[]> {
+    return this.request<JellyfinSession[]>("get", "/Sessions", {
+      timeoutMs: options?.timeoutMs,
+      signal: options?.signal,
+      retries: options?.retries ?? 0,
+    });
   }
 
   /**

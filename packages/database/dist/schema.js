@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.hiddenRecommendationsRelations = exports.anomalyEventsRelations = exports.userFingerprintsRelations = exports.activityLocationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serversRelations = exports.anomalyEvents = exports.userFingerprints = exports.activityLocations = exports.hiddenRecommendations = exports.sessions = exports.items = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
+exports.hiddenRecommendationsRelations = exports.anomalyEventsRelations = exports.userFingerprintsRelations = exports.activityLocationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serversRelations = exports.anomalyEvents = exports.userFingerprints = exports.activityLocations = exports.hiddenRecommendations = exports.activityLogCursors = exports.activeSessions = exports.sessions = exports.items = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 // Custom vector type that supports variable dimensions
 // This allows storing embeddings of any size without hardcoding dimensions
@@ -376,6 +376,29 @@ exports.sessions = (0, pg_core_1.pgTable)("sessions", {
     (0, pg_core_1.index)("sessions_server_start_time_idx").on(table.serverId, table.startTime),
     (0, pg_core_1.index)("sessions_user_start_time_idx").on(table.userId, table.startTime),
 ]);
+// Active sessions table - durable storage for currently open sessions (poller state)
+exports.activeSessions = (0, pg_core_1.pgTable)("active_sessions", {
+    serverId: (0, pg_core_1.integer)("server_id")
+        .notNull()
+        .references(() => exports.servers.id, { onDelete: "cascade" }),
+    sessionKey: (0, pg_core_1.text)("session_key").notNull(),
+    payload: (0, pg_core_1.jsonb)("payload").notNull(),
+    lastSeenAt: (0, pg_core_1.timestamp)("last_seen_at", { withTimezone: true }).notNull(),
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+}, (table) => [
+    (0, pg_core_1.primaryKey)({ columns: [table.serverId, table.sessionKey] }),
+    (0, pg_core_1.index)("active_sessions_server_last_seen_idx").on(table.serverId, table.lastSeenAt),
+]);
+// Activity log cursor per server - used to catch up Jellyfin activity log entries between polls
+exports.activityLogCursors = (0, pg_core_1.pgTable)("activity_log_cursors", {
+    serverId: (0, pg_core_1.integer)("server_id")
+        .primaryKey()
+        .references(() => exports.servers.id, { onDelete: "cascade" }),
+    cursorDate: (0, pg_core_1.timestamp)("cursor_date", { withTimezone: true }),
+    cursorId: (0, pg_core_1.text)("cursor_id"),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+});
 // Hidden recommendations table - stores user's hidden recommendations
 exports.hiddenRecommendations = (0, pg_core_1.pgTable)("hidden_recommendations", {
     id: (0, pg_core_1.serial)("id").primaryKey(),

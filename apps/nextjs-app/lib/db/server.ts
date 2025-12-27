@@ -135,7 +135,9 @@ export const saveEmbeddingConfig = async ({
 
 export const clearEmbeddingApiKey = async ({
   serverId,
-}: { serverId: number }) => {
+}: {
+  serverId: number;
+}) => {
   try {
     await db
       .update(servers)
@@ -157,10 +159,7 @@ export const clearChatApiKey = async ({ serverId }: { serverId: number }) => {
       .set({ chatApiKey: null })
       .where(eq(servers.id, serverId));
   } catch (error) {
-    console.error(
-      `Error clearing chat API key for server ${serverId}:`,
-      error,
-    );
+    console.error(`Error clearing chat API key for server ${serverId}:`, error);
     throw new Error("Failed to clear chat API key");
   }
 };
