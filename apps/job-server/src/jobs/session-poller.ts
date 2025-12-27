@@ -437,7 +437,6 @@ class SessionPoller {
     const hadBackoff = this.serverBackoff.has(server.id);
     const controller = new AbortController();
     const serverTimeoutMs = Math.max(1000, this.config.serverRequestTimeoutMs);
-    const timeoutId = setTimeout(() => controller.abort(), serverTimeoutMs);
     this.inFlightServerControllers.set(server.id, controller);
 
     const onCycleAbort = () => controller.abort();
@@ -464,6 +463,16 @@ class SessionPoller {
         }
       }
     } catch (error) {
+      // If we canceled this request (cycle timeout/watchdog/stop), do NOT mark server as down.
+      if (controller.signal.aborted || this.stopRequested || signal.aborted) {
+        const signature = formatError(error);
+        const key = `session-poller:fetch-canceled:${server.id}`;
+        if (shouldLog(key, 60_000)) {
+          console.info(
+            `[session-poller] action=fetch-canceled serverId=${server.id} error=${signature}`
+          );
+        }
+      } else {
       const backoffMs = this.recordFailure(server.id);
       const signature = formatError(error);
       const key = `session-poller:fetch-error:${server.id}`;
@@ -473,8 +482,8 @@ class SessionPoller {
           `[session-poller] action=fetch-error serverId=${server.id} backoffMs=${backoffMs} error=${signature}`
         );
       }
+      }
     } finally {
-      clearTimeout(timeoutId);
       this.inFlightServerControllers.delete(server.id);
       signal.removeEventListener("abort", onCycleAbort);
     }
