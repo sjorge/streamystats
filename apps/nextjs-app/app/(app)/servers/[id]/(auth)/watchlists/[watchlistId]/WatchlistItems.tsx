@@ -1,12 +1,25 @@
 "use client";
 
+import * as React from "react";
 import { useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Film, Tv, Trash2, GripVertical } from "lucide-react";
+import { Film, Tv, Trash2, ArrowUpDown, ChevronDown } from "lucide-react";
+import { useDebounce } from "use-debounce";
 import type { WatchlistWithItems, WatchlistItemWithDetails } from "@/lib/db/watchlists";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+  type VisibilityState,
+} from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -15,6 +28,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { usePersistantState } from "@/hooks/usePersistantState";
+import { useQueryParams } from "@/hooks/useQueryParams";
+import { formatLocalDate } from "@/lib/timezone";
+import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
+import type { Server } from "@/lib/types";
 
 interface WatchlistItemsProps {
   watchlist: WatchlistWithItems;
@@ -22,104 +55,6 @@ interface WatchlistItemsProps {
   serverUrl: string;
   currentType?: string;
   currentSort?: string;
-}
-
-function getItemImageUrl(item: WatchlistItemWithDetails["item"], serverUrl: string): string | null {
-  if (item.primaryImageTag) {
-    return `${serverUrl}/Items/${item.id}/Images/Primary?fillHeight=150&fillWidth=100&quality=80&tag=${item.primaryImageTag}`;
-  }
-  if (item.seriesId && item.seriesPrimaryImageTag) {
-    return `${serverUrl}/Items/${item.seriesId}/Images/Primary?fillHeight=150&fillWidth=100&quality=80&tag=${item.seriesPrimaryImageTag}`;
-  }
-  return null;
-}
-
-function WatchlistItemCard({
-  watchlistItem,
-  isOwner,
-  serverIdParam,
-  serverUrl,
-  onRemove,
-}: {
-  watchlistItem: WatchlistItemWithDetails;
-  isOwner: boolean;
-  serverIdParam: string;
-  serverUrl: string;
-  onRemove: (itemId: string) => void;
-}) {
-  const { item } = watchlistItem;
-  const [removing, setRemoving] = useState(false);
-
-  const handleRemove = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setRemoving(true);
-    onRemove(item.id);
-  };
-
-  const imageUrl = getItemImageUrl(item, serverUrl);
-
-  return (
-    <Link href={`/servers/${serverIdParam}/library/${item.id}`}>
-      <Card className="flex items-center gap-4 p-3 hover:bg-muted/50 transition-colors group">
-        <div className="relative w-16 h-24 rounded overflow-hidden bg-muted shrink-0">
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={item.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              {item.type === "Movie" ? (
-                <Film className="w-6 h-6 text-muted-foreground/50" />
-              ) : (
-                <Tv className="w-6 h-6 text-muted-foreground/50" />
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-medium truncate group-hover:text-primary transition-colors">
-            {item.name}
-          </h3>
-          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-            <Badge variant="outline" className="text-xs">
-              {item.type}
-            </Badge>
-            {item.productionYear && <span>{item.productionYear}</span>}
-            {item.communityRating && (
-              <span className="flex items-center gap-1">
-                <svg className="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                </svg>
-                {item.communityRating.toFixed(1)}
-              </span>
-            )}
-          </div>
-          {item.seriesName && (
-            <p className="text-xs text-muted-foreground mt-1 truncate">
-              {item.seriesName}
-              {item.parentIndexNumber && item.indexNumber && (
-                <> - S{item.parentIndexNumber}E{item.indexNumber}</>
-              )}
-            </p>
-          )}
-        </div>
-        {isOwner && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-            onClick={handleRemove}
-            disabled={removing}
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-        )}
-      </Card>
-    </Link>
-  );
 }
 
 export function WatchlistItems({
@@ -133,7 +68,30 @@ export function WatchlistItems({
   const params = useParams();
   const searchParams = useSearchParams();
   const serverIdParam = params.id as string;
+  const { updateQueryParams, isLoading } = useQueryParams();
   const [items, setItems] = useState(watchlist.items);
+
+  const currentPage = Number(searchParams.get("page") || "1");
+  const currentSearch = searchParams.get("search") || "";
+  const [searchInput, setSearchInput] = useState<string>(currentSearch);
+  const [debouncedSearch] = useDebounce(searchInput, 500);
+
+  const server: Server = React.useMemo(
+    () => ({
+      id: Number(serverIdParam),
+      url: serverUrl,
+    } as Server),
+    [serverIdParam, serverUrl],
+  );
+
+  React.useEffect(() => {
+    if (debouncedSearch !== currentSearch) {
+      updateQueryParams({
+        search: debouncedSearch || null,
+        page: "1",
+      });
+    }
+  }, [debouncedSearch, currentSearch, updateQueryParams]);
 
   const handleTypeChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -142,12 +100,14 @@ export function WatchlistItems({
     } else {
       params.delete("type");
     }
+    params.delete("page");
     router.push(`?${params.toString()}`);
   };
 
   const handleSortChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("sort", value);
+    params.delete("page");
     router.push(`?${params.toString()}`);
   };
 
@@ -162,7 +122,252 @@ export function WatchlistItems({
     }
   };
 
-  // Get unique item types from the watchlist
+  const handlePageChange = (newPage: number) => {
+    updateQueryParams({
+      page: newPage.toString(),
+    });
+  };
+
+  const columns: ColumnDef<WatchlistItemWithDetails>[] = [
+    {
+      accessorFn: (row) => row.item?.name || "",
+      id: "item_name",
+      header: "Item",
+      cell: ({ row }) => {
+        const watchlistItem = row.original;
+        const item = watchlistItem.item;
+        return (
+          <Link
+            href={`/servers/${serverIdParam}/library/${item.id}`}
+            className="flex flex-row items-center gap-4 cursor-pointer group"
+          >
+            <div className="shrink-0 rounded overflow-hidden">
+              <Poster
+                item={{
+                  id: item.id,
+                  name: item.name,
+                  type: item.type,
+                  primaryImageTag: item.primaryImageTag,
+                  primaryImageThumbTag: item.primaryImageThumbTag,
+                  primaryImageLogoTag: item.primaryImageLogoTag,
+                  backdropImageTags: item.backdropImageTags,
+                  seriesId: item.seriesId,
+                  seriesPrimaryImageTag: item.seriesPrimaryImageTag,
+                  parentBackdropItemId: item.parentBackdropItemId,
+                  parentBackdropImageTags: item.parentBackdropImageTags,
+                  parentThumbItemId: item.parentThumbItemId,
+                  parentThumbImageTag: item.parentThumbImageTag,
+                  imageBlurHashes: item.imageBlurHashes,
+                }}
+                server={server}
+                size="default"
+              />
+            </div>
+            <div className="flex flex-col">
+              <div className="capitalize font-medium transition-colors duration-200 group-hover:text-primary">
+                {item.name}
+              </div>
+              {item.seriesName && (
+                <div className="text-sm text-neutral-500 transition-colors duration-200 group-hover:text-primary/80">
+                  {item.seriesName}
+                  {item.parentIndexNumber &&
+                    item.indexNumber &&
+                    ` • S${item.parentIndexNumber}E${item.indexNumber}`}
+                </div>
+              )}
+            </div>
+          </Link>
+        );
+      },
+    },
+    {
+      accessorKey: "item.type",
+      header: () => <div className="text-left">Type</div>,
+      cell: ({ row }) => {
+        const type = row.original.item.type;
+        return (
+          <Badge variant="outline" className="text-xs">
+            {type}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "item.productionYear",
+      header: () => {
+        return (
+          <Button variant="ghost" onClick={() => handleSortChange("releaseDate")}>
+            Year
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const year = row.original.item.productionYear;
+        return <div className="font-medium">{year || "-"}</div>;
+      },
+    },
+    {
+      accessorKey: "item.communityRating",
+      header: () => <div className="text-left">Rating</div>,
+      cell: ({ row }) => {
+        const rating = row.original.item.communityRating;
+        if (!rating) return <div className="text-muted-foreground">-</div>;
+        return (
+          <div className="flex items-center gap-1">
+            <svg className="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+            </svg>
+            <span className="font-medium">{rating.toFixed(1)}</span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "addedAt",
+      header: () => {
+        return (
+          <Button variant="ghost" onClick={() => handleSortChange("dateAdded")}>
+            Date Added
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const dateValue = row.original.addedAt;
+        if (!dateValue) {
+          return <div>No Date</div>;
+        }
+
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) {
+          return <div>Invalid Date</div>;
+        }
+
+        return <div>{formatLocalDate(date, "d MMM yyyy, HH:mm")}</div>;
+      },
+    },
+    ...(isOwner
+      ? [
+          {
+            id: "actions",
+            header: () => <div className="text-right">Actions</div>,
+            cell: ({ row }) => {
+              const watchlistItem = row.original;
+              const [removing, setRemoving] = useState(false);
+
+              const handleRemove = async (e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setRemoving(true);
+                await handleRemoveItem(watchlistItem.item.id);
+                setRemoving(false);
+              };
+
+              return (
+                <div className="flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRemove}
+                    disabled={removing}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              );
+            },
+          } as ColumnDef<WatchlistItemWithDetails>,
+        ]
+      : []),
+  ];
+
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = usePersistantState<
+    VisibilityState
+  >(`watchlist-items-column-visibility-${watchlist.id}`, {});
+
+  const filteredData = React.useMemo(() => {
+    let filtered = items;
+
+    if (currentType && currentType !== "all") {
+      filtered = filtered.filter((i) => i.item.type === currentType);
+    }
+
+    if (debouncedSearch) {
+      const searchLower = debouncedSearch.toLowerCase();
+      filtered = filtered.filter(
+        (watchlistItem) =>
+          watchlistItem.item.name.toLowerCase().includes(searchLower) ||
+          watchlistItem.item.seriesName?.toLowerCase().includes(searchLower),
+      );
+    }
+
+    return filtered;
+  }, [items, currentType, debouncedSearch]);
+
+  const sortedData = React.useMemo(() => {
+    const sortOrder = currentSort || watchlist.defaultSortOrder;
+    const sorted = [...filteredData];
+
+    switch (sortOrder) {
+      case "name":
+        sorted.sort((a, b) =>
+          a.item.name.localeCompare(b.item.name, undefined, {
+            sensitivity: "base",
+          }),
+        );
+        break;
+      case "dateAdded":
+        sorted.sort((a, b) => {
+          const aDate = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+          const bDate = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+          return bDate - aDate;
+        });
+        break;
+      case "releaseDate":
+        sorted.sort((a, b) => {
+          const aYear = a.item.premiereDate
+            ? new Date(a.item.premiereDate).getTime()
+            : 0;
+          const bYear = b.item.premiereDate
+            ? new Date(b.item.premiereDate).getTime()
+            : 0;
+          return bYear - aYear;
+        });
+        break;
+      case "custom":
+      default:
+        sorted.sort((a, b) => a.position - b.position);
+        break;
+    }
+
+    return sorted;
+  }, [filteredData, currentSort, watchlist.defaultSortOrder]);
+
+  const pageSize = 20;
+  const totalPages = Math.ceil(sortedData.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedData = sortedData.slice(startIndex, endIndex);
+
+  const table = useReactTable({
+    data: paginatedData,
+    columns,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    state: {
+      columnFilters,
+      columnVisibility,
+    },
+    manualPagination: false,
+    pageCount: totalPages,
+  });
+
   const itemTypes = [...new Set(watchlist.items.map((i) => i.item.type))];
 
   if (items.length === 0) {
@@ -180,51 +385,150 @@ export function WatchlistItems({
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-4">
-        {!watchlist.allowedItemType && itemTypes.length > 1 && (
-          <Select value={currentType ?? "all"} onValueChange={handleTypeChange}>
+    <div className="w-full">
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          {!watchlist.allowedItemType && itemTypes.length > 1 && (
+            <Select value={currentType ?? "all"} onValueChange={handleTypeChange}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                {itemTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Select
+            value={currentSort ?? watchlist.defaultSortOrder}
+            onValueChange={handleSortChange}
+          >
             <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="All types" />
+              <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              {itemTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
+              <SelectItem value="custom">Custom Order</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="dateAdded">Date Added</SelectItem>
+              <SelectItem value="releaseDate">Release Date</SelectItem>
             </SelectContent>
           </Select>
-        )}
-        <Select
-          value={currentSort ?? watchlist.defaultSortOrder}
-          onValueChange={handleSortChange}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="custom">Custom Order</SelectItem>
-            <SelectItem value="name">Name</SelectItem>
-            <SelectItem value="dateAdded">Date Added</SelectItem>
-            <SelectItem value="releaseDate">Release Date</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        {items.map((watchlistItem) => (
-          <WatchlistItemCard
-            key={watchlistItem.id}
-            watchlistItem={watchlistItem}
-            isOwner={isOwner}
-            serverIdParam={serverIdParam}
-            serverUrl={serverUrl}
-            onRemove={handleRemoveItem}
+        </div>
+        <div className="flex items-center justify-between">
+          <Input
+            placeholder="Search items..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="max-w-sm"
           />
-        ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto">
+                Columns <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between space-x-2 py-4">
+        <div>
+          <p className="text-sm text-neutral-500">
+            {startIndex + 1} - {Math.min(endIndex, sortedData.length)} of{" "}
+            {sortedData.length} results.
+          </p>
+        </div>
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage <= 1 || isLoading}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages || isLoading}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
-
