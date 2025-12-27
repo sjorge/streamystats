@@ -39,6 +39,12 @@ const DB_STATEMENT_TIMEOUT_MS = 10_000;
 // How many activity log entries to check each cycle (newest-first)
 const DEFAULT_ACTIVITY_LOG_LIMIT = 100;
 
+function setLocalStatementTimeoutSql(ms: number) {
+  const safeMs = Math.max(0, Math.floor(ms));
+  // Postgres does not accept bind params here (SET ... = $1), so we must inline.
+  return sql.raw(`SET LOCAL statement_timeout = ${safeMs}`);
+}
+
 function log(
   prefix: string,
   data: Record<string, string | number | boolean | null | undefined>
@@ -418,7 +424,7 @@ class SessionPoller {
    */
   private async listServers(): Promise<Server[]> {
     return await db.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`);
+      await tx.execute(setLocalStatementTimeoutSql(DB_STATEMENT_TIMEOUT_MS));
       return await tx.select().from(servers);
     });
   }
@@ -571,7 +577,7 @@ class SessionPoller {
     }));
 
     await db.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`);
+      await tx.execute(setLocalStatementTimeoutSql(DB_STATEMENT_TIMEOUT_MS));
 
       if (rows.length > 0) {
         await tx
@@ -603,7 +609,7 @@ class SessionPoller {
   private async loadPersistedState(): Promise<void> {
     try {
       const { active, cursors } = await db.transaction(async (tx) => {
-        await tx.execute(sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`);
+        await tx.execute(setLocalStatementTimeoutSql(DB_STATEMENT_TIMEOUT_MS));
         const active = await tx.select().from(activeSessions);
         const cursors = await tx.select().from(activityLogCursors);
         return { active, cursors };
@@ -675,7 +681,7 @@ class SessionPoller {
       }
 
       await db.transaction(async (tx) => {
-        await tx.execute(sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`);
+        await tx.execute(setLocalStatementTimeoutSql(DB_STATEMENT_TIMEOUT_MS));
         await tx.delete(activeSessions);
       });
       this.trackedSessions.clear();
@@ -782,7 +788,7 @@ class SessionPoller {
       }
 
       await db.transaction(async (tx) => {
-        await tx.execute(sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`);
+        await tx.execute(setLocalStatementTimeoutSql(DB_STATEMENT_TIMEOUT_MS));
         await tx
           .insert(activities)
           .values(activityRows)
@@ -836,7 +842,7 @@ class SessionPoller {
     };
 
     await db.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`);
+      await tx.execute(setLocalStatementTimeoutSql(DB_STATEMENT_TIMEOUT_MS));
       await tx
         .insert(activityLogCursors)
         .values(row)
@@ -1216,7 +1222,7 @@ class SessionPoller {
       // Use a transaction with statement_timeout so DB stalls can't wedge polling.
       await db.transaction(async (tx) => {
         await tx.execute(
-          sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`
+          setLocalStatementTimeoutSql(DB_STATEMENT_TIMEOUT_MS)
         );
 
         // Get user from database using jellyfin ID
