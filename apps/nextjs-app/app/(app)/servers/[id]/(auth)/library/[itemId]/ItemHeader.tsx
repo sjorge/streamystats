@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDuration } from "@/lib/utils";
 import type { ItemDetailsResponse } from "./types";
+import { AddToWatchlistButton } from "./AddToWatchlistButton";
 
 interface ItemHeaderProps {
   item: Item;
@@ -56,8 +57,15 @@ export function ItemHeader({
         )}
 
         <div
-          className={`absolute ${isDeleted ? "top-14" : "top-4"} right-4 z-10`}
+          className={`absolute ${isDeleted ? "top-14" : "top-4"} right-4 z-10 flex gap-2`}
         >
+          {!isDeleted && (
+            <AddToWatchlistButton
+              itemId={item.id}
+              itemType={item.type}
+              serverId={serverId}
+            />
+          )}
           <Button
             asChild
             variant="outline"
