@@ -81,7 +81,7 @@ class SessionPoller {
   private lastTimeoutAtMs: number | null = null;
   private lastCycleDurationMs: number | null = null;
   private stopRequested = false;
-  private currentAbortController: AbortController | null = null;
+  private pollCancelRequested = false;
   private inFlightServerControllers: Map<number, AbortController> = new Map();
   private serverBackoff: Map<number, { failures: number; nextAllowedAtMs: number }> =
     new Map();
@@ -90,7 +90,7 @@ class SessionPoller {
     { cursorDate: Date | null; cursorId: string | null }
   > = new Map();
 
-  private abortInFlight(_reason: string): void {
+  private abortInFlight(reason: string): void {
     for (const controller of this.inFlightServerControllers.values()) {
       controller.abort();
     }
@@ -201,7 +201,6 @@ class SessionPoller {
         );
         // Abort any in-flight work (real cancellation for Jellyfin requests)
         this.abortInFlight("watchdog");
-        this.currentAbortController?.abort();
         // Don't start a new cycle while old one is still in progress; wait for it to unwind.
         return;
       } else {
@@ -239,20 +238,24 @@ class SessionPoller {
     this.pollInProgress = true;
     this.pollStartedAt = Date.now();
     this.totalPollCount++;
-
-    const controller = new AbortController();
-    this.currentAbortController = controller;
+    this.pollCancelRequested = false;
 
     const timeoutMs = normalizeTimeoutMs(this.config.pollTimeoutMs);
+    let timedOut = false;
     const timeoutId = setTimeout(() => {
       this.totalTimeoutCount++;
       this.lastTimeoutAtMs = Date.now();
+      timedOut = true;
+      this.pollCancelRequested = true;
       this.abortInFlight("poll-timeout");
-      controller.abort();
     }, timeoutMs);
 
     try {
-      await this.pollSessions(controller.signal);
+      await this.pollSessions();
+
+      if (timedOut) {
+        throw new Error(`Poll timeout after ${timeoutMs}ms`);
+      }
 
       // Poll succeeded
       this.lastSuccessfulPoll = Date.now();
@@ -269,7 +272,7 @@ class SessionPoller {
         );
       }
 
-      if (controller.signal.aborted) {
+      if (timedOut) {
         if (shouldLog("session-poller:poll-timeout", 30_000)) {
           console.error(
             `[session-poller] action=poll-timeout timeoutMs=${timeoutMs} consecutiveFailures=${this.consecutiveFailures}`
@@ -286,9 +289,9 @@ class SessionPoller {
       }
     } finally {
       clearTimeout(timeoutId);
+      this.pollCancelRequested = false;
       this.pollInProgress = false;
       this.pollStartedAt = null;
-      this.currentAbortController = null;
     }
   }
 
@@ -297,7 +300,13 @@ class SessionPoller {
    *
    * IMPORTANT: This is async so we can flush open sessions durably before returning.
    */
-  async stop(): Promise<void> {
+  stop(): void;
+  stop(): Promise<void>;
+  stop(): void | Promise<void> {
+    return this.stopImpl();
+  }
+
+  private async stopImpl(): Promise<void> {
     log("session-poller", { action: "stopping" });
 
     this.stopRequested = true;
@@ -309,8 +318,6 @@ class SessionPoller {
 
     // Abort network calls (Jellyfin), but do not abort DB finalize.
     this.abortInFlight("stop");
-    this.currentAbortController?.abort();
-    this.currentAbortController = null;
 
     await this.flushSessions();
 
@@ -349,7 +356,7 @@ class SessionPoller {
   /**
    * Poll all servers for session updates
    */
-  private async pollSessions(signal: AbortSignal): Promise<void> {
+  private async pollSessions(): Promise<void> {
     try {
       const activeServers = await this.listServers();
 
@@ -357,23 +364,15 @@ class SessionPoller {
         Math.max(1, Math.floor(this.config.serverConcurrency))
       );
 
-      const tasks: Array<Promise<void>> = [];
-      for (const server of activeServers) {
-        if (!this.shouldPollServer(server.id)) continue;
-        tasks.push(limit(() => this.pollServer(server, signal)));
-      }
+      const tasks = activeServers
+        .filter((server) => this.shouldPollServer(server.id))
+        .map((server) => limit(() => this.pollServer(server)));
 
       const results = await Promise.allSettled(tasks);
-      let rejectedCount = 0;
-      for (const r of results) {
-        if (r.status === "rejected") rejectedCount += 1;
-      }
-      if (
-        rejectedCount > 0 &&
-        shouldLog("session-poller:server-task-rejected", 30_000)
-      ) {
+      const rejected = results.filter((r) => r.status === "rejected");
+      if (rejected.length > 0 && shouldLog("session-poller:server-task-rejected", 30_000)) {
         console.error(
-          `[session-poller] action=server-task-rejected count=${rejectedCount}`
+          `[session-poller] action=server-task-rejected count=${rejected.length}`
         );
       }
     } catch (error) {
@@ -427,16 +426,14 @@ class SessionPoller {
   /**
    * Poll sessions for a specific server
    */
-  private async pollServer(server: Server, signal: AbortSignal): Promise<void> {
+  private async pollServer(server: Server): Promise<void> {
+    if (this.stopRequested || this.pollCancelRequested) return;
+
     const hadBackoff = this.serverBackoff.has(server.id);
     const controller = new AbortController();
     const serverTimeoutMs = Math.max(1000, this.config.serverRequestTimeoutMs);
     const timeoutId = setTimeout(() => controller.abort(), serverTimeoutMs);
     this.inFlightServerControllers.set(server.id, controller);
-
-    const onCycleAbort = () => controller.abort();
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener("abort", onCycleAbort, { once: true });
 
     try {
       const client = JellyfinClient.fromServer(server);
@@ -470,7 +467,6 @@ class SessionPoller {
     } finally {
       clearTimeout(timeoutId);
       this.inFlightServerControllers.delete(server.id);
-      signal.removeEventListener("abort", onCycleAbort);
     }
   }
 
@@ -653,41 +649,30 @@ class SessionPoller {
       }
 
       const serversList = await this.listServers();
-      const byId = new Map<number, Server>();
-      for (const s of serversList) byId.set(s.id, s);
+      const byId = new Map(serversList.map((s) => [s.id, s]));
 
-      const flushConcurrency = 5;
-      const limit = pLimit(flushConcurrency);
-      const tasks: Array<Promise<unknown>> = [];
-
+      const toFinalize: Array<{ server: Server; session: TrackedSession }> = [];
       for (const [serverKey, sessionsMap] of this.trackedSessions.entries()) {
         const id = Number(serverKey.replace("server_", ""));
         const server = byId.get(id);
         if (!server) continue;
-
         for (const session of sessionsMap.values()) {
-          const finalDuration = this.calculatePlayDuration(session);
-          const percentComplete = this.calculatePercentComplete(
-            session,
-            finalDuration
-          );
-          const completed = percentComplete >= 90;
-
-          tasks.push(
-            limit(() =>
-              this.savePlaybackRecord(
-                server,
-                session,
-                finalDuration,
-                percentComplete,
-                completed
-              )
-            )
-          );
+          toFinalize.push({ server, session });
         }
       }
 
-      await Promise.allSettled(tasks);
+      for (const { server, session } of toFinalize) {
+        const finalDuration = this.calculatePlayDuration(session);
+        const percentComplete = this.calculatePercentComplete(session, finalDuration);
+        const completed = percentComplete >= 90;
+        await this.savePlaybackRecord(
+          server,
+          session,
+          finalDuration,
+          percentComplete,
+          completed
+        );
+      }
 
       await db.transaction(async (tx) => {
         await tx.execute(sql`SET LOCAL statement_timeout = ${DB_STATEMENT_TIMEOUT_MS}`);
@@ -721,21 +706,17 @@ class SessionPoller {
         return;
       }
 
-      const limit = DEFAULT_ACTIVITY_LOG_LIMIT;
       const requestTimeoutMs = Math.max(1000, this.config.serverRequestTimeoutMs);
-
       const cursorDate = existing.cursorDate ?? new Date(0);
       const cursorId = existing.cursorId ?? null;
 
       const candidates: Array<{ a: JellyfinActivity; date: Date }> = [];
-
       // NOTE: Jellyfin returns newest-first; we page until we reach the cursor to avoid gaps.
       let startIndex = 0;
+      const limit = DEFAULT_ACTIVITY_LOG_LIMIT;
       let reachedCursor = false;
-      let pagesFetched = 0;
-      const maxPages = 50;
 
-      while (!reachedCursor && pagesFetched < maxPages) {
+      while (!reachedCursor) {
         const page = await client.getActivities(startIndex, limit, {
           timeoutMs: requestTimeoutMs,
           retries: 0,
@@ -748,21 +729,20 @@ class SessionPoller {
             reachedCursor = true;
             break;
           }
-
           const d = new Date(a.Date);
-          if (!Number.isFinite(d.getTime())) continue;
-
+          if (!Number.isFinite(d.getTime())) {
+            continue;
+          }
           if (d <= cursorDate) {
             reachedCursor = true;
             break;
           }
-
+          // Collect newest-first; we'll sort to oldest-first before processing.
           candidates.push({ a, date: d });
         }
 
         if (page.length < limit) break;
         startIndex += page.length;
-        pagesFetched += 1;
       }
 
       if (candidates.length === 0) return;
@@ -775,7 +755,7 @@ class SessionPoller {
         const uid = c.a.UserId;
         if (typeof uid === "string" && uid.length > 0) userIdSet.add(uid);
       }
-      const userIds = Array.from(userIdSet);
+      const userIds: string[] = Array.from(userIdSet);
       const validUserIds = new Set<string>();
       if (userIds.length > 0) {
         const rows = await db
@@ -826,7 +806,11 @@ class SessionPoller {
         cursorDate: last.date,
         cursorId: last.a.Id,
       });
-      await this.persistActivityLogCursor(server.id, last.date, last.a.Id);
+      await this.persistActivityLogCursor(
+        server.id,
+        last.date,
+        last.a.Id
+      );
     } catch (error) {
       const signature = formatError(error);
       const key = `session-poller:activity-catchup-error:${server.id}`;
@@ -891,20 +875,25 @@ class SessionPoller {
     currentSessions: JellyfinSession[],
     trackedSessions: Map<string, TrackedSession>
   ): SessionChanges {
-    const currentMap = new Map<string, JellyfinSession>();
+    const currentKeys = new Set<string>();
     const newSessions: JellyfinSession[] = [];
     const updatedSessions: JellyfinSession[] = [];
 
     for (const session of currentSessions) {
       const key = this.generateSessionKey(session);
-      currentMap.set(key, session);
-      if (trackedSessions.has(key)) updatedSessions.push(session);
-      else newSessions.push(session);
+      currentKeys.add(key);
+      if (trackedSessions.has(key)) {
+        updatedSessions.push(session);
+      } else {
+        newSessions.push(session);
+      }
     }
 
     const endedSessions: Array<{ key: string; session: TrackedSession }> = [];
     for (const [key, session] of trackedSessions.entries()) {
-      if (!currentMap.has(key)) endedSessions.push({ key, session });
+      if (!currentKeys.has(key)) {
+        endedSessions.push({ key, session });
+      }
     }
 
     return { newSessions, updatedSessions, endedSessions };

@@ -1,3 +1,4 @@
+import { parseISO } from "date-fns";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Container } from "@/components/Container";
@@ -7,7 +8,6 @@ import { getActivities, getUniqueActivityTypes } from "@/lib/db/activities";
 import { getServer } from "@/lib/db/server";
 import { getUsers } from "@/lib/db/users";
 import { ActivityLogTable } from "./ActivityLogTable";
-import { parseISO } from "date-fns";
 
 export default async function ActivitiesPage({
   params,

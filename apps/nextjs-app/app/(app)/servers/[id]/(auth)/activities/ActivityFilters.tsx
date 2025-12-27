@@ -1,5 +1,6 @@
 "use client";
 
+import type { User } from "@streamystats/database/schema";
 import { format, isValid, parseISO } from "date-fns";
 import { CalendarIcon, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -21,7 +22,6 @@ import {
 } from "@/components/ui/select";
 import { useQueryParams } from "@/hooks/useQueryParams";
 import { cn } from "@/lib/utils";
-import type { User } from "@streamystats/database/schema";
 
 const DATE_PARAM_FORMAT = "yyyy-MM-dd";
 

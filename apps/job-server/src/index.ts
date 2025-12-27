@@ -117,7 +117,7 @@ async function startServer() {
 async function shutdown() {
   console.log("[job-server] status=shutting-down");
   activityScheduler.stop();
-  sessionPoller.stop();
+  await sessionPoller.stop();
   await closeJobQueue();
   await closeConnection();
   process.exit(0);
