@@ -1,6 +1,6 @@
+import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/api-auth";
 import { getWatchlistByName } from "@/lib/db/watchlists";
-import type { NextRequest } from "next/server";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -44,4 +44,3 @@ export async function GET(request: NextRequest) {
 
   return jsonResponse({ data: watchlist });
 }
-

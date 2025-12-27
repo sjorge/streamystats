@@ -16,8 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDuration } from "@/lib/utils";
-import type { ItemDetailsResponse } from "./types";
 import { AddToWatchlistButton } from "./AddToWatchlistButton";
+import type { ItemDetailsResponse } from "./types";
 
 interface ItemHeaderProps {
   item: Item;

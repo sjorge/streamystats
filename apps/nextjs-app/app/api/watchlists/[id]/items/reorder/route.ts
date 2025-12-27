@@ -1,6 +1,6 @@
+import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/api-auth";
 import { reorderWatchlistItems } from "@/lib/db/watchlists";
-import type { NextRequest } from "next/server";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -15,7 +15,7 @@ function jsonResponse(body: unknown, status = 200) {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireSession();
   if (auth.error) return auth.error;
@@ -24,7 +24,7 @@ export async function POST(
   const { id } = await params;
 
   const watchlistId = parseInt(id, 10);
-  if (isNaN(watchlistId)) {
+  if (Number.isNaN(watchlistId)) {
     return jsonResponse({ error: "Invalid watchlist ID" }, 400);
   }
 
@@ -41,7 +41,10 @@ export async function POST(
 
   const { itemIds } = body as Record<string, unknown>;
 
-  if (!Array.isArray(itemIds) || !itemIds.every((id) => typeof id === "string")) {
+  if (
+    !Array.isArray(itemIds) ||
+    !itemIds.every((id) => typeof id === "string")
+  ) {
     return jsonResponse({ error: "itemIds must be an array of strings" }, 400);
   }
 
@@ -57,4 +60,3 @@ export async function POST(
 
   return jsonResponse({ success: true });
 }
-

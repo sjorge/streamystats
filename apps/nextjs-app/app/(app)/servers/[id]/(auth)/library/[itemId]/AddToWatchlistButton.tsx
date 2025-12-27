@@ -1,16 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Check, ListPlus, Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Check, ListPlus, Plus, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -84,9 +84,12 @@ export function AddToWatchlistButton({
       // Remove from watchlist
       setAdding(watchlistId);
       try {
-        const res = await fetch(`/api/watchlists/${watchlistId}/items/${itemId}`, {
-          method: "DELETE",
-        });
+        const res = await fetch(
+          `/api/watchlists/${watchlistId}/items/${itemId}`,
+          {
+            method: "DELETE",
+          },
+        );
         if (res.ok) {
           setInWatchlists(inWatchlists.filter((id) => id !== watchlistId));
         }
@@ -146,7 +149,7 @@ export function AddToWatchlistButton({
 
   // Filter watchlists that can accept this item type
   const compatibleWatchlists = watchlists.filter(
-    (wl) => !wl.allowedItemType || wl.allowedItemType === itemType
+    (wl) => !wl.allowedItemType || wl.allowedItemType === itemType,
   );
 
   return (
@@ -240,4 +243,3 @@ export function AddToWatchlistButton({
     </>
   );
 }
-

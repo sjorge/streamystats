@@ -1,6 +1,6 @@
+import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/api-auth";
 import { removeItemFromWatchlist } from "@/lib/db/watchlists";
-import type { NextRequest } from "next/server";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -15,7 +15,7 @@ function jsonResponse(body: unknown, status = 200) {
  */
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string; itemId: string }> }
+  { params }: { params: Promise<{ id: string; itemId: string }> },
 ) {
   const auth = await requireSession();
   if (auth.error) return auth.error;
@@ -24,7 +24,7 @@ export async function DELETE(
   const { id, itemId } = await params;
 
   const watchlistId = parseInt(id, 10);
-  if (isNaN(watchlistId)) {
+  if (Number.isNaN(watchlistId)) {
     return jsonResponse({ error: "Invalid watchlist ID" }, 400);
   }
 
@@ -35,9 +35,11 @@ export async function DELETE(
   });
 
   if (!deleted) {
-    return jsonResponse({ error: "Item not found in watchlist or access denied" }, 404);
+    return jsonResponse(
+      { error: "Item not found in watchlist or access denied" },
+      404,
+    );
   }
 
   return jsonResponse({ success: true });
 }
-

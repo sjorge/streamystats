@@ -1,9 +1,6 @@
-import { requireSession } from "@/lib/api-auth";
-import {
-  createWatchlist,
-  getWatchlistsForUser,
-} from "@/lib/db/watchlists";
 import type { NextRequest } from "next/server";
+import { requireSession } from "@/lib/api-auth";
+import { createWatchlist, getWatchlistsForUser } from "@/lib/db/watchlists";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -61,12 +58,15 @@ export async function POST(request: NextRequest) {
   if (
     defaultSortOrder !== undefined &&
     !["custom", "name", "dateAdded", "releaseDate"].includes(
-      defaultSortOrder as string
+      defaultSortOrder as string,
     )
   ) {
     return jsonResponse(
-      { error: "Invalid defaultSortOrder. Must be custom, name, dateAdded, or releaseDate" },
-      400
+      {
+        error:
+          "Invalid defaultSortOrder. Must be custom, name, dateAdded, or releaseDate",
+      },
+      400,
     );
   }
 
@@ -84,4 +84,3 @@ export async function POST(request: NextRequest) {
 
   return jsonResponse({ data: watchlist }, 201);
 }
-

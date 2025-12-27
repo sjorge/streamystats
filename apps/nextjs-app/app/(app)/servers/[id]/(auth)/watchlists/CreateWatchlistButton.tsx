@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,8 +15,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -24,12 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 interface CreateWatchlistButtonProps {
   serverId: number;
 }
 
-export function CreateWatchlistButton({ serverId }: CreateWatchlistButtonProps) {
+export function CreateWatchlistButton({
+  serverId,
+}: CreateWatchlistButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -112,7 +114,12 @@ export function CreateWatchlistButton({ serverId }: CreateWatchlistButtonProps) 
             </div>
             <div className="grid gap-2">
               <Label htmlFor="itemType">Item Type Lock (optional)</Label>
-              <Select value={allowedItemType || "_none"} onValueChange={(v) => setAllowedItemType(v === "_none" ? "" : v)}>
+              <Select
+                value={allowedItemType || "_none"}
+                onValueChange={(v) =>
+                  setAllowedItemType(v === "_none" ? "" : v)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Allow all types" />
                 </SelectTrigger>
@@ -126,7 +133,10 @@ export function CreateWatchlistButton({ serverId }: CreateWatchlistButtonProps) 
             </div>
             <div className="grid gap-2">
               <Label htmlFor="sortOrder">Default Sort Order</Label>
-              <Select value={defaultSortOrder} onValueChange={setDefaultSortOrder}>
+              <Select
+                value={defaultSortOrder}
+                onValueChange={setDefaultSortOrder}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -150,7 +160,11 @@ export function CreateWatchlistButton({ serverId }: CreateWatchlistButtonProps) 
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={loading || !name.trim()}>
@@ -162,4 +176,3 @@ export function CreateWatchlistButton({ serverId }: CreateWatchlistButtonProps) 
     </Dialog>
   );
 }
-

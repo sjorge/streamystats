@@ -1,12 +1,13 @@
 "use client";
 
 import type { Item } from "@streamystats/database";
-import type { WatchlistWithItemCount } from "@/lib/db/watchlists";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Globe, Lock, Film, Tv, ChevronRight } from "lucide-react";
+import { ChevronRight, Film, Globe, Lock, Tv } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import type { WatchlistWithItemCount } from "@/lib/db/watchlists";
 
 interface WatchlistCardProps {
   watchlist: WatchlistWithItemCount;
@@ -53,16 +54,16 @@ function WatchlistPoster({
         {gridItems.map((item) => {
           const imageUrl = getItemImageUrl(item, serverUrl);
           return (
-            <div
-              key={item.id}
-              className="relative bg-muted overflow-hidden"
-            >
+            <div key={item.id} className="relative bg-muted overflow-hidden">
               {imageUrl ? (
-                <img
+                <Image
                   src={imageUrl}
                   alt={item.name}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover/poster:scale-105"
+                  fill
+                  sizes="(max-width: 768px) 50vw, 150px"
+                  className="object-cover transition-transform duration-300 group-hover/poster:scale-105"
                   loading="lazy"
+                  unoptimized
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/80">
@@ -107,7 +108,7 @@ export function WatchlistCard({
           <div className="relative p-4 pb-3">
             <WatchlistPoster items={previewItems} serverUrl={serverUrl} />
           </div>
-          
+
           <div className="px-4 pb-4 pt-2 flex-1 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2 min-h-[3rem]">
               <div className="flex-1 min-w-0">
@@ -135,7 +136,8 @@ export function WatchlistCard({
                 variant="secondary"
                 className="text-xs font-medium px-2.5 py-0.5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
               >
-                {watchlist.itemCount} {watchlist.itemCount === 1 ? "item" : "items"}
+                {watchlist.itemCount}{" "}
+                {watchlist.itemCount === 1 ? "item" : "items"}
               </Badge>
               {watchlist.allowedItemType && (
                 <Badge
@@ -160,4 +162,3 @@ export function WatchlistCard({
     </Link>
   );
 }
-

@@ -3,14 +3,13 @@ import {
   db,
   type Item,
   items,
+  type NewWatchlist,
   type Watchlist,
-  watchlists,
   type WatchlistItem,
   watchlistItems,
-  type NewWatchlist,
-  type NewWatchlistItem,
+  watchlists,
 } from "@streamystats/database";
-import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, or, type SQL, sql } from "drizzle-orm";
 
 export type SortOrder = "custom" | "name" | "dateAdded" | "releaseDate";
 
@@ -24,6 +23,41 @@ export interface WatchlistWithItems extends Watchlist {
 
 export interface WatchlistItemWithDetails extends WatchlistItem {
   item: Item;
+}
+
+export type WatchlistListItem = Pick<
+  Item,
+  | "id"
+  | "name"
+  | "type"
+  | "productionYear"
+  | "runtimeTicks"
+  | "genres"
+  | "primaryImageTag"
+  | "primaryImageThumbTag"
+  | "primaryImageLogoTag"
+  | "backdropImageTags"
+  | "seriesId"
+  | "seriesPrimaryImageTag"
+  | "parentBackdropItemId"
+  | "parentBackdropImageTags"
+  | "parentThumbItemId"
+  | "parentThumbImageTag"
+  | "imageBlurHashes"
+  | "seriesName"
+  | "seasonName"
+  | "indexNumber"
+  | "parentIndexNumber"
+  | "premiereDate"
+  | "communityRating"
+>;
+
+export interface WatchlistItemWithListItem extends WatchlistItem {
+  item: WatchlistListItem;
+}
+
+export interface WatchlistWithItemsLite extends Watchlist {
+  items: WatchlistItemWithListItem[];
 }
 
 /**
@@ -46,15 +80,15 @@ export const getWatchlistsForUser = async ({
     .where(
       and(
         eq(watchlists.serverId, serverId),
-        or(eq(watchlists.userId, userId), eq(watchlists.isPublic, true))
-      )
+        or(eq(watchlists.userId, userId), eq(watchlists.isPublic, true)),
+      ),
     )
     .groupBy(watchlists.id)
     .orderBy(desc(watchlists.createdAt));
 
   return result.map((r) => ({
     ...r.watchlist,
-    itemCount: r.itemCount,
+    itemCount: Number(r.itemCount),
   }));
 };
 
@@ -71,7 +105,7 @@ export const getWatchlistById = async ({
   const result = await db.query.watchlists.findFirst({
     where: and(
       eq(watchlists.id, watchlistId),
-      or(eq(watchlists.userId, userId), eq(watchlists.isPublic, true))
+      or(eq(watchlists.userId, userId), eq(watchlists.isPublic, true)),
     ),
   });
 
@@ -97,7 +131,10 @@ export const getWatchlistByName = async ({
       eq(watchlists.serverId, serverId),
       eq(watchlists.userId, userId),
       eq(watchlists.name, name),
-      or(eq(watchlists.userId, requestingUserId), eq(watchlists.isPublic, true))
+      or(
+        eq(watchlists.userId, requestingUserId),
+        eq(watchlists.isPublic, true),
+      ),
     ),
   });
 
@@ -124,9 +161,10 @@ export const getWatchlistWithItems = async ({
     return null;
   }
 
-  const effectiveSortOrder = sortOrder ?? (watchlist.defaultSortOrder as SortOrder);
+  const effectiveSortOrder =
+    sortOrder ?? (watchlist.defaultSortOrder as SortOrder);
 
-  let orderByClause;
+  let orderByClause: SQL;
   switch (effectiveSortOrder) {
     case "name":
       orderByClause = asc(items.name);
@@ -137,7 +175,6 @@ export const getWatchlistWithItems = async ({
     case "releaseDate":
       orderByClause = desc(items.premiereDate);
       break;
-    case "custom":
     default:
       orderByClause = asc(watchlistItems.position);
       break;
@@ -157,6 +194,65 @@ export const getWatchlistWithItems = async ({
     .innerJoin(items, eq(watchlistItems.itemId, items.id))
     .where(and(...whereConditions))
     .orderBy(orderByClause);
+
+  return {
+    ...watchlist,
+    items: itemsResult.map((r) => ({
+      ...r.watchlistItem,
+      item: r.item,
+    })),
+  };
+};
+
+/**
+ * Get watchlist with all its items (lightweight item payload safe for Client Components)
+ */
+export const getWatchlistWithItemsLite = async ({
+  watchlistId,
+  userId,
+}: {
+  watchlistId: number;
+  userId: string;
+}): Promise<WatchlistWithItemsLite | null> => {
+  const watchlist = await getWatchlistById({ watchlistId, userId });
+
+  if (!watchlist) {
+    return null;
+  }
+
+  const itemsResult = await db
+    .select({
+      watchlistItem: watchlistItems,
+      item: {
+        id: items.id,
+        name: items.name,
+        type: items.type,
+        productionYear: items.productionYear,
+        runtimeTicks: items.runtimeTicks,
+        genres: items.genres,
+        primaryImageTag: items.primaryImageTag,
+        primaryImageThumbTag: items.primaryImageThumbTag,
+        primaryImageLogoTag: items.primaryImageLogoTag,
+        backdropImageTags: items.backdropImageTags,
+        seriesId: items.seriesId,
+        seriesPrimaryImageTag: items.seriesPrimaryImageTag,
+        parentBackdropItemId: items.parentBackdropItemId,
+        parentBackdropImageTags: items.parentBackdropImageTags,
+        parentThumbItemId: items.parentThumbItemId,
+        parentThumbImageTag: items.parentThumbImageTag,
+        imageBlurHashes: items.imageBlurHashes,
+        seriesName: items.seriesName,
+        seasonName: items.seasonName,
+        indexNumber: items.indexNumber,
+        parentIndexNumber: items.parentIndexNumber,
+        premiereDate: items.premiereDate,
+        communityRating: items.communityRating,
+      },
+    })
+    .from(watchlistItems)
+    .innerJoin(items, eq(watchlistItems.itemId, items.id))
+    .where(eq(watchlistItems.watchlistId, watchlistId))
+    .orderBy(asc(watchlistItems.position));
 
   return {
     ...watchlist,
@@ -190,7 +286,7 @@ export const getWatchlistPreviewItems = async ({
  * Create a new watchlist
  */
 export const createWatchlist = async (
-  data: Omit<NewWatchlist, "createdAt" | "updatedAt">
+  data: Omit<NewWatchlist, "createdAt" | "updatedAt">,
 ): Promise<Watchlist> => {
   const [result] = await db.insert(watchlists).values(data).returning();
   return result;
@@ -206,7 +302,16 @@ export const updateWatchlist = async ({
 }: {
   watchlistId: number;
   userId: string;
-  data: Partial<Pick<Watchlist, "name" | "description" | "isPublic" | "allowedItemType" | "defaultSortOrder">>;
+  data: Partial<
+    Pick<
+      Watchlist,
+      | "name"
+      | "description"
+      | "isPublic"
+      | "allowedItemType"
+      | "defaultSortOrder"
+    >
+  >;
 }): Promise<Watchlist | null> => {
   const [result] = await db
     .update(watchlists)
@@ -269,7 +374,9 @@ export const addItemToWatchlist = async ({
 
   // Get max position
   const maxPositionResult = await db
-    .select({ maxPos: sql<number>`COALESCE(MAX(${watchlistItems.position}), -1)` })
+    .select({
+      maxPos: sql<number>`COALESCE(MAX(${watchlistItems.position}), -1)`,
+    })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, watchlistId));
 
@@ -318,8 +425,8 @@ export const removeItemFromWatchlist = async ({
     .where(
       and(
         eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.itemId, itemId)
-      )
+        eq(watchlistItems.itemId, itemId),
+      ),
     )
     .returning();
 
@@ -355,8 +462,8 @@ export const reorderWatchlistItems = async ({
       .where(
         and(
           eq(watchlistItems.watchlistId, watchlistId),
-          eq(watchlistItems.itemId, itemIds[i])
-        )
+          eq(watchlistItems.itemId, itemIds[i]),
+        ),
       );
   }
 
@@ -383,8 +490,8 @@ export const getWatchlistsContainingItem = async ({
       and(
         eq(watchlists.serverId, serverId),
         eq(watchlists.userId, userId),
-        eq(watchlistItems.itemId, itemId)
-      )
+        eq(watchlistItems.itemId, itemId),
+      ),
     );
 
   return result.map((r) => r.watchlist);
@@ -407,13 +514,14 @@ export const getUserOwnWatchlists = async ({
     })
     .from(watchlists)
     .leftJoin(watchlistItems, eq(watchlists.id, watchlistItems.watchlistId))
-    .where(and(eq(watchlists.serverId, serverId), eq(watchlists.userId, userId)))
+    .where(
+      and(eq(watchlists.serverId, serverId), eq(watchlists.userId, userId)),
+    )
     .groupBy(watchlists.id)
     .orderBy(desc(watchlists.createdAt));
 
   return result.map((r) => ({
     ...r.watchlist,
-    itemCount: r.itemCount,
+    itemCount: Number(r.itemCount),
   }));
 };
-

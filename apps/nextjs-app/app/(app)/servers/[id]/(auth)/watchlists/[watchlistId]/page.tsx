@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/Container";
 import { getServer } from "@/lib/db/server";
 import { getMe } from "@/lib/db/users";
-import { getWatchlistWithItems } from "@/lib/db/watchlists";
+import { getWatchlistWithItemsLite } from "@/lib/db/watchlists";
 import { WatchlistHeader } from "./WatchlistHeader";
 import { WatchlistItems } from "./WatchlistItems";
 
@@ -28,15 +28,13 @@ export default async function WatchlistDetailPage({
   }
 
   const watchlistIdNum = parseInt(watchlistId, 10);
-  if (isNaN(watchlistIdNum)) {
+  if (Number.isNaN(watchlistIdNum)) {
     redirect(`/servers/${id}/watchlists`);
   }
 
-  const watchlist = await getWatchlistWithItems({
+  const watchlist = await getWatchlistWithItemsLite({
     watchlistId: watchlistIdNum,
     userId: me.id,
-    typeFilter: type,
-    sortOrder: sort as any,
   });
 
   if (!watchlist) {
@@ -47,18 +45,14 @@ export default async function WatchlistDetailPage({
 
   return (
     <Container>
-      <WatchlistHeader
-        watchlist={watchlist}
-        isOwner={isOwner}
-      />
+      <WatchlistHeader watchlist={watchlist} isOwner={isOwner} />
       <WatchlistItems
         watchlist={watchlist}
         isOwner={isOwner}
-        serverUrl={server.url}
+        server={server}
         currentType={type}
         currentSort={sort}
       />
     </Container>
   );
 }
-

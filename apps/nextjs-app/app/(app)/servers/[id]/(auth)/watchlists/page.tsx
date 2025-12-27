@@ -3,9 +3,9 @@ import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { getServer } from "@/lib/db/server";
 import { getMe } from "@/lib/db/users";
-import { getWatchlistsForUser, getWatchlistPreviewItems } from "@/lib/db/watchlists";
-import { WatchlistsGrid } from "./WatchlistsGrid";
+import { getWatchlistsForUser } from "@/lib/db/watchlists";
 import { CreateWatchlistButton } from "./CreateWatchlistButton";
+import { WatchlistsTable } from "./WatchlistsTable";
 
 export default async function WatchlistsPage({
   params,
@@ -30,19 +30,6 @@ export default async function WatchlistsPage({
     userId: me.id,
   });
 
-  // Get preview items for each watchlist
-  const watchlistsWithPreviews = await Promise.all(
-    watchlists.map(async (watchlist) => {
-      const previewItems = await getWatchlistPreviewItems({
-        watchlistId: watchlist.id,
-      });
-      return {
-        ...watchlist,
-        previewItems,
-      };
-    })
-  );
-
   return (
     <Container>
       <div className="flex items-center justify-between mb-6">
@@ -52,8 +39,8 @@ export default async function WatchlistsPage({
         />
         <CreateWatchlistButton serverId={server.id} />
       </div>
-      <WatchlistsGrid
-        watchlists={watchlistsWithPreviews}
+      <WatchlistsTable
+        watchlists={watchlists}
         serverId={server.id}
         serverUrl={server.url}
         currentUserId={me.id}
@@ -61,4 +48,3 @@ export default async function WatchlistsPage({
     </Container>
   );
 }
-

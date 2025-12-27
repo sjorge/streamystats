@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import type { Watchlist } from "@streamystats/database";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,8 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -23,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 interface EditWatchlistDialogProps {
   watchlist: Watchlist;
@@ -41,10 +41,10 @@ export function EditWatchlistDialog({
   const [description, setDescription] = useState(watchlist.description ?? "");
   const [isPublic, setIsPublic] = useState(watchlist.isPublic);
   const [allowedItemType, setAllowedItemType] = useState(
-    watchlist.allowedItemType ?? ""
+    watchlist.allowedItemType ?? "",
   );
   const [defaultSortOrder, setDefaultSortOrder] = useState(
-    watchlist.defaultSortOrder
+    watchlist.defaultSortOrder,
   );
 
   useEffect(() => {
@@ -90,7 +90,9 @@ export function EditWatchlistDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Edit Watchlist</DialogTitle>
-            <DialogDescription>Update your watchlist settings</DialogDescription>
+            <DialogDescription>
+              Update your watchlist settings
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -115,7 +117,12 @@ export function EditWatchlistDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-itemType">Item Type Lock</Label>
-              <Select value={allowedItemType || "_none"} onValueChange={(v) => setAllowedItemType(v === "_none" ? "" : v)}>
+              <Select
+                value={allowedItemType || "_none"}
+                onValueChange={(v) =>
+                  setAllowedItemType(v === "_none" ? "" : v)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Allow all types" />
                 </SelectTrigger>
@@ -129,7 +136,10 @@ export function EditWatchlistDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-sortOrder">Default Sort Order</Label>
-              <Select value={defaultSortOrder} onValueChange={setDefaultSortOrder}>
+              <Select
+                value={defaultSortOrder}
+                onValueChange={setDefaultSortOrder}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -169,4 +179,3 @@ export function EditWatchlistDialog({
     </Dialog>
   );
 }
-

@@ -1,19 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Globe, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import Link from "next/link";
-import type { WatchlistWithItems } from "@/lib/db/watchlists";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  ArrowLeft,
+  Globe,
+  Lock,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,17 +21,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { WatchlistWithItemsLite } from "@/lib/db/watchlists";
 import { EditWatchlistDialog } from "./EditWatchlistDialog";
 
 interface WatchlistHeaderProps {
-  watchlist: WatchlistWithItems;
+  watchlist: WatchlistWithItemsLite;
   isOwner: boolean;
 }
 
-export function WatchlistHeader({
-  watchlist,
-  isOwner,
-}: WatchlistHeaderProps) {
+export function WatchlistHeader({ watchlist, isOwner }: WatchlistHeaderProps) {
   const router = useRouter();
   const params = useParams();
   const serverIdParam = params.id as string;
@@ -79,14 +83,19 @@ export function WatchlistHeader({
               )}
             </div>
             {watchlist.description && (
-              <p className="text-muted-foreground mb-3">{watchlist.description}</p>
+              <p className="text-muted-foreground mb-3">
+                {watchlist.description}
+              </p>
             )}
             <div className="flex items-center gap-2">
               <Badge variant="secondary">
-                {watchlist.items.length} {watchlist.items.length === 1 ? "item" : "items"}
+                {watchlist.items.length}{" "}
+                {watchlist.items.length === 1 ? "item" : "items"}
               </Badge>
               {watchlist.allowedItemType && (
-                <Badge variant="outline">{watchlist.allowedItemType} only</Badge>
+                <Badge variant="outline">
+                  {watchlist.allowedItemType} only
+                </Badge>
               )}
               <Badge variant="outline" className="capitalize">
                 Sort: {watchlist.defaultSortOrder}
@@ -124,8 +133,8 @@ export function WatchlistHeader({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Watchlist</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{watchlist.name}"? This action cannot be
-              undone.
+              Are you sure you want to delete "{watchlist.name}"? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -149,4 +158,3 @@ export function WatchlistHeader({
     </>
   );
 }
-

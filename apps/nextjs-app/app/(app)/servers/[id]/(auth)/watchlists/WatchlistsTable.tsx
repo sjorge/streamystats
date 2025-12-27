@@ -1,13 +1,9 @@
 "use client";
 
-import type { Item } from "@streamystats/database";
-import type { WatchlistWithItemCount } from "@/lib/db/watchlists";
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
@@ -16,9 +12,7 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Globe, Lock } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import * as React from "react";
-import { useDebounce } from "use-debounce";
 import JellyfinAvatar from "@/components/JellyfinAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,7 +22,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -38,69 +31,30 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePersistantState } from "@/hooks/usePersistantState";
-import { useQueryParams } from "@/hooks/useQueryParams";
+import type { WatchlistWithItemCount } from "@/lib/db/watchlists";
 import { formatLocalDate } from "@/lib/timezone";
 
-interface WatchlistWithPreviews extends WatchlistWithItemCount {
-  previewItems: Item[];
-}
-
-interface WatchlistsGridProps {
-  watchlists: WatchlistWithPreviews[];
+interface WatchlistsTableProps {
+  watchlists: WatchlistWithItemCount[];
   serverId: number;
   serverUrl: string;
   currentUserId: string;
 }
 
-export function WatchlistsGrid({
+export function WatchlistsTable({
   watchlists,
   serverId,
   serverUrl,
   currentUserId,
-}: WatchlistsGridProps) {
-  const searchParams = useSearchParams();
-  const { updateQueryParams, isLoading } = useQueryParams();
+}: WatchlistsTableProps) {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
 
-  const currentPage = Number(searchParams.get("page") || "1");
-  const currentSearch = searchParams.get("search") || "";
-  const currentSortBy = searchParams.get("sort_by") || "";
-  const currentSortOrder = searchParams.get("sort_order") || "";
-
-  const [searchInput, setSearchInput] = React.useState<string>(currentSearch);
-  const [debouncedSearch] = useDebounce(searchInput, 500);
-
-  React.useEffect(() => {
-    if (debouncedSearch !== currentSearch) {
-      updateQueryParams({
-        search: debouncedSearch || null,
-        page: "1",
-      });
-    }
-  }, [debouncedSearch, currentSearch, updateQueryParams]);
-
-  const sorting: SortingState = currentSortBy
-    ? [{ id: currentSortBy, desc: currentSortOrder === "desc" }]
-    : [];
-
-  const handleSortChange = (columnId: string) => {
-    if (currentSortBy !== columnId) {
-      updateQueryParams({
-        sort_by: columnId,
-        sort_order: "asc",
-      });
-    } else {
-      updateQueryParams({
-        sort_order: currentSortOrder === "asc" ? "desc" : "asc",
-      });
-    }
-  };
-
-  const columns: ColumnDef<WatchlistWithPreviews>[] = [
+  const columns: ColumnDef<WatchlistWithItemCount>[] = [
     {
       accessorKey: "name",
-      header: () => {
+      header: ({ column }) => {
         return (
-          <Button variant="ghost" onClick={() => handleSortChange("name")}>
+          <Button variant="ghost" onClick={column.getToggleSortingHandler()}>
             Name
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -110,11 +64,11 @@ export function WatchlistsGrid({
         const watchlist = row.original;
         const isOwner = watchlist.userId === currentUserId;
         return (
-          <Link
-            href={`/servers/${serverId}/watchlists/${watchlist.id}`}
-            className="flex flex-row items-center gap-4 cursor-pointer group"
-          >
-            <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex flex-row items-center gap-4 group">
+            <Link
+              href={`/servers/${serverId}/watchlists/${watchlist.id}`}
+              className="flex flex-col min-w-0 flex-1 cursor-pointer"
+            >
               <div className="flex items-center gap-2">
                 <div className="capitalize font-medium transition-colors duration-200 group-hover:text-primary truncate">
                   {watchlist.name}
@@ -138,19 +92,16 @@ export function WatchlistsGrid({
                   {watchlist.description}
                 </div>
               )}
-            </div>
-          </Link>
+            </Link>
+          </div>
         );
       },
     },
     {
       accessorKey: "itemCount",
-      header: () => {
+      header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
-            onClick={() => handleSortChange("itemCount")}
-          >
+          <Button variant="ghost" onClick={column.getToggleSortingHandler()}>
             Items
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -194,7 +145,8 @@ export function WatchlistsGrid({
       id: "owner",
       header: () => <div className="text-left">Owner</div>,
       cell: ({ row }) => {
-        const userId = row.getValue("userId") as string;
+        // Column id is "owner" (not "userId"), so avoid row.getValue("userId") which spams console.
+        const userId = row.original.userId;
         const isOwner = userId === currentUserId;
         return (
           <div className="flex items-center gap-2">
@@ -221,12 +173,9 @@ export function WatchlistsGrid({
     },
     {
       accessorKey: "createdAt",
-      header: () => {
+      header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
-            onClick={() => handleSortChange("createdAt")}
-          >
+          <Button variant="ghost" onClick={column.getToggleSortingHandler()}>
             Created
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -248,86 +197,22 @@ export function WatchlistsGrid({
     },
   ];
 
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
-  );
-  const [columnVisibility, setColumnVisibility] = usePersistantState<
-    VisibilityState
-  >(`watchlists-column-visibility-${serverId}`, {});
-
-  const handlePageChange = (newPage: number) => {
-    updateQueryParams({
-      page: newPage.toString(),
-    });
-  };
-
-  const filteredData = React.useMemo(() => {
-    if (!debouncedSearch) return watchlists;
-
-    const searchLower = debouncedSearch.toLowerCase();
-    return watchlists.filter(
-      (watchlist) =>
-        watchlist.name.toLowerCase().includes(searchLower) ||
-        watchlist.description?.toLowerCase().includes(searchLower) ||
-        watchlist.allowedItemType?.toLowerCase().includes(searchLower),
+  const [columnVisibility, setColumnVisibility] =
+    usePersistantState<VisibilityState>(
+      `watchlists-column-visibility-${serverId}`,
+      {},
     );
-  }, [watchlists, debouncedSearch]);
-
-  const sortedData = React.useMemo(() => {
-    if (!currentSortBy) return filteredData;
-
-    const sorted = [...filteredData];
-    sorted.sort((a, b) => {
-      let aVal: any;
-      let bVal: any;
-
-      switch (currentSortBy) {
-        case "name":
-          aVal = a.name.toLowerCase();
-          bVal = b.name.toLowerCase();
-          break;
-        case "itemCount":
-          aVal = a.itemCount;
-          bVal = b.itemCount;
-          break;
-        case "createdAt":
-          aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          break;
-        default:
-          return 0;
-      }
-
-      if (aVal < bVal) return currentSortOrder === "asc" ? -1 : 1;
-      if (aVal > bVal) return currentSortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return sorted;
-  }, [filteredData, currentSortBy, currentSortOrder]);
-
-  const pageSize = 20;
-  const totalPages = Math.ceil(sortedData.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedData = sortedData.slice(startIndex, endIndex);
 
   const table = useReactTable({
-    data: paginatedData,
+    data: watchlists,
     columns,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-    },
-    manualPagination: false,
-    pageCount: totalPages,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    state: { sorting, columnVisibility },
+    initialState: { pagination: { pageSize: 20 } },
   });
 
   if (watchlists.length === 0) {
@@ -339,6 +224,8 @@ export function WatchlistsGrid({
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-label="Empty watchlist"
+            role="img"
           >
             <path
               strokeLinecap="round"
@@ -359,14 +246,6 @@ export function WatchlistsGrid({
   return (
     <div className="w-full">
       <div className="flex items-center pb-4">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search watchlists..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="max-w-sm"
-          />
-        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
@@ -416,21 +295,24 @@ export function WatchlistsGrid({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className="cursor-pointer"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
@@ -446,25 +328,33 @@ export function WatchlistsGrid({
       </div>
       <div className="flex items-center justify-between space-x-2 py-4">
         <div>
-          <p className="text-sm text-neutral-500">
-            {startIndex + 1} - {Math.min(endIndex, sortedData.length)} of{" "}
-            {sortedData.length} results.
-          </p>
+          {(() => {
+            const { pageIndex, pageSize } = table.getState().pagination;
+            const total = table.getPrePaginationRowModel().rows.length;
+            if (total === 0) return null;
+            const from = pageIndex * pageSize + 1;
+            const to = Math.min((pageIndex + 1) * pageSize, total);
+            return (
+              <p className="text-sm text-neutral-500">
+                {from} - {to} of {total} results.
+              </p>
+            );
+          })()}
         </div>
         <div className="space-x-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage <= 1 || isLoading}
+            onClick={table.previousPage}
+            disabled={!table.getCanPreviousPage()}
           >
             Previous
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage >= totalPages || isLoading}
+            onClick={table.nextPage}
+            disabled={!table.getCanNextPage()}
           >
             Next
           </Button>
@@ -473,4 +363,3 @@ export function WatchlistsGrid({
     </div>
   );
 }
-

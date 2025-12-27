@@ -96,7 +96,7 @@ export const DynamicBreadcrumbs: React.FC = () => {
 
           try {
             const watchlistId = parseInt(segment, 10);
-            if (!isNaN(watchlistId)) {
+            if (!Number.isNaN(watchlistId)) {
               const response = await fetch(
                 `${basePath}/api/watchlists/${watchlistId}`,
               );

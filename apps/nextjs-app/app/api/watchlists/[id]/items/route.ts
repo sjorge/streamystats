@@ -1,9 +1,6 @@
-import { requireSession } from "@/lib/api-auth";
-import {
-  addItemToWatchlist,
-  getWatchlistWithItems,
-} from "@/lib/db/watchlists";
 import type { NextRequest } from "next/server";
+import { requireSession } from "@/lib/api-auth";
+import { addItemToWatchlist, getWatchlistWithItems } from "@/lib/db/watchlists";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -18,7 +15,7 @@ function jsonResponse(body: unknown, status = 200) {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireSession();
   if (auth.error) return auth.error;
@@ -27,13 +24,13 @@ export async function GET(
   const { id } = await params;
 
   const watchlistId = parseInt(id, 10);
-  if (isNaN(watchlistId)) {
+  if (Number.isNaN(watchlistId)) {
     return jsonResponse({ error: "Invalid watchlist ID" }, 400);
   }
 
   const searchParams = request.nextUrl.searchParams;
   const typeFilter = searchParams.get("type") ?? undefined;
-  const sortOrder = searchParams.get("sort") as any ?? undefined;
+  const sortOrder = (searchParams.get("sort") as any) ?? undefined;
 
   const watchlist = await getWatchlistWithItems({
     watchlistId,
@@ -55,7 +52,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireSession();
   if (auth.error) return auth.error;
@@ -64,7 +61,7 @@ export async function POST(
   const { id } = await params;
 
   const watchlistId = parseInt(id, 10);
-  if (isNaN(watchlistId)) {
+  if (Number.isNaN(watchlistId)) {
     return jsonResponse({ error: "Invalid watchlist ID" }, 400);
   }
 
@@ -93,11 +90,13 @@ export async function POST(
 
   if (!result) {
     return jsonResponse(
-      { error: "Failed to add item. Watchlist not found, item type not allowed, or item already exists." },
-      400
+      {
+        error:
+          "Failed to add item. Watchlist not found, item type not allowed, or item already exists.",
+      },
+      400,
     );
   }
 
   return jsonResponse({ data: result }, 201);
 }
-
