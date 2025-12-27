@@ -8,6 +8,7 @@ import {
   Search,
   Tv,
   User,
+  Users,
   Music,
   Disc,
 } from "lucide-react";
@@ -61,6 +62,8 @@ function getResultIcon(result: SearchResult) {
       return ActivitySquare;
     case "session":
       return Clock;
+    case "actor":
+      return Users;
     default:
       return Search;
   }
@@ -85,9 +88,9 @@ function SearchResultItem({
     onSelect();
   }, [router, serverId, result.href, onSelect]);
 
-  // Build image URL for items
+  // Build image URL for items and actors
   let imageUrl: string | undefined;
-  if (result.type === "item" && result.imageId && result.imageTag && serverUrl) {
+  if ((result.type === "item" || result.type === "actor") && result.imageId && result.imageTag && serverUrl) {
     imageUrl = `${serverUrl}/Items/${result.imageId}/Images/Primary?tag=${result.imageTag}&quality=90&maxWidth=80`;
   }
 
@@ -317,6 +320,23 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
                         <SearchResultItem
                           key={`session-${session.id}`}
                           result={session}
+                          serverId={serverId}
+                          serverUrl={serverUrl}
+                          onSelect={handleSelect}
+                        />
+                      ))}
+                    </CommandGroup>
+                  </>
+                )}
+
+                {results.actors && results.actors.length > 0 && (
+                  <>
+                    <CommandSeparator />
+                    <CommandGroup heading="Cast & Crew">
+                      {results.actors.map((actor) => (
+                        <SearchResultItem
+                          key={`actor-${actor.id}`}
+                          result={actor}
                           serverId={serverId}
                           serverUrl={serverUrl}
                           onSelect={handleSelect}

@@ -9,6 +9,7 @@ import {
   type RecommendationItem,
 } from "@/lib/db/similar-statistics";
 import { getMe, isUserAdmin } from "@/lib/db/users";
+import { CastSection } from "./CastSection";
 import { ItemHeader } from "./ItemHeader";
 import { ItemMetadata } from "./ItemMetadata";
 import { SeasonsAndEpisodes } from "./SeasonsAndEpisodes";
@@ -68,6 +69,14 @@ export default async function ItemDetailsPage({
           serverId={id}
           itemId={itemId}
         />
+        {(itemDetails.item.type === "Movie" ||
+          itemDetails.item.type === "Series") && (
+          <CastSection
+            item={itemDetails.item}
+            server={server}
+            serverId={id}
+          />
+        )}
         {itemDetails.item.type === "Series" && seasons.length > 0 && (
           <SeasonsAndEpisodes seasons={seasons} serverId={id} server={server} />
         )}

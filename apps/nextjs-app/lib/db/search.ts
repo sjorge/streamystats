@@ -16,8 +16,8 @@ import {
  */
 export type SearchResult = {
   id: string;
-  type: "item" | "user" | "watchlist" | "activity" | "session";
-  subtype?: string; // e.g., "Movie", "Series", "Episode" for items
+  type: "item" | "user" | "watchlist" | "activity" | "session" | "actor";
+  subtype?: string; // e.g., "Movie", "Series", "Episode" for items, "Actor", "Director" for actors
   title: string;
   subtitle?: string;
   imageId?: string;
@@ -36,6 +36,7 @@ export type SearchResults = {
   watchlists: SearchResult[];
   activities: SearchResult[];
   sessions: SearchResult[];
+  actors: SearchResult[];
   total: number;
 };
 
@@ -329,6 +330,82 @@ async function searchSessions(
   }));
 }
 
+// Person type from Jellyfin people array
+interface Person {
+  Id: string;
+  Name: string;
+  Role?: string;
+  Type: string;
+  PrimaryImageTag?: string;
+}
+
+/**
+ * Search actors/people across all items
+ */
+async function searchActors(
+  serverId: number,
+  query: string,
+  limit: number = 5
+): Promise<SearchResult[]> {
+  if (!query.trim()) return [];
+
+  // Search for items that have matching people in their people JSONB field
+  const results = await db
+    .select({
+      people: items.people,
+    })
+    .from(items)
+    .where(
+      and(
+        eq(items.serverId, serverId),
+        isNull(items.deletedAt),
+        sql`${items.people} IS NOT NULL`
+      )
+    )
+    .limit(500); // Get a batch of items to search through
+
+  // Extract unique actors matching the query
+  const actorMap = new Map<string, Person>();
+  const queryLower = query.toLowerCase();
+
+  for (const row of results) {
+    if (!row.people) continue;
+
+    let people: Person[] = [];
+    try {
+      if (Array.isArray(row.people)) {
+        people = row.people as Person[];
+      } else if (typeof row.people === "object") {
+        people = Object.values(row.people as Record<string, Person>);
+      }
+    } catch {
+      continue;
+    }
+
+    for (const person of people) {
+      if (!person?.Id || !person?.Name) continue;
+      if (actorMap.has(person.Id)) continue;
+      
+      if (person.Name.toLowerCase().includes(queryLower)) {
+        actorMap.set(person.Id, person);
+        if (actorMap.size >= limit) break;
+      }
+    }
+    if (actorMap.size >= limit) break;
+  }
+
+  return Array.from(actorMap.values()).map((person) => ({
+    id: person.Id,
+    type: "actor" as const,
+    subtype: person.Type,
+    title: person.Name,
+    subtitle: person.Type,
+    imageId: person.Id,
+    imageTag: person.PrimaryImageTag,
+    href: `/actors/${encodeURIComponent(person.Id)}`,
+  }));
+}
+
 /**
  * Global search across all entity types
  */
@@ -342,6 +419,7 @@ export async function globalSearch(
     watchlistLimit?: number;
     activityLimit?: number;
     sessionLimit?: number;
+    actorLimit?: number;
   } = {}
 ): Promise<SearchResults> {
   const {
@@ -350,6 +428,7 @@ export async function globalSearch(
     watchlistLimit = 5,
     activityLimit = 5,
     sessionLimit = 5,
+    actorLimit = 5,
   } = options;
 
   if (!query.trim()) {
@@ -359,18 +438,20 @@ export async function globalSearch(
       watchlists: [],
       activities: [],
       sessions: [],
+      actors: [],
       total: 0,
     };
   }
 
   // Execute all searches in parallel
-  const [itemResults, userResults, watchlistResults, activityResults, sessionResults] = 
+  const [itemResults, userResults, watchlistResults, activityResults, sessionResults, actorResults] = 
     await Promise.all([
       searchItems(serverId, query, itemLimit),
       searchUsers(serverId, query, userLimit),
       searchWatchlists(serverId, query, userId, watchlistLimit),
       searchActivities(serverId, query, activityLimit),
       searchSessions(serverId, query, sessionLimit),
+      searchActors(serverId, query, actorLimit),
     ]);
 
   const total = 
@@ -378,7 +459,8 @@ export async function globalSearch(
     userResults.length + 
     watchlistResults.length + 
     activityResults.length + 
-    sessionResults.length;
+    sessionResults.length +
+    actorResults.length;
 
   return {
     items: itemResults,
@@ -386,6 +468,7 @@ export async function globalSearch(
     watchlists: watchlistResults,
     activities: activityResults,
     sessions: sessionResults,
+    actors: actorResults,
     total,
   };
 }
