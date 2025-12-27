@@ -9,8 +9,9 @@ import { getSession, type SessionUser } from "./session";
 /**
  * Parse MediaBrowser authorization header
  * Format: MediaBrowser Client="...", Device="...", DeviceId="...", Version="...", Token="..."
+ * Note: Not exported to avoid Server Action async requirement
  */
-export function parseMediaBrowserHeader(authHeader: string): {
+function parseMediaBrowserHeader(authHeader: string): {
   token?: string;
   client?: string;
   device?: string;
