@@ -10,7 +10,14 @@ import {
   resolveServer,
   type ServerIdentifier,
 } from "@/lib/db/server-resolver";
-import { getSimilarStatistics } from "@/lib/db/similar-statistics";
+import {
+  getSimilarSeries,
+  type SeriesRecommendationItem,
+} from "@/lib/db/similar-series-statistics";
+import {
+  getSimilarStatistics,
+  type RecommendationItem,
+} from "@/lib/db/similar-statistics";
 import { authenticateByName } from "@/lib/jellyfin-auth";
 
 type RecommendationType = "Movie" | "Series" | "all";
@@ -260,17 +267,29 @@ async function buildRecommendationsResponse(args: {
   const { server, user, params, timeWindow } = args;
 
   const fetchLimit = Math.min(200, Math.max(params.limit * 4, params.limit));
-  const raw = await getSimilarStatistics(server.id, user.id, fetchLimit, 0, {
-    start: timeWindow.start,
-    end: timeWindow.end,
-  });
 
-  const filtered =
-    params.type === "all"
-      ? raw
-      : raw.filter((r) => r.item.type === params.type);
+  // Fetch from appropriate sources based on type
+  let movieResults: RecommendationItem[] = [];
+  let seriesResults: SeriesRecommendationItem[] = [];
 
-  const limitedResults = filtered.slice(0, params.limit);
+  if (params.type === "Movie" || params.type === "all") {
+    movieResults = await getSimilarStatistics(server.id, user.id, fetchLimit, 0, {
+      start: timeWindow.start,
+      end: timeWindow.end,
+    });
+  }
+
+  if (params.type === "Series" || params.type === "all") {
+    seriesResults = await getSimilarSeries(server.id, user.id, fetchLimit, 0);
+  }
+
+  // Combine and sort by similarity (both types have compatible structure)
+  const combined = [
+    ...movieResults,
+    ...seriesResults,
+  ].sort((a, b) => b.similarity - a.similarity);
+
+  const limitedResults = combined.slice(0, params.limit);
 
   // Return IDs-only format for Jellyfin API integration
   if (params.format === "ids") {
