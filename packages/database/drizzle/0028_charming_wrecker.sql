@@ -1,0 +1,1 @@
+ALTER TABLE "servers" DROP COLUMN "jellyfin_id";
