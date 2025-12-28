@@ -1,4 +1,4 @@
-import { db, items, libraries, itemPeople } from "@streamystats/database";
+import { db, items, libraries } from "@streamystats/database";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/api-auth";
 

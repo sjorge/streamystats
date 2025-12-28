@@ -1,6 +1,12 @@
 "use client";
 
-import { AlertTriangle, CheckCircle, Loader2, RefreshCw, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+  RefreshCw,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -52,9 +58,7 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
       setData(result);
       setError(null);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch progress",
-      );
+      setError(err instanceof Error ? err.message : "Failed to fetch progress");
     } finally {
       setIsLoading(false);
     }
@@ -225,9 +229,7 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
         </div>
 
         {triggerResult && (
-          <Alert
-            variant={triggerResult.success ? "default" : "destructive"}
-          >
+          <Alert variant={triggerResult.success ? "default" : "destructive"}>
             {triggerResult.success ? (
               <CheckCircle className="h-4 w-4" />
             ) : (
