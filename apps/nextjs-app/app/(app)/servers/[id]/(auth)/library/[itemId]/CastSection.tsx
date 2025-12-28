@@ -1,22 +1,18 @@
 "use client";
 
-import type { Item } from "@streamystats/database/schema";
 import { Clapperboard, PenTool, User, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import {
-  getItemCast,
-  getItemDirectors,
-  getItemWriters,
-  type Person,
-} from "@/lib/db/actor-types";
+import type { PersonFromDb } from "@/lib/db/actor-types";
 import type { ServerPublic } from "@/lib/types";
 
 interface CastSectionProps {
-  item: Item;
+  cast: PersonFromDb[];
+  directors: PersonFromDb[];
+  writers: PersonFromDb[];
   server: ServerPublic;
   serverId: number;
 }
@@ -26,21 +22,21 @@ function PersonCard({
   server,
   serverId,
 }: {
-  person: Person;
+  person: PersonFromDb;
   server: ServerPublic;
   serverId: number;
 }) {
   const [hasError, setHasError] = useState(false);
 
-  const imageUrl = person.PrimaryImageTag
-    ? `${server.url}/Items/${person.Id}/Images/Primary?fillHeight=240&fillWidth=160&quality=96&tag=${person.PrimaryImageTag}`
+  const imageUrl = person.primaryImageTag
+    ? `${server.url}/Items/${person.id}/Images/Primary?fillHeight=240&fillWidth=160&quality=96&tag=${person.primaryImageTag}`
     : null;
 
   return (
     <div className="flex-shrink-0 group relative">
       <div className="relative w-[120px] sm:w-[140px] py-2">
         <Link
-          href={`/servers/${serverId}/actors/${encodeURIComponent(person.Id)}`}
+          href={`/servers/${serverId}/actors/${encodeURIComponent(person.id)}`}
           className="flex flex-col overflow-hidden border border-border bg-card rounded-lg hover:border-primary/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] hover:z-10 relative"
         >
           <div className="relative">
@@ -49,7 +45,7 @@ function PersonCard({
               {imageUrl && !hasError ? (
                 <Image
                   src={imageUrl}
-                  alt={person.Name}
+                  alt={person.name}
                   width={160}
                   height={240}
                   className="w-full h-full object-cover rounded-t-lg"
@@ -65,11 +61,11 @@ function PersonCard({
 
           <div className="p-2.5 space-y-0.5 bg-gradient-to-b from-card to-card/95">
             <h3 className="text-foreground text-xs font-bold truncate">
-              {person.Name}
+              {person.name}
             </h3>
-            {person.Role && (
+            {person.role && (
               <p className="text-muted-foreground text-[10px] truncate">
-                {person.Role}
+                {person.role}
               </p>
             )}
           </div>
@@ -85,7 +81,7 @@ function CrewList({
   title,
   icon,
 }: {
-  people: Person[];
+  people: PersonFromDb[];
   serverId: number;
   title: string;
   icon: React.ReactNode;
@@ -101,11 +97,11 @@ function CrewList({
       <div className="flex flex-wrap gap-1">
         {people.map((person, index) => (
           <Link
-            key={person.Id}
-            href={`/servers/${serverId}/actors/${encodeURIComponent(person.Id)}`}
+            key={person.id}
+            href={`/servers/${serverId}/actors/${encodeURIComponent(person.id)}`}
             className="text-sm font-medium hover:text-primary transition-colors"
           >
-            {person.Name}
+            {person.name}
             {index < people.length - 1 && ","}
           </Link>
         ))}
@@ -114,11 +110,13 @@ function CrewList({
   );
 }
 
-export function CastSection({ item, server, serverId }: CastSectionProps) {
-  const cast = getItemCast(item);
-  const directors = getItemDirectors(item);
-  const writers = getItemWriters(item);
-
+export function CastSection({
+  cast,
+  directors,
+  writers,
+  server,
+  serverId,
+}: CastSectionProps) {
   const hasPeople =
     cast.length > 0 || directors.length > 0 || writers.length > 0;
 
@@ -159,7 +157,7 @@ export function CastSection({ item, server, serverId }: CastSectionProps) {
               <div className="flex gap-3 flex-nowrap w-max">
                 {cast.map((person) => (
                   <PersonCard
-                    key={person.Id}
+                    key={person.id}
                     person={person}
                     server={server}
                     serverId={serverId}

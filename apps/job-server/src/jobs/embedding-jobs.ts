@@ -1,4 +1,4 @@
-import { db, Item, items, servers } from "@streamystats/database";
+import { db, Item, items, servers, people, itemPeople } from "@streamystats/database";
 import axios from "axios";
 import { and, eq, sql } from "drizzle-orm";
 import OpenAI from "openai";
@@ -193,7 +193,7 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
       indexname: string;
       indexdef: string;
     }>(sql`
-      SELECT indexname, indexdef FROM pg_indexes 
+      SELECT indexname, indexdef FROM pg_indexes
       WHERE tablename = 'items' AND indexname = 'items_embedding_idx'
     `);
 
@@ -214,8 +214,8 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
       `[embeddings-index] dimensions=${dimensions} action=create method=hnsw`
     );
     await db.execute(sql`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS items_embedding_idx 
-      ON items 
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS items_embedding_idx
+      ON items
       USING hnsw ((embedding::vector(${sql.raw(String(dimensions))})) vector_cosine_ops)
     `);
     indexEnsuredForDimension.add(dimensions);
@@ -226,8 +226,9 @@ async function ensureEmbeddingIndex(dimensions: number): Promise<void> {
 
 /**
  * Prepare item text for embedding.
+ * Fetches people data from the normalized people/item_people tables.
  */
-function prepareTextForEmbedding(item: Item): string {
+async function prepareTextForEmbedding(item: Item, serverId: number): Promise<string> {
   const parts: string[] = [];
 
   parts.push(`Title: ${item.name}`);
@@ -260,36 +261,42 @@ function prepareTextForEmbedding(item: Item): string {
     if (minutes > 0) parts.push(`Runtime: ${minutes} minutes`);
   }
 
-  if (item.people) {
-    try {
-      type PersonData = { Name?: string; Role?: string; Type?: string };
-      const peopleData =
-        typeof item.people === "string"
-          ? (JSON.parse(item.people) as Record<string, PersonData>)
-          : (item.people as Record<string, PersonData>);
+  // Fetch people from normalized tables (type is stored per item-person relationship)
+  try {
+    const itemPeopleData = await db
+      .select({
+        name: people.name,
+        type: itemPeople.type,
+        role: itemPeople.role,
+      })
+      .from(itemPeople)
+      .innerJoin(
+        people,
+        and(
+          eq(itemPeople.personId, people.id),
+          eq(itemPeople.serverId, people.serverId)
+        )
+      )
+      .where(eq(itemPeople.itemId, item.id))
+      .orderBy(itemPeople.sortOrder);
 
-      if (peopleData && typeof peopleData === "object") {
-        const people = Object.values(peopleData).filter(
-          (p): p is PersonData => !!p && typeof p === "object" && !!p.Name
-        );
+    if (itemPeopleData.length > 0) {
+      const directors = itemPeopleData
+        .filter((p) => p.type === "Director")
+        .map((p) => p.name);
+      const cast = itemPeopleData
+        .filter((p) => p.type === "Actor")
+        .map((p) => `${p.name}${p.role ? ` as ${p.role}` : ""}`);
+      const crew = itemPeopleData
+        .filter((p) => p.type !== "Director" && p.type !== "Actor")
+        .map((p) => `${p.name} (${p.type || "Crew"})`);
 
-        const directors = people
-          .filter((p) => p.Type === "Director")
-          .map((p) => p.Name);
-        const cast = people
-          .filter((p) => p.Type === "Actor")
-          .map((p) => `${p.Name}${p.Role ? ` as ${p.Role}` : ""}`);
-        const crew = people
-          .filter((p) => p.Type !== "Director" && p.Type !== "Actor")
-          .map((p) => `${p.Name} (${p.Type || "Crew"})`);
-
-        if (directors.length) parts.push(`Directors: ${directors.join(", ")}`);
-        if (cast.length) parts.push(`Cast: ${cast.slice(0, 15).join(", ")}`);
-        if (crew.length) parts.push(`Crew: ${crew.slice(0, 10).join(", ")}`);
-      }
-    } catch {
-      // Ignore parse errors
+      if (directors.length) parts.push(`Directors: ${directors.join(", ")}`);
+      if (cast.length) parts.push(`Cast: ${cast.slice(0, 15).join(", ")}`);
+      if (crew.length) parts.push(`Crew: ${crew.slice(0, 10).join(", ")}`);
     }
+  } catch {
+    // Ignore errors fetching people
   }
 
   return parts.join("\n").substring(0, DEFAULT_MAX_TEXT_LENGTH);
@@ -302,7 +309,8 @@ async function processOpenAIBatch(
   client: OpenAI,
   batchItems: Item[],
   config: EmbeddingConfig,
-  validateEmbedding: (raw: number[], itemId: string) => number[] | null
+  validateEmbedding: (raw: number[], itemId: string) => number[] | null,
+  serverId: number
 ): Promise<{ processed: number; skipped: number; errors: number }> {
   let processed = 0;
   let skipped = 0;
@@ -313,7 +321,7 @@ async function processOpenAIBatch(
   const toSkip: Item[] = [];
 
   for (const item of batchItems) {
-    const text = prepareTextForEmbedding(item);
+    const text = await prepareTextForEmbedding(item, serverId);
     if (text.trim()) {
       batchData.push({ item, text });
     } else {
@@ -406,9 +414,10 @@ async function processOpenAIBatch(
 async function processOllamaItem(
   item: Item,
   config: EmbeddingConfig,
-  validateEmbedding: (raw: number[], itemId: string) => number[] | null
+  validateEmbedding: (raw: number[], itemId: string) => number[] | null,
+  serverId: number
 ): Promise<{ processed: number; skipped: number; errors: number }> {
-  const text = prepareTextForEmbedding(item);
+  const text = await prepareTextForEmbedding(item, serverId);
 
   if (!text.trim()) {
     await db
@@ -631,7 +640,8 @@ export async function generateItemEmbeddingsJob(
               openaiClient,
               apiBatch,
               config,
-              validateEmbedding
+              validateEmbedding,
+              serverId
             );
             totalProcessed += result.processed;
             totalSkipped += result.skipped;
@@ -694,7 +704,7 @@ export async function generateItemEmbeddingsJob(
           }
 
           try {
-            const result = await processOllamaItem(item, config, validateEmbedding);
+            const result = await processOllamaItem(item, config, validateEmbedding, serverId);
             totalProcessed += result.processed;
             totalSkipped += result.skipped;
             totalErrors += result.errors;

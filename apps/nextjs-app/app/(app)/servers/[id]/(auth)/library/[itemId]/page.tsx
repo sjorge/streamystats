@@ -1,5 +1,10 @@
 import { redirect } from "next/navigation";
 import { Container } from "@/components/Container";
+import {
+  getItemCast,
+  getItemDirectors,
+  getItemWriters,
+} from "@/lib/db/actor-types";
 import { getItemDetails, getSeasonsAndEpisodes } from "@/lib/db/items";
 import { getServer } from "@/lib/db/server";
 import type { SeriesRecommendationItem } from "@/lib/db/similar-series-statistics";
@@ -53,6 +58,16 @@ export default async function ItemDetailsPage({
       ? await getSeasonsAndEpisodes({ seriesId: itemId })
       : [];
 
+  // Get cast and crew for movies and series
+  const [cast, directors, writers] =
+    itemDetails.item.type === "Movie" || itemDetails.item.type === "Series"
+      ? await Promise.all([
+          getItemCast(itemId, server.id),
+          getItemDirectors(itemId, server.id),
+          getItemWriters(itemId, server.id),
+        ])
+      : [[], [], []];
+
   return (
     <Container className="flex flex-col">
       <div className="space-y-6 pb-10">
@@ -71,7 +86,13 @@ export default async function ItemDetailsPage({
         />
         {(itemDetails.item.type === "Movie" ||
           itemDetails.item.type === "Series") && (
-          <CastSection item={itemDetails.item} server={server} serverId={id} />
+          <CastSection
+            cast={cast}
+            directors={directors}
+            writers={writers}
+            server={server}
+            serverId={id}
+          />
         )}
         {itemDetails.item.type === "Series" && seasons.length > 0 && (
           <SeasonsAndEpisodes seasons={seasons} serverId={id} server={server} />

@@ -295,7 +295,7 @@ export async function jellyfinRecentActivitiesSyncWorker(job: {
 }
 
 /**
- * People sync job worker - backfills items.people in the background
+ * People sync job worker - syncs people data to the people and item_people tables
  */
 export async function jellyfinPeopleSyncWorker(job: {
   id: string;

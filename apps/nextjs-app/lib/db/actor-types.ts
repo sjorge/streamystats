@@ -1,12 +1,16 @@
 import type { Item } from "@streamystats/database";
+import { db, itemPeople, people } from "@streamystats/database";
+import { and, eq } from "drizzle-orm";
 
-// Person type from Jellyfin
-export interface Person {
-  Id: string;
-  Name: string;
-  Role?: string;
-  Type: string;
-  PrimaryImageTag?: string;
+/**
+ * Person type from the normalized people table
+ */
+export interface PersonFromDb {
+  id: string;
+  name: string;
+  type: string;
+  role?: string;
+  primaryImageTag?: string;
 }
 
 export interface ActorStats {
@@ -39,79 +43,179 @@ export interface ActorDetailsResponse {
 }
 
 /**
- * Parse the people JSONB field from an item
+ * Get all people for an item from the normalized tables
+ * Note: type is stored on item_people, not on people, since a person can have
+ * different roles in different items (e.g., Actor in one, Director in another)
  */
-export function parsePeople(people: unknown): Person[] {
-  if (!people) return [];
+export async function getItemPeople(
+  itemId: string,
+  serverId: number,
+): Promise<PersonFromDb[]> {
+  const results = await db
+    .select({
+      id: people.id,
+      name: people.name,
+      type: itemPeople.type,
+      role: itemPeople.role,
+      primaryImageTag: people.primaryImageTag,
+    })
+    .from(itemPeople)
+    .innerJoin(
+      people,
+      and(
+        eq(itemPeople.personId, people.id),
+        eq(itemPeople.serverId, people.serverId),
+      ),
+    )
+    .where(
+      and(eq(itemPeople.itemId, itemId), eq(itemPeople.serverId, serverId)),
+    )
+    .orderBy(itemPeople.sortOrder);
 
-  try {
-    if (Array.isArray(people)) {
-      return people.filter(
-        (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id,
-      );
-    }
-
-    if (typeof people === "object") {
-      return Object.values(people as Record<string, Person>).filter(
-        (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id,
-      );
-    }
-
-    if (typeof people === "string") {
-      const parsed = JSON.parse(people);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(
-          (p): p is Person =>
-            !!p && typeof p === "object" && !!p.Name && !!p.Id,
-        );
-      }
-      if (typeof parsed === "object") {
-        return Object.values(parsed as Record<string, Person>).filter(
-          (p): p is Person =>
-            !!p && typeof p === "object" && !!p.Name && !!p.Id,
-        );
-      }
-    }
-  } catch {
-    // Failed to parse
-  }
-
-  return [];
+  return results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    role: r.role ?? undefined,
+    primaryImageTag: r.primaryImageTag ?? undefined,
+  }));
 }
 
 /**
- * Get cast from an item's people field (only actors)
+ * Get cast from an item (only actors)
  */
-export const getItemCast = (item: Item): Person[] => {
-  const people = parsePeople(item.people);
-  return people.filter((p) => p.Type === "Actor");
-};
+export async function getItemCast(
+  itemId: string,
+  serverId: number,
+): Promise<PersonFromDb[]> {
+  const results = await db
+    .select({
+      id: people.id,
+      name: people.name,
+      type: itemPeople.type,
+      role: itemPeople.role,
+      primaryImageTag: people.primaryImageTag,
+    })
+    .from(itemPeople)
+    .innerJoin(
+      people,
+      and(
+        eq(itemPeople.personId, people.id),
+        eq(itemPeople.serverId, people.serverId),
+      ),
+    )
+    .where(
+      and(
+        eq(itemPeople.itemId, itemId),
+        eq(itemPeople.serverId, serverId),
+        eq(itemPeople.type, "Actor"),
+      ),
+    )
+    .orderBy(itemPeople.sortOrder);
+
+  return results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    role: r.role ?? undefined,
+    primaryImageTag: r.primaryImageTag ?? undefined,
+  }));
+}
 
 /**
- * Get directors from an item's people field
+ * Get directors from an item
  */
-export const getItemDirectors = (item: Item): Person[] => {
-  const people = parsePeople(item.people);
-  return people.filter((p) => p.Type === "Director");
-};
+export async function getItemDirectors(
+  itemId: string,
+  serverId: number,
+): Promise<PersonFromDb[]> {
+  const results = await db
+    .select({
+      id: people.id,
+      name: people.name,
+      type: itemPeople.type,
+      role: itemPeople.role,
+      primaryImageTag: people.primaryImageTag,
+    })
+    .from(itemPeople)
+    .innerJoin(
+      people,
+      and(
+        eq(itemPeople.personId, people.id),
+        eq(itemPeople.serverId, people.serverId),
+      ),
+    )
+    .where(
+      and(
+        eq(itemPeople.itemId, itemId),
+        eq(itemPeople.serverId, serverId),
+        eq(itemPeople.type, "Director"),
+      ),
+    )
+    .orderBy(itemPeople.sortOrder);
+
+  return results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    role: r.role ?? undefined,
+    primaryImageTag: r.primaryImageTag ?? undefined,
+  }));
+}
 
 /**
- * Get writers from an item's people field
+ * Get writers from an item
  */
-export const getItemWriters = (item: Item): Person[] => {
-  const people = parsePeople(item.people);
-  return people.filter((p) => p.Type === "Writer");
-};
+export async function getItemWriters(
+  itemId: string,
+  serverId: number,
+): Promise<PersonFromDb[]> {
+  const results = await db
+    .select({
+      id: people.id,
+      name: people.name,
+      type: itemPeople.type,
+      role: itemPeople.role,
+      primaryImageTag: people.primaryImageTag,
+    })
+    .from(itemPeople)
+    .innerJoin(
+      people,
+      and(
+        eq(itemPeople.personId, people.id),
+        eq(itemPeople.serverId, people.serverId),
+      ),
+    )
+    .where(
+      and(
+        eq(itemPeople.itemId, itemId),
+        eq(itemPeople.serverId, serverId),
+        eq(itemPeople.type, "Writer"),
+      ),
+    )
+    .orderBy(itemPeople.sortOrder);
+
+  return results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    role: r.role ?? undefined,
+    primaryImageTag: r.primaryImageTag ?? undefined,
+  }));
+}
 
 /**
  * Get all people from an item grouped by type
  */
-export const getItemPeopleGrouped = (item: Item): Record<string, Person[]> => {
-  const people = parsePeople(item.people);
-  const grouped: Record<string, Person[]> = {};
+export async function getItemPeopleGrouped(
+  itemId: string,
+  serverId: number,
+): Promise<Record<string, PersonFromDb[]>> {
+  const allPeople = await getItemPeople(itemId, serverId);
+  const grouped: Record<string, PersonFromDb[]> = {};
 
-  for (const person of people) {
-    const type = person.Type || "Other";
+  for (const person of allPeople) {
+    const type = person.type || "Other";
     if (!grouped[type]) {
       grouped[type] = [];
     }
@@ -119,4 +223,4 @@ export const getItemPeopleGrouped = (item: Item): Record<string, Person[]> => {
   }
 
   return grouped;
-};
+}
