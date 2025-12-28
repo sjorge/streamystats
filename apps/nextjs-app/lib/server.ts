@@ -1,6 +1,7 @@
 "use server";
 
-import { db, type Server, servers } from "@streamystats/database";
+import type { Server } from "@streamystats/database";
+import type { ServerPublic } from "@/lib/types";
 
 interface CreateServerRequest {
   name: string;
@@ -17,7 +18,7 @@ interface CreateServerRequest {
 
 interface CreateServerSuccessResponse {
   success: boolean;
-  server: Server;
+  server: ServerPublic;
   syncJobId: string;
   message: string;
 }
@@ -66,8 +67,30 @@ export async function createServer(
       };
     }
 
-    const result: CreateServerSuccessResponse = await response.json();
-    return result;
+    const result = (await response.json()) as {
+      success: boolean;
+      server: Server;
+      syncJobId: string;
+      message: string;
+    };
+
+    const {
+      apiKey: _apiKey,
+      embeddingApiKey,
+      chatApiKey,
+      ...rest
+    } = result.server;
+
+    return {
+      success: result.success,
+      syncJobId: result.syncJobId,
+      message: result.message,
+      server: {
+        ...(rest as Omit<ServerPublic, "hasChatApiKey" | "hasEmbeddingApiKey">),
+        hasEmbeddingApiKey: Boolean(embeddingApiKey),
+        hasChatApiKey: Boolean(chatApiKey),
+      },
+    };
   } catch (error) {
     console.error("Error creating server:", error);
     return {
@@ -104,18 +127,6 @@ export async function getServerSyncStatus(serverId: number) {
         ? error.message
         : "Failed to get server sync status",
     );
-  }
-}
-
-/**
- * Gets all servers from the database
- */
-export async function getServers(): Promise<Server[]> {
-  try {
-    return await db.select().from(servers);
-  } catch (error) {
-    console.error("Error fetching servers:", error);
-    throw new Error("Failed to fetch servers from database");
   }
 }
 

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { login } from "@/lib/auth";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 
 const FormSchema = z.object({
   username: z.string(),
@@ -34,8 +34,8 @@ const FormSchema = z.object({
 });
 
 interface Props {
-  server: Server;
-  servers: Server[];
+  server: ServerPublic;
+  servers: ServerPublic[];
 }
 
 export const SignInForm: React.FC<Props> = ({ server, servers }) => {

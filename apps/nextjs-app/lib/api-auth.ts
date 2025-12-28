@@ -27,8 +27,7 @@ function parseMediaBrowserHeader(authHeader: string): {
 
   // Parse key="value" pairs
   const regex = /(\w+)="([^"]*)"/g;
-  let match;
-  while ((match = regex.exec(params)) !== null) {
+  for (const match of params.matchAll(regex)) {
     result[match[1].toLowerCase()] = match[2];
   }
 
@@ -47,7 +46,7 @@ function parseMediaBrowserHeader(authHeader: string): {
  */
 export async function validateJellyfinToken(
   serverUrl: string,
-  token: string
+  token: string,
 ): Promise<{ userId: string; userName: string; isAdmin: boolean } | null> {
   try {
     const response = await fetch(`${serverUrl}/Users/Me`, {
@@ -80,7 +79,7 @@ export async function validateJellyfinToken(
  * Returns session user info if valid
  */
 export async function authenticateMediaBrowser(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<{ session: SessionUser; server: Server } | null> {
   const authHeader = request.headers.get("authorization");
   if (!authHeader) {
@@ -275,12 +274,10 @@ export async function requireSession(): Promise<
  * Requires authentication via either:
  * 1. Session cookie (web app login)
  * 2. MediaBrowser token header (external API clients)
- * 
+ *
  * Use this for API endpoints that should support external access.
  */
-export async function requireAuth(
-  request: NextRequest
-): Promise<
+export async function requireAuth(request: NextRequest): Promise<
   | {
       error: Response;
       session: null;

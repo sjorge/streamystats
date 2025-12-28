@@ -1,22 +1,27 @@
 import "server-only";
+import { db, items, sessions } from "@streamystats/database";
+import { and, count, eq, isNotNull, sql, sum } from "drizzle-orm";
 import {
-  db,
-  items,
-  sessions,
-} from "@streamystats/database";
-import {
-  and,
-  count,
-  eq,
-  isNotNull,
-  sql,
-  sum,
-} from "drizzle-orm";
+  type ActorDetailsResponse,
+  type ActorItem,
+  type Person,
+  parsePeople,
+} from "./actor-types";
 import { getStatisticsExclusions } from "./exclusions";
-import { parsePeople, type ActorItem, type ActorDetailsResponse, type Person } from "./actor-types";
 
-export type { Person, ActorStats, ActorItem, ActorDetailsResponse } from "./actor-types";
-export { parsePeople, getItemCast, getItemDirectors, getItemWriters, getItemPeopleGrouped } from "./actor-types";
+export type {
+  ActorDetailsResponse,
+  ActorItem,
+  ActorStats,
+  Person,
+} from "./actor-types";
+export {
+  getItemCast,
+  getItemDirectors,
+  getItemPeopleGrouped,
+  getItemWriters,
+  parsePeople,
+} from "./actor-types";
 
 /**
  * Get actor details with all items they appear in and statistics
@@ -31,7 +36,7 @@ export const getActorDetails = async ({
   // Get exclusion settings
   const exclusions = await getStatisticsExclusions(serverId);
 
-  // Find all items that have this actor
+  // Find all items that have this actor using array containment check
   const allItems = await db
     .select({
       item: items,
@@ -41,9 +46,12 @@ export const getActorDetails = async ({
       and(
         eq(items.serverId, serverId),
         isNotNull(items.people),
-        sql`${items.people}::jsonb @> ${JSON.stringify([{ Id: actorId }])}::jsonb OR
-            EXISTS (SELECT 1 FROM jsonb_each(${items.people}::jsonb) AS p WHERE (p.value->>'Id') = ${actorId})`
-      )
+        sql`jsonb_typeof(${items.people}) = 'array'`,
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${items.people}) AS person
+          WHERE person->>'Id' = ${actorId}
+        )`,
+      ),
     );
 
   if (allItems.length === 0) {
@@ -93,7 +101,10 @@ export const getActorDetails = async ({
 
       // Build where conditions
       const whereConditions = [
-        sql`${sessions.itemId} IN (${sql.join(itemIdsToQuery.map(id => sql`${id}`), sql`, `)})`,
+        sql`${sessions.itemId} IN (${sql.join(
+          itemIdsToQuery.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
         isNotNull(sessions.playDuration),
       ];
 
@@ -116,7 +127,7 @@ export const getActorDetails = async ({
         totalViews: stats[0]?.totalViews || 0,
         totalWatchTime: Number(stats[0]?.totalWatchTime || 0),
       };
-    })
+    }),
   );
 
   // Sort by total watch time descending
@@ -126,7 +137,7 @@ export const getActorDetails = async ({
   const totalViews = itemsWithStats.reduce((sum, i) => sum + i.totalViews, 0);
   const totalWatchTime = itemsWithStats.reduce(
     (sum, i) => sum + i.totalWatchTime,
-    0
+    0,
   );
 
   return {

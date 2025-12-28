@@ -1,17 +1,17 @@
 "use client";
 
-import type { Server } from "@streamystats/database/schema";
 import { Calendar, Clock, Film, Play, Tv } from "lucide-react";
 import Link from "next/link";
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDuration } from "@/lib/utils";
 import type { ActorItem } from "@/lib/db/actors";
+import type { ServerPublic } from "@/lib/types";
+import { formatDuration } from "@/lib/utils";
 
 interface ActorFilmographyProps {
   items: ActorItem[];
-  server: Server;
+  server: ServerPublic;
   serverId: number;
 }
 
@@ -21,7 +21,7 @@ function FilmographyItem({
   serverId,
 }: {
   actorItem: ActorItem;
-  server: Server;
+  server: ServerPublic;
   serverId: number;
 }) {
   const { item, role, totalViews, totalWatchTime } = actorItem;
@@ -52,10 +52,7 @@ function FilmographyItem({
                 </p>
               )}
             </div>
-            <Badge
-              variant="outline"
-              className="flex-shrink-0 gap-1 text-xs"
-            >
+            <Badge variant="outline" className="flex-shrink-0 gap-1 text-xs">
               {item.type === "Series" ? (
                 <Tv className="w-3 h-3" />
               ) : (
@@ -138,4 +135,3 @@ export function ActorFilmography({
     </Card>
   );
 }
-

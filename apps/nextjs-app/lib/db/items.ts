@@ -455,6 +455,7 @@ export const getItemUserStats = async ({
           passwordResetProviderId:
             "Jellyfin.Server.Implementations.Users.DefaultPasswordResetProvider",
           syncPlayAccess: "CreateAndJoinGroups",
+          searchVector: null,
           createdAt: stat.userCreatedAt || new Date(),
           updatedAt: stat.userUpdatedAt || new Date(),
         }
@@ -498,6 +499,7 @@ export const getItemUserStats = async ({
           passwordResetProviderId:
             "Jellyfin.Server.Implementations.Users.DefaultPasswordResetProvider",
           syncPlayAccess: "CreateAndJoinGroups",
+          searchVector: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };

@@ -71,11 +71,7 @@ export default async function ItemDetailsPage({
         />
         {(itemDetails.item.type === "Movie" ||
           itemDetails.item.type === "Series") && (
-          <CastSection
-            item={itemDetails.item}
-            server={server}
-            serverId={id}
-          />
+          <CastSection item={itemDetails.item} server={server} serverId={id} />
         )}
         {itemDetails.item.type === "Series" && seasons.length > 0 && (
           <SeasonsAndEpisodes seasons={seasons} serverId={id} server={server} />

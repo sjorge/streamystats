@@ -1,4 +1,3 @@
-import type { Server } from "@streamystats/database/schema";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Container } from "@/components/Container";
@@ -10,6 +9,7 @@ import { getSimilarSeries } from "@/lib/db/similar-series-statistics";
 import { getSimilarStatistics } from "@/lib/db/similar-statistics";
 import { getMostWatchedItems } from "@/lib/db/statistics";
 import { getMe, isUserAdmin } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { ActiveSessions } from "./ActiveSessions";
 import { MostWatchedItems } from "./MostWatchedItems";
 import { SeasonalRecommendations } from "./SeasonalRecommendations";
@@ -83,7 +83,7 @@ async function GeneralStats({
   userActivityStartDate,
   userActivityEndDate,
 }: {
-  server: Server;
+  server: ServerPublic;
   userActivityStartDate: string;
   userActivityEndDate: string;
 }) {

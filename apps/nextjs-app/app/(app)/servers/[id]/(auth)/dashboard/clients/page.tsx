@@ -1,4 +1,3 @@
-import type { Server } from "@streamystats/database";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Container } from "@/components/Container";
@@ -8,6 +7,7 @@ import { setEndDateToEndOfDay } from "@/dates";
 import { getClientStatistics } from "@/lib/db/client-statistics";
 import { getServer } from "@/lib/db/server";
 import { getMe, getUsers, isUserAdmin } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { ClientStatistics } from "../ClientStatistics";
 import { ClientFilters } from "./ClientFilters";
 
@@ -61,7 +61,7 @@ async function ClientStats({
   endDate,
   userId,
 }: {
-  server: Server;
+  server: ServerPublic;
   startDate?: string;
   endDate?: string;
   userId?: string;

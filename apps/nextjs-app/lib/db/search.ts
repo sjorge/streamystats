@@ -1,15 +1,14 @@
 "use server";
 
-import { and, eq, isNull, sql, desc, or, ilike } from "drizzle-orm";
 import { db } from "@streamystats/database";
 import {
-  items,
-  users,
   activities,
-  watchlists,
+  items,
   sessions,
-  libraries,
+  users,
+  watchlists,
 } from "@streamystats/database/schema";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 /**
  * Generic search result type that can represent any searchable entity
@@ -46,77 +45,101 @@ export type SearchResults = {
  */
 function buildTsQuery(query: string): string {
   // Clean and prepare the query
-  const cleaned = query.trim().replace(/[^\w\s]/g, " ").trim();
+  const cleaned = query
+    .trim()
+    .replace(/[^\w\s]/g, " ")
+    .trim();
   if (!cleaned) return "";
-  
+
   // Use plainto_tsquery for simple text search (handles spaces automatically)
   return cleaned;
 }
 
 /**
  * Search items (movies, series, episodes, etc.)
+ * Uses full-text search, ILIKE, and trigram similarity for fuzzy matching
  */
 async function searchItems(
   serverId: number,
   query: string,
-  limit: number = 10
+  limit: number = 10,
 ): Promise<SearchResult[]> {
   const searchQuery = buildTsQuery(query);
   if (!searchQuery) return [];
 
-  // Combine full-text search with ILIKE fallback for better results
-  const results = await db
-    .select({
-      id: items.id,
-      name: items.name,
-      type: items.type,
-      seriesName: items.seriesName,
-      seasonName: items.seasonName,
-      indexNumber: items.indexNumber,
-      parentIndexNumber: items.parentIndexNumber,
-      productionYear: items.productionYear,
-      primaryImageTag: items.primaryImageTag,
-      seriesPrimaryImageTag: items.seriesPrimaryImageTag,
-      seriesId: items.seriesId,
-      rank: sql<number>`CASE 
-        WHEN search_vector IS NOT NULL 
-        THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-        ELSE 0 
-      END`.as("rank"),
-    })
-    .from(items)
-    .where(
-      and(
-        eq(items.serverId, serverId),
-        isNull(items.deletedAt),
-        or(
-          sql`search_vector @@ plainto_tsquery('english', ${searchQuery})`,
-          ilike(items.name, `%${query}%`),
-          ilike(items.seriesName, `%${query}%`)
-        )
+  // Use a CTE to set similarity threshold, then search with multiple strategies:
+  // 1. Full-text search (uses GiST index on search_vector)
+  // 2. ILIKE pattern match (uses GIN trigram index)
+  // 3. word_similarity for fuzzy matching with typos (threshold 0.4)
+  const results = await db.execute<{
+    id: string;
+    name: string;
+    type: string;
+    series_name: string | null;
+    season_name: string | null;
+    index_number: number | null;
+    parent_index_number: number | null;
+    production_year: number | null;
+    primary_image_tag: string | null;
+    series_primary_image_tag: string | null;
+    series_id: string | null;
+    rank: number;
+  }>(sql`
+    SELECT 
+      ${items.id} as id,
+      ${items.name} as name,
+      ${items.type} as type,
+      ${items.seriesName} as series_name,
+      ${items.seasonName} as season_name,
+      ${items.indexNumber} as index_number,
+      ${items.parentIndexNumber} as parent_index_number,
+      ${items.productionYear} as production_year,
+      ${items.primaryImageTag} as primary_image_tag,
+      ${items.seriesPrimaryImageTag} as series_primary_image_tag,
+      ${items.seriesId} as series_id,
+      GREATEST(
+        CASE 
+          WHEN search_vector IS NOT NULL 
+          THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
+          ELSE 0 
+        END,
+        word_similarity(${query}, ${items.name}),
+        COALESCE(word_similarity(${query}, ${items.seriesName}), 0)
+      ) as rank
+    FROM ${items}
+    WHERE ${items.serverId} = ${serverId}
+      AND ${items.deletedAt} IS NULL
+      AND (
+        search_vector @@ plainto_tsquery('english', ${searchQuery})
+        OR ${items.name} ILIKE ${`%${query}%`}
+        OR ${items.seriesName} ILIKE ${`%${query}%`}
+        OR word_similarity(${query}, ${items.name}) > 0.3
+        OR word_similarity(${query}, ${items.seriesName}) > 0.3
       )
-    )
-    .orderBy(desc(sql`rank`), desc(items.communityRating))
-    .limit(limit);
+    ORDER BY rank DESC, ${items.communityRating} DESC NULLS LAST
+    LIMIT ${limit}
+  `);
 
-  return results.map((item) => {
+  return [...results].map((item) => {
     let subtitle = "";
-    if (item.type === "Episode" && item.seriesName) {
-      subtitle = item.seriesName;
-      if (item.parentIndexNumber !== null && item.indexNumber !== null) {
-        subtitle += ` - S${item.parentIndexNumber}E${item.indexNumber}`;
+    if (item.type === "Episode" && item.series_name) {
+      subtitle = item.series_name;
+      if (item.parent_index_number !== null && item.index_number !== null) {
+        subtitle += ` - S${item.parent_index_number}E${item.index_number}`;
       }
-    } else if (item.type === "Season" && item.seriesName) {
-      subtitle = item.seriesName;
-    } else if (item.productionYear) {
-      subtitle = String(item.productionYear);
+    } else if (item.type === "Season" && item.series_name) {
+      subtitle = item.series_name;
+    } else if (item.production_year) {
+      subtitle = String(item.production_year);
     }
 
     // Use series image for episodes if available
-    const imageId = item.type === "Episode" && item.seriesId ? item.seriesId : item.id;
-    const imageTag = item.type === "Episode" && item.seriesPrimaryImageTag 
-      ? item.seriesPrimaryImageTag 
-      : item.primaryImageTag;
+    const imageId =
+      item.type === "Episode" && item.series_id ? item.series_id : item.id;
+    const imageTag =
+      item.type === "Episode" && item.series_primary_image_tag
+        ? item.series_primary_image_tag
+        : item.primary_image_tag;
 
     return {
       id: item.id,
@@ -138,7 +161,7 @@ async function searchItems(
 async function searchUsers(
   serverId: number,
   query: string,
-  limit: number = 5
+  limit: number = 5,
 ): Promise<SearchResult[]> {
   const searchQuery = buildTsQuery(query);
   if (!searchQuery) return [];
@@ -160,9 +183,9 @@ async function searchUsers(
         eq(users.serverId, serverId),
         or(
           sql`search_vector @@ plainto_tsquery('english', ${searchQuery})`,
-          ilike(users.name, `%${query}%`)
-        )
-      )
+          ilike(users.name, `%${query}%`),
+        ),
+      ),
     )
     .orderBy(desc(sql`rank`))
     .limit(limit);
@@ -184,7 +207,7 @@ async function searchWatchlists(
   serverId: number,
   query: string,
   userId: string,
-  limit: number = 5
+  limit: number = 5,
 ): Promise<SearchResult[]> {
   const searchQuery = buildTsQuery(query);
   if (!searchQuery) return [];
@@ -206,15 +229,12 @@ async function searchWatchlists(
     .where(
       and(
         eq(watchlists.serverId, serverId),
-        or(
-          eq(watchlists.userId, userId),
-          eq(watchlists.isPublic, true)
-        ),
+        or(eq(watchlists.userId, userId), eq(watchlists.isPublic, true)),
         or(
           sql`search_vector @@ plainto_tsquery('english', ${searchQuery})`,
-          ilike(watchlists.name, `%${query}%`)
-        )
-      )
+          ilike(watchlists.name, `%${query}%`),
+        ),
+      ),
     )
     .orderBy(desc(sql`rank`))
     .limit(limit);
@@ -236,7 +256,7 @@ async function searchWatchlists(
 async function searchActivities(
   serverId: number,
   query: string,
-  limit: number = 5
+  limit: number = 5,
 ): Promise<SearchResult[]> {
   const searchQuery = buildTsQuery(query);
   if (!searchQuery) return [];
@@ -261,9 +281,9 @@ async function searchActivities(
         eq(activities.serverId, serverId),
         or(
           sql`search_vector @@ plainto_tsquery('english', ${searchQuery})`,
-          ilike(activities.name, `%${query}%`)
-        )
-      )
+          ilike(activities.name, `%${query}%`),
+        ),
+      ),
     )
     .orderBy(desc(sql`rank`), desc(activities.date))
     .limit(limit);
@@ -289,7 +309,7 @@ async function searchActivities(
 async function searchSessions(
   serverId: number,
   query: string,
-  limit: number = 5
+  limit: number = 5,
 ): Promise<SearchResult[]> {
   const results = await db
     .select({
@@ -311,9 +331,9 @@ async function searchSessions(
           ilike(sessions.seriesName, `%${query}%`),
           ilike(sessions.userName, `%${query}%`),
           ilike(sessions.deviceName, `%${query}%`),
-          ilike(sessions.clientName, `%${query}%`)
-        )
-      )
+          ilike(sessions.clientName, `%${query}%`),
+        ),
+      ),
     )
     .orderBy(desc(sessions.startTime))
     .limit(limit);
@@ -330,79 +350,66 @@ async function searchSessions(
   }));
 }
 
-// Person type from Jellyfin people array
-interface Person {
-  Id: string;
-  Name: string;
-  Role?: string;
-  Type: string;
-  PrimaryImageTag?: string;
-}
-
 /**
- * Search actors/people across all items
+ * Search actors/people across all items using PostgreSQL fuzzy matching
+ * Uses jsonb_array_elements() with word_similarity for typo tolerance
  */
 async function searchActors(
   serverId: number,
   query: string,
-  limit: number = 5
+  limit: number = 5,
 ): Promise<SearchResult[]> {
   if (!query.trim()) return [];
 
-  // Search for items that have matching people in their people JSONB field
-  const results = await db
-    .select({
-      people: items.people,
-    })
-    .from(items)
-    .where(
-      and(
-        eq(items.serverId, serverId),
-        isNull(items.deletedAt),
-        sql`${items.people} IS NOT NULL`
+  // Use PostgreSQL to extract and search people from JSONB, with fuzzy matching
+  // Uses word_similarity for better partial matching (handles "ian mckellen" -> "Ian McKellen")
+  // Threshold of 0.4 balances typo tolerance vs false positives
+  const results = await db.execute<{
+    id: string;
+    name: string;
+    type: string;
+    role: string | null;
+    primary_image_tag: string | null;
+    similarity_score: number;
+  }>(sql`
+    SELECT DISTINCT ON (person->>'Id')
+      person->>'Id' as id,
+      person->>'Name' as name,
+      person->>'Type' as type,
+      person->>'Role' as role,
+      person->>'PrimaryImageTag' as primary_image_tag,
+      GREATEST(
+        word_similarity(${query}, (person->>'Name')),
+        CASE WHEN (person->>'Name') ILIKE ${`%${query}%`} THEN 1.0 ELSE 0 END
+      ) as similarity_score
+    FROM ${items},
+      jsonb_array_elements(${items.people}) as person
+    WHERE ${items.serverId} = ${serverId}
+      AND ${items.deletedAt} IS NULL
+      AND ${items.people} IS NOT NULL
+      AND jsonb_typeof(${items.people}) = 'array'
+      AND (
+        (person->>'Name') ILIKE ${`%${query}%`}
+        OR word_similarity(${query}, (person->>'Name')) > 0.3
       )
-    )
-    .limit(500); // Get a batch of items to search through
+    ORDER BY person->>'Id', similarity_score DESC
+  `);
 
-  // Extract unique actors matching the query
-  const actorMap = new Map<string, Person>();
-  const queryLower = query.toLowerCase();
+  // Re-sort by similarity and limit
+  const sorted = [...results]
+    .sort((a, b) => b.similarity_score - a.similarity_score)
+    .slice(0, limit);
 
-  for (const row of results) {
-    if (!row.people) continue;
-
-    let people: Person[] = [];
-    try {
-      if (Array.isArray(row.people)) {
-        people = row.people as Person[];
-      } else if (typeof row.people === "object") {
-        people = Object.values(row.people as Record<string, Person>);
-      }
-    } catch {
-      continue;
-    }
-
-    for (const person of people) {
-      if (!person?.Id || !person?.Name) continue;
-      if (actorMap.has(person.Id)) continue;
-      
-      if (person.Name.toLowerCase().includes(queryLower)) {
-        actorMap.set(person.Id, person);
-        if (actorMap.size >= limit) break;
-      }
-    }
-    if (actorMap.size >= limit) break;
-  }
-
-  return Array.from(actorMap.values()).map((person) => ({
-    id: person.Id,
+  return sorted.map((person) => ({
+    id: person.id,
     type: "actor" as const,
-    subtype: person.Type,
-    title: person.Name,
-    subtitle: person.Type,
-    imageId: person.Id,
-    imageTag: person.PrimaryImageTag,
-    href: `/actors/${encodeURIComponent(person.Id)}`,
+    subtype: person.type,
+    title: person.name,
+    subtitle: person.type,
+    imageId: person.id,
+    imageTag: person.primary_image_tag ?? undefined,
+    href: `/actors/${encodeURIComponent(person.id)}`,
+    rank: person.similarity_score,
   }));
 }
 
@@ -420,7 +427,7 @@ export async function globalSearch(
     activityLimit?: number;
     sessionLimit?: number;
     actorLimit?: number;
-  } = {}
+  } = {},
 ): Promise<SearchResults> {
   const {
     itemLimit = 10,
@@ -444,21 +451,27 @@ export async function globalSearch(
   }
 
   // Execute all searches in parallel
-  const [itemResults, userResults, watchlistResults, activityResults, sessionResults, actorResults] = 
-    await Promise.all([
-      searchItems(serverId, query, itemLimit),
-      searchUsers(serverId, query, userLimit),
-      searchWatchlists(serverId, query, userId, watchlistLimit),
-      searchActivities(serverId, query, activityLimit),
-      searchSessions(serverId, query, sessionLimit),
-      searchActors(serverId, query, actorLimit),
-    ]);
+  const [
+    itemResults,
+    userResults,
+    watchlistResults,
+    activityResults,
+    sessionResults,
+    actorResults,
+  ] = await Promise.all([
+    searchItems(serverId, query, itemLimit),
+    searchUsers(serverId, query, userLimit),
+    searchWatchlists(serverId, query, userId, watchlistLimit),
+    searchActivities(serverId, query, activityLimit),
+    searchSessions(serverId, query, sessionLimit),
+    searchActors(serverId, query, actorLimit),
+  ]);
 
-  const total = 
-    itemResults.length + 
-    userResults.length + 
-    watchlistResults.length + 
-    activityResults.length + 
+  const total =
+    itemResults.length +
+    userResults.length +
+    watchlistResults.length +
+    activityResults.length +
     sessionResults.length +
     actorResults.length;
 
@@ -472,4 +485,3 @@ export async function globalSearch(
     total,
   };
 }
-

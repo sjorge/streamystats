@@ -47,13 +47,13 @@ export function parsePeople(people: unknown): Person[] {
   try {
     if (Array.isArray(people)) {
       return people.filter(
-        (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id
+        (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id,
       );
     }
 
     if (typeof people === "object") {
       return Object.values(people as Record<string, Person>).filter(
-        (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id
+        (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id,
       );
     }
 
@@ -61,12 +61,14 @@ export function parsePeople(people: unknown): Person[] {
       const parsed = JSON.parse(people);
       if (Array.isArray(parsed)) {
         return parsed.filter(
-          (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id
+          (p): p is Person =>
+            !!p && typeof p === "object" && !!p.Name && !!p.Id,
         );
       }
       if (typeof parsed === "object") {
         return Object.values(parsed as Record<string, Person>).filter(
-          (p): p is Person => !!p && typeof p === "object" && !!p.Name && !!p.Id
+          (p): p is Person =>
+            !!p && typeof p === "object" && !!p.Name && !!p.Id,
         );
       }
     }
@@ -104,9 +106,7 @@ export const getItemWriters = (item: Item): Person[] => {
 /**
  * Get all people from an item grouped by type
  */
-export const getItemPeopleGrouped = (
-  item: Item
-): Record<string, Person[]> => {
+export const getItemPeopleGrouped = (item: Item): Record<string, Person[]> => {
   const people = parsePeople(item.people);
   const grouped: Record<string, Person[]> = {};
 
@@ -120,4 +120,3 @@ export const getItemPeopleGrouped = (
 
   return grouped;
 };
-

@@ -1,17 +1,17 @@
 "use client";
 
-import type { Server } from "@streamystats/database/schema";
 import { Clock, Film, Play, User } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDuration } from "@/lib/utils";
 import type { ActorDetailsResponse } from "@/lib/db/actors";
+import type { ServerPublic } from "@/lib/types";
+import { formatDuration } from "@/lib/utils";
 
 interface ActorHeaderProps {
   actor: ActorDetailsResponse;
-  server: Server;
+  server: ServerPublic;
 }
 
 function StatTile({
@@ -99,4 +99,3 @@ export function ActorHeader({ actor, server }: ActorHeaderProps) {
     </Card>
   );
 }
-

@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { getServers } from "@/lib/db/server";
+import { getServersWithSecrets } from "@/lib/db/server";
 
 export async function GET() {
   // The middleware will set this header if there's a server connectivity issue
@@ -17,7 +17,7 @@ export async function GET() {
 
   // Proactively check Jellyfin server connectivity
   try {
-    const servers = await getServers();
+    const servers = await getServersWithSecrets();
     let hasConnectivityIssue = false;
     const serverErrors = [];
 

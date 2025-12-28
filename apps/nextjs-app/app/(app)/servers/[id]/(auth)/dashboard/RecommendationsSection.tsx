@@ -1,6 +1,5 @@
 "use client";
 
-import type { Server } from "@streamystats/database";
 import { EyeOffIcon, Link2, type LucideIcon, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { ServerPublic } from "@/lib/types";
 import type {
   RecommendationCardItem,
   RecommendationListItem,
@@ -25,7 +25,7 @@ interface RecommendationsSectionProps {
   description: string;
   icon: LucideIcon;
   recommendations: RecommendationListItem[];
-  server: Server;
+  server: ServerPublic;
   onHideRecommendation: (
     serverId: string | number,
     itemId: string,

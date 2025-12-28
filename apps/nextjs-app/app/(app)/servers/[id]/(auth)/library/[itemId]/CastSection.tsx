@@ -1,6 +1,6 @@
 "use client";
 
-import type { Item, Server } from "@streamystats/database/schema";
+import type { Item } from "@streamystats/database/schema";
 import { Clapperboard, PenTool, User, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,10 +13,11 @@ import {
   getItemWriters,
   type Person,
 } from "@/lib/db/actor-types";
+import type { ServerPublic } from "@/lib/types";
 
 interface CastSectionProps {
   item: Item;
-  server: Server;
+  server: ServerPublic;
   serverId: number;
 }
 
@@ -26,7 +27,7 @@ function PersonCard({
   serverId,
 }: {
   person: Person;
-  server: Server;
+  server: ServerPublic;
   serverId: number;
 }) {
   const [hasError, setHasError] = useState(false);
@@ -118,7 +119,8 @@ export function CastSection({ item, server, serverId }: CastSectionProps) {
   const directors = getItemDirectors(item);
   const writers = getItemWriters(item);
 
-  const hasPeople = cast.length > 0 || directors.length > 0 || writers.length > 0;
+  const hasPeople =
+    cast.length > 0 || directors.length > 0 || writers.length > 0;
 
   if (!hasPeople) return null;
 
@@ -172,4 +174,3 @@ export function CastSection({ item, server, serverId }: CastSectionProps) {
     </Card>
   );
 }
-

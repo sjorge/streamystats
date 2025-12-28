@@ -1,3 +1,5 @@
+import type { Server as DatabaseServer } from "@streamystats/database";
+
 // Re-export types from database
 export type {
   Activity,
@@ -7,6 +9,14 @@ export type {
   Session,
   User,
 } from "@streamystats/database";
+
+export type ServerPublic = Omit<
+  DatabaseServer,
+  "apiKey" | "embeddingApiKey" | "chatApiKey"
+> & {
+  hasEmbeddingApiKey: boolean;
+  hasChatApiKey: boolean;
+};
 
 // Type definitions for library statistics
 export interface AggregatedLibraryStatistics {

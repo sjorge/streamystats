@@ -3,15 +3,16 @@
 import {
   ActivitySquare,
   Clock,
+  Disc,
   Film,
   ListVideo,
+  Music,
   Search,
   Tv,
   User,
   Users,
-  Music,
-  Disc,
 } from "lucide-react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -19,12 +20,10 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
 import type { SearchResult, SearchResults } from "@/lib/db/search";
 
 interface GlobalSearchProps {
@@ -90,7 +89,12 @@ function SearchResultItem({
 
   // Build image URL for items and actors
   let imageUrl: string | undefined;
-  if ((result.type === "item" || result.type === "actor") && result.imageId && result.imageTag && serverUrl) {
+  if (
+    (result.type === "item" || result.type === "actor") &&
+    result.imageId &&
+    result.imageTag &&
+    serverUrl
+  ) {
     imageUrl = `${serverUrl}/Items/${result.imageId}/Images/Primary?tag=${result.imageTag}&quality=90&maxWidth=80`;
   }
 
@@ -101,11 +105,13 @@ function SearchResultItem({
       className="flex items-center gap-3 py-2 cursor-pointer"
     >
       {imageUrl ? (
-        <img
+        <Image
           src={imageUrl}
           alt=""
+          width={32}
+          height={40}
           className="h-10 w-8 rounded object-cover bg-muted flex-shrink-0"
-          loading="lazy"
+          unoptimized
         />
       ) : (
         <div className="h-10 w-8 rounded bg-muted flex items-center justify-center flex-shrink-0">
@@ -131,7 +137,7 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
   const params = useParams();
   const serverId = params.id as string;
   const router = useRouter();
-  
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery] = useDebounce(query, 300);
@@ -161,14 +167,18 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
   // Click outside to close
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
 
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [open]);
 
@@ -183,7 +193,7 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
       setIsLoading(true);
       try {
         const response = await fetch(
-          `/api/search?q=${encodeURIComponent(debouncedQuery)}&limit=10`
+          `/api/search?q=${encodeURIComponent(debouncedQuery)}&limit=10`,
         );
         if (response.ok) {
           const data = await response.json();
@@ -353,4 +363,3 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
     </div>
   );
 }
-

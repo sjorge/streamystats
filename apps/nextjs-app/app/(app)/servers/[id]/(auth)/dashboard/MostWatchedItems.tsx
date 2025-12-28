@@ -1,6 +1,6 @@
 "use client";
 
-import type { Item, Server } from "@streamystats/database/schema";
+import type { Item } from "@streamystats/database/schema";
 import { Settings } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { usePersistantState } from "@/hooks/usePersistantState";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { Poster } from "./Poster";
 
@@ -29,7 +30,7 @@ interface Props {
     Episode: ItemWithStats[];
     Series: ItemWithStats[];
   };
-  server: Server;
+  server: ServerPublic;
 }
 
 // Local storage key

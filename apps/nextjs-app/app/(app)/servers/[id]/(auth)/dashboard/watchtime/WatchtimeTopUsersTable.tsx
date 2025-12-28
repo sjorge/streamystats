@@ -1,4 +1,3 @@
-import type { Server } from "@streamystats/database/schema";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -10,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { UserStatsSummary } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 
 function filterAndLimitTopUsers(users: UserStatsSummary[]): UserStatsSummary[] {
@@ -22,7 +22,7 @@ export function WatchtimeTopUsersTable({
   server,
   users,
 }: {
-  server: Server;
+  server: ServerPublic;
   users: UserStatsSummary[];
 }) {
   const topUsers = filterAndLimitTopUsers(users);

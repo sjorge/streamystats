@@ -123,12 +123,7 @@ export const ClientUsageCard = ({ data }: ClientUsageCardProps) => {
               cursor={false}
               content={<ChartTooltipContent indicator="line" />}
             />
-            <Bar
-              dataKey="watchTime"
-              layout="vertical"
-              radius={4}
-              className="fill-green-600"
-            >
+            <Bar dataKey="watchTime" radius={4} className="fill-green-600">
               <LabelList
                 dataKey="labelWithPercent"
                 content={({ x, y, width: barWidth, height, value }) => (

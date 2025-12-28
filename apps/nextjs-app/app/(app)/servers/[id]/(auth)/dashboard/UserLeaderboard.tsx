@@ -1,9 +1,10 @@
-import type { Server, User } from "@streamystats/database/schema";
+import type { User } from "@streamystats/database/schema";
 import { getTotalWatchTimeForUsers, getUsers } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { UserLeaderboardTable } from "./UserLeaderBoardTable";
 
 interface Props {
-  server: Server;
+  server: ServerPublic;
 }
 
 export const UserLeaderboard = async ({ server }: Props) => {

@@ -1,6 +1,5 @@
 "use client";
 
-import type { Server } from "@streamystats/database";
 import {
   BookOpen,
   Bug,
@@ -34,6 +33,7 @@ import {
   getSeasonalRecommendations,
   type SeasonalRecommendationResult,
 } from "@/lib/db/seasonal-recommendations";
+import type { ServerPublic } from "@/lib/types";
 
 // Map icon names to Lucide components
 const iconMap: Record<string, LucideIcon> = {
@@ -211,7 +211,7 @@ function getHolidayIcon(iconName: string): LucideIcon {
 
 interface SeasonalRecommendationsProps {
   data: SeasonalRecommendationResult;
-  server: Server;
+  server: ServerPublic;
 }
 
 export function SeasonalRecommendations({

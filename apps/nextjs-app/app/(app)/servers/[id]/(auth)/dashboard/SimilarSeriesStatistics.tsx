@@ -1,17 +1,17 @@
 "use client";
 
-import type { Server } from "@streamystats/database";
 import { Monitor } from "lucide-react";
 import {
   getSimilarSeries,
   hideSeriesRecommendation,
   type SeriesRecommendationItem,
 } from "@/lib/db/similar-series-statistics";
+import type { ServerPublic } from "@/lib/types";
 import { RecommendationsSection } from "./RecommendationsSection";
 
 interface Props {
   data: SeriesRecommendationItem[];
-  server: Server;
+  server: ServerPublic;
 }
 
 export const SimilarSeriesStatistics = ({ data, server }: Props) => {

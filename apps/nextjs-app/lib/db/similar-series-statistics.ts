@@ -33,7 +33,7 @@ const debugLog = (...args: unknown[]) => {
     enableDebug
   ) {
     // eslint-disable-next-line no-console
-    console.log(...args);
+    console.debug(...args);
   }
 };
 

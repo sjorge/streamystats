@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/Container";
 import { getActorDetails } from "@/lib/db/actors";
 import { getServer } from "@/lib/db/server";
-import { ActorHeader } from "./ActorHeader";
 import { ActorFilmography } from "./ActorFilmography";
+import { ActorHeader } from "./ActorHeader";
 
 export default async function ActorPage({
   params,
@@ -39,4 +39,3 @@ export default async function ActorPage({
     </Container>
   );
 }
-

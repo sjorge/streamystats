@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { requireApiKey } from "@/lib/api-auth";
 import { getItemDetails } from "@/lib/db/items";
-import { getServer } from "@/lib/db/server";
+import { getServerWithSecrets } from "@/lib/db/server";
 
 /**
  * API Route: GET /api/get-item-details/[itemId]?serverId=123
@@ -71,7 +71,7 @@ export async function GET(
       );
     }
 
-    const server = await getServer({ serverId });
+    const server = await getServerWithSecrets({ serverId });
 
     if (!server) {
       return new Response(

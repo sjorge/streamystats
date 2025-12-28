@@ -37,7 +37,7 @@ import {
   saveChatConfig,
   testChatConnection,
 } from "@/lib/db/server";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 
 const PROVIDER_PRESETS = {
   openai: {
@@ -100,7 +100,7 @@ const PROVIDER_PRESETS = {
 
 type PresetKey = keyof typeof PROVIDER_PRESETS;
 
-function detectPreset(server: Server): PresetKey {
+function detectPreset(server: ServerPublic): PresetKey {
   const baseUrl = server.chatBaseUrl || "";
   for (const [key, preset] of Object.entries(PROVIDER_PRESETS)) {
     if (key !== "custom" && baseUrl === preset.baseUrl) {
@@ -113,7 +113,7 @@ function detectPreset(server: Server): PresetKey {
   return baseUrl ? "custom" : "openai";
 }
 
-export function ChatAIManager({ server }: { server: Server }) {
+export function ChatAIManager({ server }: { server: ServerPublic }) {
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>(
     detectPreset(server),
   );
@@ -123,7 +123,7 @@ export function ChatAIManager({ server }: { server: Server }) {
   );
   // Don't pre-fill API key for security - just track if one exists
   const [apiKey, setApiKey] = useState("");
-  const hasExistingApiKey = Boolean(server.chatApiKey);
+  const hasExistingApiKey = server.hasChatApiKey;
   const [model, setModel] = useState(
     server.chatModel || PROVIDER_PRESETS.openai.defaultModel,
   );

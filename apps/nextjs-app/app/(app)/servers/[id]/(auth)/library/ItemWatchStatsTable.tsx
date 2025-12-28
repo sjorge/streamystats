@@ -40,14 +40,14 @@ import type {
   ItemWatchStats,
   ItemWatchStatsResponse,
   Library,
-  Server,
+  ServerPublic,
 } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { Poster } from "../dashboard/Poster";
 import LibraryDropdown from "./LibraryDropdown";
 
 export interface ItemWatchStatsTableProps {
-  server: Server;
+  server: ServerPublic;
   data: ItemWatchStatsResponse;
   libraries: Library[];
 }
@@ -418,7 +418,7 @@ const MemoizedTableRow = React.memo(
     columns: _columns,
   }: {
     row: Row<ItemWatchStats>;
-    server: Server;
+    server: ServerPublic;
     columns: ColumnDef<ItemWatchStats>[];
   }) => {
     return (

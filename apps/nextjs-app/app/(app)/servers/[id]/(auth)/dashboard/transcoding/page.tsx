@@ -1,4 +1,3 @@
-import type { Server } from "@streamystats/database";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Container } from "@/components/Container";
@@ -7,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getServer } from "@/lib/db/server";
 import { getTranscodingStatistics } from "@/lib/db/transcoding-statistics";
 import { getMe, isUserAdmin } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { TranscodingStatistics } from "../TranscodingStatistics";
 
 export default async function TranscodingPage({
@@ -31,7 +31,7 @@ export default async function TranscodingPage({
   );
 }
 
-async function TranscodingStats({ server }: { server: Server }) {
+async function TranscodingStats({ server }: { server: ServerPublic }) {
   const [isAdmin, me] = await Promise.all([isUserAdmin(), getMe()]);
   const ts = await getTranscodingStatistics(
     server.id,

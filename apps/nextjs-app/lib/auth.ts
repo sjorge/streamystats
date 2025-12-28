@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { shouldUseSecureCookies } from "@/lib/secure-cookies";
-import { getServer } from "./db/server";
+import { getServerWithSecrets } from "./db/server";
 import { createSession } from "./session";
 
 export const login = async ({
@@ -14,7 +14,7 @@ export const login = async ({
   username: string;
   password?: string | null;
 }): Promise<void> => {
-  const server = await getServer({ serverId: serverId.toString() });
+  const server = await getServerWithSecrets({ serverId: serverId.toString() });
 
   if (!server) {
     throw new Error("Server not found");

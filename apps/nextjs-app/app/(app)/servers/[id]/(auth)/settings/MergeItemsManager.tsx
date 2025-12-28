@@ -29,12 +29,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Item, Server } from "@/lib/types";
+import type { Item, ServerPublic } from "@/lib/types";
 import { fetch } from "@/lib/utils";
 import { Poster } from "../dashboard/Poster";
 
 interface MergeItemsManagerProps {
-  server: Server;
+  server: ServerPublic;
 }
 
 interface MergeResult {

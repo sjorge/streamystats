@@ -367,7 +367,10 @@ export async function GET(request: NextRequest) {
     if (token) {
       const userInfo = await validateJellyfinToken(server.url, token);
       if (userInfo) {
-        let targetUser: ApiUser = { id: userInfo.userId, name: userInfo.userName };
+        let targetUser: ApiUser = {
+          id: userInfo.userId,
+          name: userInfo.userName,
+        };
         if (userInfo.isAdmin && parsed.targetUserId) {
           targetUser = { id: parsed.targetUserId, name: null };
         }

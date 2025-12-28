@@ -1,33 +1,17 @@
 import { redirect } from "next/navigation";
-import { getServers } from "@/lib/server";
+import { getServers } from "@/lib/db/server";
 
 export default async function Home() {
-  console.log("[DEBUG] Home page: Starting server check");
-
-  let servers: Server[] | undefined;
-
   try {
-    servers = await getServers();
-    console.log("[DEBUG] Home page: Fetched servers:", {
-      count: servers?.length || 0,
-      hasServers: Boolean(servers?.length),
-      firstServerId: servers?.[0]?.id || null,
-    });
+    const servers = await getServers();
+    const firstServerId = servers[0]?.id;
+    if (firstServerId) {
+      redirect(`/servers/${firstServerId}/dashboard`);
+    }
   } catch (error) {
     console.error("[DEBUG] Home page: Error fetching servers:", error);
-    console.log("[DEBUG] Home page: Redirecting to setup due to error");
     redirect("/setup");
   }
 
-  if (servers?.[0]?.id) {
-    const redirectPath = `/servers/${servers[0].id}/dashboard`;
-    console.log(
-      "[DEBUG] Home page: Redirecting to server dashboard:",
-      redirectPath,
-    );
-    redirect(redirectPath);
-  } else {
-    console.log("[DEBUG] Home page: No servers found, redirecting to setup");
-    redirect("/setup");
-  }
+  redirect("/setup");
 }

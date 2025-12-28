@@ -3,7 +3,7 @@
 import { db } from "@streamystats/database";
 import { servers } from "@streamystats/database/schema";
 import { eq } from "drizzle-orm";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 /**
  * Server action to update excluded users for a server
@@ -17,9 +17,6 @@ export async function updateExcludedUsersAction(
       .update(servers)
       .set({ excludedUserIds })
       .where(eq(servers.id, serverId));
-
-    // Revalidate cache for exclusion settings
-    revalidateTag(`exclusion-settings-${serverId}`);
 
     // Revalidate all statistics pages
     revalidatePath(`/servers/${serverId}/dashboard`);
@@ -53,9 +50,6 @@ export async function updateExcludedLibrariesAction(
       .update(servers)
       .set({ excludedLibraryIds })
       .where(eq(servers.id, serverId));
-
-    // Revalidate cache for exclusion settings
-    revalidateTag(`exclusion-settings-${serverId}`);
 
     // Revalidate all statistics pages
     revalidatePath(`/servers/${serverId}/dashboard`);

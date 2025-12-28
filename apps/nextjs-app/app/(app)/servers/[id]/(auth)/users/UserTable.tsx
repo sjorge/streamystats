@@ -34,12 +34,12 @@ import {
 } from "@/components/ui/table";
 import { usePersistantState } from "@/hooks/usePersistantState";
 import type { UserWithStats } from "@/lib/db/users";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 
 export interface UserTableProps {
   data: UserWithStats[];
-  server: Server;
+  server: ServerPublic;
 }
 
 export const UserTable: React.FC<UserTableProps> = ({

@@ -1,4 +1,5 @@
-import { createServer, getServers } from "@/lib/server";
+import { getServers } from "@/lib/db/server";
+import { createServer } from "@/lib/server";
 
 export async function GET() {
   try {

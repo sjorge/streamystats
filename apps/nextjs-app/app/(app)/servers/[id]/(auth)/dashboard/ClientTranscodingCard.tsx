@@ -123,7 +123,6 @@ export const ClientTranscodingCard = ({ data }: ClientTranscodingCardProps) => {
             />
             <Bar
               dataKey="transcodingRate"
-              layout="vertical"
               radius={4}
               className="fill-orange-600"
             >

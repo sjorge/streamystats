@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Item, Server } from "@/lib/types";
+import type { Item, ServerPublic } from "@/lib/types";
 import { cn, formatDuration } from "@/lib/utils";
 
 export interface ItemWithStats extends Item {
@@ -15,7 +15,7 @@ export interface ItemWithStats extends Item {
 
 interface TopItemsListProps {
   items: ItemWithStats[];
-  server: Server;
+  server: ServerPublic;
   title: string;
   type: "movie" | "series";
   className?: string;
@@ -56,7 +56,7 @@ function ItemsList({
   type,
 }: {
   items: ItemWithStats[];
-  server: Server;
+  server: ServerPublic;
   type: "movie" | "series";
 }) {
   if (items.length === 0) {
