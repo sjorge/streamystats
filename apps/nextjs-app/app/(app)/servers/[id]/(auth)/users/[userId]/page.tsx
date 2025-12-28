@@ -11,6 +11,7 @@ import {
   getUniquePlayMethods,
   getUserHistory,
 } from "@/lib/db/history";
+import { getAlmostDoneSeries } from "@/lib/db/items";
 import { getUserAnomalies } from "@/lib/db/locations";
 import { getServer } from "@/lib/db/server";
 import { getMostWatchedItems } from "@/lib/db/statistics";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/db/users";
 import { formatDuration } from "@/lib/utils";
 import { HistoryTable } from "../../history/HistoryTable";
+import { AlmostDone } from "./AlmostDone";
 import { GenreStatsGraph } from "./GenreStatsGraph";
 import { TopItemsList } from "./TopItems";
 import UserBadges from "./UserBadges";
@@ -65,6 +67,7 @@ export default async function User({
     userHistory,
     genreStats,
     mostWatched,
+    almostDone,
     anomalyData,
     users,
     deviceNames,
@@ -85,6 +88,7 @@ export default async function User({
     }),
     getUserGenreStats({ userId: user.id, serverId: server.id }),
     getMostWatchedItems({ serverId: server.id, userId: user.id }),
+    getAlmostDoneSeries({ serverId: server.id, userId: user.id }),
     getUserAnomalies(server.id, user.id, { resolved: false, limit: 1 }),
     getUsers({ serverId: server.id }),
     getUniqueDeviceNames(server.id),
@@ -150,6 +154,11 @@ export default async function User({
           server={server}
         />
       </div>
+      {almostDone.length > 0 && (
+        <div className="mt-6">
+          <AlmostDone data={almostDone} server={server} />
+        </div>
+      )}
       <div className="mt-6 mb-4">
         <UserSimilarity serverId={server.id} userId={user.id} />
       </div>

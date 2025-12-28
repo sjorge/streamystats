@@ -791,3 +791,260 @@ export const getSeasonsAndEpisodes = async ({
 
   return seasons;
 };
+
+export interface SeasonProgress {
+  seasonNumber: number;
+  totalEpisodes: number;
+  watchedEpisodes: number;
+  episodes: Array<{
+    episodeNumber: number;
+    watched: boolean;
+    episodeId: string;
+    name: string | null;
+  }>;
+}
+
+export interface AlmostDoneSeries {
+  series: Item;
+  totalEpisodes: number;
+  watchedEpisodes: number;
+  percentComplete: number;
+  seasons: SeasonProgress[];
+}
+
+/**
+ * Get series that the user has almost finished watching (between minPercent and maxPercent)
+ * Default is 50-99% complete
+ */
+export const getAlmostDoneSeries = async ({
+  serverId,
+  userId,
+  minPercent = 50,
+  maxPercent = 99,
+  limit = 10,
+}: {
+  serverId: number | string;
+  userId: string;
+  minPercent?: number;
+  maxPercent?: number;
+  limit?: number;
+}): Promise<AlmostDoneSeries[]> => {
+  const serverIdNum = Number(serverId);
+
+  const { itemLibraryExclusion } = await getStatisticsExclusions(serverIdNum);
+
+  // Step 1: Get all series that the user has watched at least one episode of
+  const watchedSeriesQuery = await db
+    .selectDistinct({
+      seriesId: items.seriesId,
+    })
+    .from(sessions)
+    .innerJoin(items, eq(sessions.itemId, items.id))
+    .where(
+      and(
+        eq(sessions.serverId, serverIdNum),
+        eq(sessions.userId, userId),
+        eq(items.type, "Episode"),
+        isNotNull(items.seriesId),
+        isNotNull(sessions.playDuration),
+        ...(itemLibraryExclusion ? [itemLibraryExclusion] : []),
+      ),
+    );
+
+  const watchedSeriesIds = watchedSeriesQuery
+    .map((row) => row.seriesId)
+    .filter((id): id is string => id !== null);
+
+  if (watchedSeriesIds.length === 0) {
+    return [];
+  }
+
+  // Step 2: Get all episodes for these series
+  const allEpisodesForSeries = await db
+    .select({
+      id: items.id,
+      seriesId: items.seriesId,
+      parentIndexNumber: items.parentIndexNumber,
+      indexNumber: items.indexNumber,
+      name: items.name,
+    })
+    .from(items)
+    .where(
+      and(
+        eq(items.type, "Episode"),
+        inArray(items.seriesId, watchedSeriesIds),
+        isNotNull(items.parentIndexNumber),
+        isNotNull(items.indexNumber),
+        ...(itemLibraryExclusion ? [itemLibraryExclusion] : []),
+      ),
+    );
+
+  // Step 3: Get all watched episode IDs for this user
+  const episodeIds = allEpisodesForSeries.map((ep) => ep.id);
+  if (episodeIds.length === 0) {
+    return [];
+  }
+
+  const watchedEpisodesQuery = await db
+    .selectDistinct({
+      itemId: sessions.itemId,
+    })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.serverId, serverIdNum),
+        eq(sessions.userId, userId),
+        inArray(sessions.itemId, episodeIds),
+        isNotNull(sessions.playDuration),
+      ),
+    );
+
+  const watchedEpisodeIds = new Set(
+    watchedEpisodesQuery
+      .map((row) => row.itemId)
+      .filter((id): id is string => id !== null),
+  );
+
+  // Step 4: Group episodes by series and calculate progress
+  const seriesEpisodeMap = new Map<
+    string,
+    Array<{
+      id: string;
+      seasonNumber: number;
+      episodeNumber: number;
+      name: string | null;
+    }>
+  >();
+
+  for (const episode of allEpisodesForSeries) {
+    if (
+      episode.seriesId === null ||
+      episode.parentIndexNumber === null ||
+      episode.indexNumber === null
+    ) {
+      continue;
+    }
+
+    if (!seriesEpisodeMap.has(episode.seriesId)) {
+      seriesEpisodeMap.set(episode.seriesId, []);
+    }
+    seriesEpisodeMap.get(episode.seriesId)?.push({
+      id: episode.id,
+      seasonNumber: episode.parentIndexNumber,
+      episodeNumber: episode.indexNumber,
+      name: episode.name,
+    });
+  }
+
+  // Step 5: Calculate completion percentage for each series
+  const seriesProgress: Array<{
+    seriesId: string;
+    totalEpisodes: number;
+    watchedEpisodes: number;
+    percentComplete: number;
+    episodes: Array<{
+      id: string;
+      seasonNumber: number;
+      episodeNumber: number;
+      name: string | null;
+      watched: boolean;
+    }>;
+  }> = [];
+
+  for (const [seriesId, episodes] of seriesEpisodeMap) {
+    const totalEpisodes = episodes.length;
+    const episodesWithWatchStatus = episodes.map((ep) => ({
+      ...ep,
+      watched: watchedEpisodeIds.has(ep.id),
+    }));
+    const watchedCount = episodesWithWatchStatus.filter(
+      (ep) => ep.watched,
+    ).length;
+    const percentComplete =
+      totalEpisodes > 0 ? (watchedCount / totalEpisodes) * 100 : 0;
+
+    if (percentComplete >= minPercent && percentComplete <= maxPercent) {
+      seriesProgress.push({
+        seriesId,
+        totalEpisodes,
+        watchedEpisodes: watchedCount,
+        percentComplete,
+        episodes: episodesWithWatchStatus,
+      });
+    }
+  }
+
+  // Step 6: Sort by percent complete descending (closest to done first)
+  seriesProgress.sort((a, b) => b.percentComplete - a.percentComplete);
+
+  // Step 7: Limit results
+  const limitedProgress = seriesProgress.slice(0, limit);
+
+  if (limitedProgress.length === 0) {
+    return [];
+  }
+
+  // Step 8: Fetch series metadata
+  const seriesIdsToFetch = limitedProgress.map((p) => p.seriesId);
+  const seriesItems = await db
+    .select()
+    .from(items)
+    .where(and(eq(items.type, "Series"), inArray(items.id, seriesIdsToFetch)));
+
+  const seriesMap = new Map<string, Item>();
+  for (const series of seriesItems) {
+    seriesMap.set(series.id, series);
+  }
+
+  // Step 9: Build final result with season breakdown
+  const result: AlmostDoneSeries[] = [];
+
+  for (const progress of limitedProgress) {
+    const series = seriesMap.get(progress.seriesId);
+    if (!series) {
+      continue;
+    }
+
+    // Group episodes by season
+    const seasonMap = new Map<
+      number,
+      Array<{
+        episodeNumber: number;
+        watched: boolean;
+        episodeId: string;
+        name: string | null;
+      }>
+    >();
+
+    for (const ep of progress.episodes) {
+      if (!seasonMap.has(ep.seasonNumber)) {
+        seasonMap.set(ep.seasonNumber, []);
+      }
+      seasonMap.get(ep.seasonNumber)?.push({
+        episodeNumber: ep.episodeNumber,
+        watched: ep.watched,
+        episodeId: ep.id,
+        name: ep.name,
+      });
+    }
+
+    const seasons: SeasonProgress[] = Array.from(seasonMap.entries())
+      .map(([seasonNumber, episodes]) => ({
+        seasonNumber,
+        totalEpisodes: episodes.length,
+        watchedEpisodes: episodes.filter((ep) => ep.watched).length,
+        episodes: episodes.sort((a, b) => a.episodeNumber - b.episodeNumber),
+      }))
+      .sort((a, b) => a.seasonNumber - b.seasonNumber);
+
+    result.push({
+      series,
+      totalEpisodes: progress.totalEpisodes,
+      watchedEpisodes: progress.watchedEpisodes,
+      percentComplete: Math.round(progress.percentComplete * 10) / 10,
+      seasons,
+    });
+  }
+
+  return result;
+};
