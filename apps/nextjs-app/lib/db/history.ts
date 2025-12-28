@@ -172,11 +172,14 @@ export const getHistory = async (
     case "device_name":
       orderClause = order(sessions.deviceName);
       break;
+    case "start_time":
+      orderClause = order(sessions.startTime);
+      break;
     case "date_created":
       orderClause = order(sessions.createdAt);
       break;
     default:
-      orderClause = desc(sessions.createdAt);
+      orderClause = desc(sessions.startTime);
   }
 
   // Get paginated results
@@ -275,15 +278,18 @@ export const getUserHistory = async (
       case "device_name":
         sortColumn = sessions.deviceName;
         break;
+      case "start_time":
+        sortColumn = sessions.startTime;
+        break;
       case "date_created":
         sortColumn = sessions.createdAt;
         break;
       default:
-        sortColumn = sessions.createdAt;
+        sortColumn = sessions.startTime;
     }
     orderByClause = sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn);
   } else {
-    orderByClause = desc(sessions.createdAt);
+    orderByClause = desc(sessions.startTime);
   }
 
   // Get paginated results

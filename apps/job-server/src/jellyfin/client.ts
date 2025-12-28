@@ -718,6 +718,49 @@ export class JellyfinClient {
     return allItems;
   }
 
+  /**
+   * Fetch all played items for a specific user with UserData.
+   * Used for inferring watch history from Jellyfin's played status.
+   */
+  async getUserPlayedItems(
+    userId: string,
+    options?: {
+      includeItemTypes?: string[];
+      pageSize?: number;
+    }
+  ): Promise<JellyfinBaseItemDto[]> {
+    const itemTypes = options?.includeItemTypes ?? ["Movie", "Episode"];
+    const pageSize = options?.pageSize ?? 500;
+
+    const allItems: JellyfinBaseItemDto[] = [];
+    let startIndex = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.makeRequest<ItemsResponse>("get", "/Items", {
+        params: {
+          UserId: userId,
+          Recursive: true,
+          Fields: [...DEFAULT_ITEM_FIELDS, "UserData"].join(","),
+          IncludeItemTypes: itemTypes.join(","),
+          IsPlayed: true,
+          StartIndex: startIndex,
+          Limit: pageSize,
+          IsFolder: false,
+          IsPlaceHolder: false,
+        },
+      });
+
+      const items = response.Items || [];
+      allItems.push(...items);
+
+      startIndex += items.length;
+      hasMore = startIndex < response.TotalRecordCount && items.length > 0;
+    }
+
+    return allItems;
+  }
+
   // Helper method to create client from server configuration
   static fromServer(server: Server): JellyfinClient {
     return new JellyfinClient({

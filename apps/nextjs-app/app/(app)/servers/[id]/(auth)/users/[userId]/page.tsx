@@ -11,6 +11,7 @@ import {
   getUniquePlayMethods,
   getUserHistory,
 } from "@/lib/db/history";
+import { getInferredSessionCount } from "@/lib/db/infer-watchtime";
 import { getAlmostDoneSeries } from "@/lib/db/items";
 import { getUserAnomalies } from "@/lib/db/locations";
 import { getServer } from "@/lib/db/server";
@@ -23,10 +24,12 @@ import {
   getWatchTimePerWeekDay,
   isUserAdmin,
 } from "@/lib/db/users";
+import { getSession } from "@/lib/session";
 import { formatDuration } from "@/lib/utils";
 import { HistoryTable } from "../../history/HistoryTable";
 import { AlmostDone } from "./AlmostDone";
 import { GenreStatsGraph } from "./GenreStatsGraph";
+import { InferWatchtimeManager } from "./InferWatchtimeManager";
 import { TopItemsList } from "./TopItems";
 import UserBadges from "./UserBadges";
 import { UserSimilarity } from "./UserSimilarity";
@@ -57,7 +60,13 @@ export default async function User({
     redirect("/");
   }
 
-  const isAdmin = await isUserAdmin();
+  const [isAdmin, currentSession] = await Promise.all([
+    isUserAdmin(),
+    getSession(),
+  ]);
+
+  // Check if current user is viewing their own page
+  const isCurrentUser = currentSession?.id === user.id;
 
   // Get additional user statistics and history
   const currentPage = Number.parseInt(page, 10);
@@ -73,6 +82,7 @@ export default async function User({
     deviceNames,
     clientNames,
     playMethods,
+    inferredSessionCount,
   ] = await Promise.all([
     getUserWatchStats({ serverId: server.id, userId: user.id }),
     getWatchTimePerWeekDay({
@@ -94,6 +104,7 @@ export default async function User({
     getUniqueDeviceNames(server.id),
     getUniqueClientNames(server.id),
     getUniquePlayMethods(server.id),
+    getInferredSessionCount(server.id, user.id),
   ]);
 
   return (
@@ -162,6 +173,17 @@ export default async function User({
       <div className="mt-6 mb-4">
         <UserSimilarity serverId={server.id} userId={user.id} />
       </div>
+      {(isCurrentUser || isAdmin) && (
+        <div className="mb-4">
+          <InferWatchtimeManager
+            serverId={server.id}
+            userId={user.id}
+            userName={user.name}
+            isCurrentUser={isCurrentUser}
+            inferredSessionCount={inferredSessionCount}
+          />
+        </div>
+      )}
       <HistoryTable
         server={server}
         data={userHistory}

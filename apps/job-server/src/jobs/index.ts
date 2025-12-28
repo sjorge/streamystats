@@ -24,6 +24,13 @@ export {
 
 export { logJobResult } from "./job-logger";
 
+export {
+  inferWatchtimeJob,
+  INFER_WATCHTIME_JOB_NAME,
+  type InferWatchtimeJobData,
+  type InferWatchtimeResult,
+} from "./infer-watchtime-job";
+
 export { TIMEOUT_CONFIG } from "./config";
 
 // Export Jellyfin sync workers from the original location

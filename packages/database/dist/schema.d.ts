@@ -3713,6 +3713,23 @@ export declare const sessions: import("drizzle-orm/pg-core").PgTableWithColumns<
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        isInferred: import("drizzle-orm/pg-core").PgColumn<{
+            name: "is_inferred";
+            tableName: "sessions";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         isTranscoded: import("drizzle-orm/pg-core").PgColumn<{
             name: "is_transcoded";
             tableName: "sessions";
