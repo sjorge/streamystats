@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getJobQueue, JobTypes } from "../../jobs/queue";
 import { JELLYFIN_JOB_NAMES } from "../../jellyfin/workers";
+import { BACKFILL_JOB_NAMES } from "../../jobs/server-jobs";
 import {
   db,
   servers,
@@ -256,6 +257,7 @@ app.post("/create-server", async (c) => {
       }
 
       const serverInfo = (await testResponse.json()) as {
+        Id?: string;
         ServerName?: string;
         Version?: string;
         ProductName?: string;
@@ -283,6 +285,7 @@ app.post("/create-server", async (c) => {
         name: serverInfo.ServerName || name,
         url,
         apiKey,
+        jellyfinId: serverInfo.Id,
         version: serverInfo.Version,
         productName: serverInfo.ProductName,
         operatingSystem: serverInfo.OperatingSystem,
@@ -392,6 +395,23 @@ app.post("/test/add-test-server", async (c) => {
   } catch (error) {
     console.error("Error queuing test server job:", error);
     return c.json({ error: "Failed to queue test job" }, 500);
+  }
+});
+
+// Backfill Jellyfin server IDs for existing servers
+app.post("/backfill-jellyfin-ids", async (c) => {
+  try {
+    const boss = await getJobQueue();
+    const jobId = await boss.send(BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS, {});
+
+    return c.json({
+      success: true,
+      jobId,
+      message: "Backfill Jellyfin IDs job queued successfully",
+    });
+  } catch (error) {
+    console.error("Error queuing backfill jellyfin ids job:", error);
+    return c.json({ error: "Failed to queue job" }, 500);
   }
 });
 
