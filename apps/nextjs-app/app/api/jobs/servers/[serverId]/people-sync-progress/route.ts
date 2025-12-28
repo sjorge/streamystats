@@ -60,7 +60,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const total = Number(totalResult[0]?.count ?? 0);
 
-    // Count items that still need people sync (no item_people records)
+    // Count items that still need people sync (no item_people records for this server)
     const remainingResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(items)
@@ -72,6 +72,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           sql`NOT EXISTS (
             SELECT 1 FROM item_people ip
             WHERE ip.item_id = ${items.id}
+            AND ip.server_id = ${serverIdNum}
           )`,
         ),
       );

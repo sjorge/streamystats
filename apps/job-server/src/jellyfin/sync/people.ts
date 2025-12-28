@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   items,
@@ -77,6 +77,7 @@ export async function syncPeopleForServer(
           sql`NOT EXISTS (
             SELECT 1 FROM item_people ip
             WHERE ip.item_id = ${items.id}
+            AND ip.server_id = ${serverId}
           )`
         )
       )
@@ -170,6 +171,7 @@ export async function syncPeopleForServer(
         sql`NOT EXISTS (
           SELECT 1 FROM item_people ip
           WHERE ip.item_id = ${items.id}
+          AND ip.server_id = ${serverId}
         )`
       )
     );
@@ -203,8 +205,10 @@ async function syncPeopleToTables(
   itemId: string,
   peopleData: PersonData[]
 ): Promise<{ insertedPeople: number; insertedLinks: number }> {
-  // Delete existing item_people for this item (in case of resync)
-  await db.delete(itemPeople).where(eq(itemPeople.itemId, itemId));
+  // Delete existing item_people for this item on this server (in case of resync)
+  await db.delete(itemPeople).where(
+    and(eq(itemPeople.itemId, itemId), eq(itemPeople.serverId, serverId))
+  );
 
   if (!peopleData || peopleData.length === 0) {
     return { insertedPeople: 0, insertedLinks: 0 };
