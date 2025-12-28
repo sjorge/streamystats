@@ -156,11 +156,16 @@ export async function cleanupDeletedItems(
     const seasonKeyToJellyfinItem = new Map<string, MinimalJellyfinItem>();
     const seriesKeyToJellyfinItem = new Map<string, MinimalJellyfinItem>();
 
+    // Track which libraries we successfully fetched - if any fail, we should not delete items from those libraries
+    const successfullyFetchedLibraries = new Set<string>();
+    const failedLibraries: string[] = [];
+
     for (const library of serverLibraries) {
       try {
         metrics.apiRequests++;
         const libraryItems = await client.getAllItemsMinimal(library.id);
         metrics.librariesScanned++;
+        successfullyFetchedLibraries.add(library.id);
 
         // Build all lookup maps in a single pass
         for (const item of libraryItems) {
@@ -231,10 +236,28 @@ export async function cleanupDeletedItems(
         );
       } catch (error) {
         metrics.errors++;
+        failedLibraries.push(library.id);
         errors.push(
           `Library ${library.name}: ${
             error instanceof Error ? error.message : "Unknown error"
           }`
+        );
+        console.warn(
+          formatSyncLogLine("deleted-items-cleanup", {
+            server: server.name,
+            page: 0,
+            processed: 0,
+            inserted: 0,
+            updated: 0,
+            errors: 1,
+            processMs: 0,
+            totalProcessed: 0,
+            libraryId: library.id,
+            libraryName: library.name,
+            message: `Failed to fetch library items - will skip deletion for this library`,
+            error: error instanceof Error ? error.message : "Unknown error",
+            phase: "fetch-error",
+          })
         );
       }
     }
@@ -299,6 +322,8 @@ export async function cleanupDeletedItems(
     }
 
     // Phase 2: Process database items per-library to limit memory usage
+    // IMPORTANT: Only process libraries that were successfully fetched from Jellyfin
+    // If a library fetch failed (timeout, etc.), we must NOT mark its items as deleted
     const allItemsToDelete: string[] = [];
     const allItemsToMigrate: Array<{
       oldId: string;
@@ -307,6 +332,27 @@ export async function cleanupDeletedItems(
     }> = [];
 
     for (const library of serverLibraries) {
+      // Skip libraries that failed to fetch - we cannot safely determine what's deleted
+      if (!successfullyFetchedLibraries.has(library.id)) {
+        console.info(
+          formatSyncLogLine("deleted-items-cleanup", {
+            server: server.name,
+            page: 0,
+            processed: 0,
+            inserted: 0,
+            updated: 0,
+            errors: 0,
+            processMs: 0,
+            totalProcessed: metrics.itemsScanned,
+            libraryId: library.id,
+            libraryName: library.name,
+            message: "Skipping library - fetch failed earlier",
+            phase: "library-skipped",
+          })
+        );
+        continue;
+      }
+
       const result = await processLibraryItems(
         server.id,
         library.id,
@@ -358,6 +404,8 @@ export async function cleanupDeletedItems(
         totalProcessed: 0,
         toDelete: allItemsToDelete.length,
         toMigrate: allItemsToMigrate.length,
+        librariesProcessed: successfullyFetchedLibraries.size,
+        librariesSkipped: failedLibraries.length,
         memoryMB: getMemoryUsageMB(),
         phase: "analysis",
       })

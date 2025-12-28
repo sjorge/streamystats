@@ -1060,13 +1060,46 @@ function hasFieldsChanged<T extends Record<string, any>>(
 }
 
 /**
+ * Deep compare two values for equality, handling objects with potentially different key ordering
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== typeof b) return false;
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  if (typeof a === "object" && typeof b === "object") {
+    const aObj = a as Record<string, unknown>;
+    const bObj = b as Record<string, unknown>;
+    const aKeys = Object.keys(aObj).sort();
+    const bKeys = Object.keys(bObj).sort();
+    if (aKeys.length !== bKeys.length) return false;
+    for (let i = 0; i < aKeys.length; i++) {
+      if (aKeys[i] !== bKeys[i]) return false;
+      if (!deepEqual(aObj[aKeys[i]], bObj[bKeys[i]])) return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Check if image-related fields have changed
  */
 function hasImageFieldsChanged(
   existing: Item,
   newItem: NewItem | Item,
 ): boolean {
-  const imageFields = [
+  // Simple scalar fields - direct comparison is fine
+  const scalarFields = [
     "primaryImageTag",
     "seriesPrimaryImageTag",
     "primaryImageThumbTag",
@@ -1076,42 +1109,36 @@ function hasImageFieldsChanged(
     "parentThumbImageTag",
     "parentLogoItemId",
     "parentLogoImageTag",
-    "backdropImageTags",
     "parentBackdropItemId",
-    "parentBackdropImageTags",
-    "imageBlurHashes",
-    "imageTags",
     "canDelete",
     "canDownload",
     "playAccess",
     "isHD",
-    "providerIds",
-    "tags",
     "seriesStudio",
   ];
 
-  for (const field of imageFields) {
+  for (const field of scalarFields) {
     if ((existing as Record<string, unknown>)[field] !== (newItem as Record<string, unknown>)[field]) {
       return true;
     }
   }
 
-  // Also check rawData for backdrop image tags and image blur hashes
-  const existingRaw = (existing.rawData || {}) as Record<string, unknown>;
-  const newRaw = (newItem.rawData || {}) as Record<string, unknown>;
+  // Object/array fields - need deep comparison to handle key ordering differences
+  const objectFields = [
+    "backdropImageTags",
+    "parentBackdropImageTags",
+    "imageBlurHashes",
+    "imageTags",
+    "providerIds",
+    "tags",
+  ];
 
-  if (
-    JSON.stringify(existingRaw.BackdropImageTags) !==
-    JSON.stringify(newRaw.BackdropImageTags)
-  ) {
-    return true;
-  }
-
-  if (
-    JSON.stringify(existingRaw.ImageBlurHashes) !==
-    JSON.stringify(newRaw.ImageBlurHashes)
-  ) {
-    return true;
+  for (const field of objectFields) {
+    const existingValue = (existing as Record<string, unknown>)[field];
+    const newValue = (newItem as Record<string, unknown>)[field];
+    if (!deepEqual(existingValue, newValue)) {
+      return true;
+    }
   }
 
   return false;

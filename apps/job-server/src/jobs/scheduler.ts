@@ -13,16 +13,16 @@ class SyncScheduler {
   private scheduledTasks: Map<string, cron.ScheduledTask> = new Map();
   private enabled: boolean = false;
   private activitySyncInterval: string =
-    Bun.env.CRON_ACTIVITY_SYNC || "*/1 * * * *"; // Every minute
+    Bun.env.CRON_ACTIVITY_SYNC || "*/5 * * * *"; // Every 5 minutes
   private recentItemsSyncInterval: string =
-    Bun.env.CRON_RECENT_ITEMS_SYNC || "*/1 * * * *"; // Every minute
-  private userSyncInterval: string = Bun.env.CRON_USER_SYNC || "*/1 * * * *"; // Every minute
+    Bun.env.CRON_RECENT_ITEMS_SYNC || "*/5 * * * *"; // Every 5 minutes
+  private userSyncInterval: string = Bun.env.CRON_USER_SYNC || "*/5 * * * *"; // Every 5 minutes
   private peopleSyncInterval: string =
-    Bun.env.CRON_PEOPLE_SYNC || "*/15 * * * *"; // Every 15 minutes
+    Bun.env.CRON_PEOPLE_SYNC || "*/15 * * * *"; // Every hour
   private embeddingsSyncInterval: string =
     Bun.env.CRON_EMBEDDINGS_SYNC || "*/15 * * * *"; // Every 15 minutes
   private geolocationSyncInterval: string =
-    Bun.env.CRON_GEOLOCATION_SYNC || "*/5 * * * *"; // Every 5 minutes
+    Bun.env.CRON_GEOLOCATION_SYNC || "*/15 * * * *"; // Every 5 minutes
   private fingerprintSyncInterval: string =
     Bun.env.CRON_FINGERPRINT_SYNC || "0 4 * * *"; // Daily at 4 AM
   private jobCleanupInterval: string =
