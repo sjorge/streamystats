@@ -56,7 +56,8 @@ export interface WatchlistItemWithListItem extends WatchlistItem {
   item: WatchlistListItem;
 }
 
-export interface WatchlistWithItemsLite extends Omit<Watchlist, "searchVector"> {
+export interface WatchlistWithItemsLite
+  extends Omit<Watchlist, "searchVector"> {
   items: WatchlistItemWithListItem[];
 }
 
@@ -131,7 +132,10 @@ export const getPublicWatchlistWithItems = async ({
 }: {
   watchlistId: number;
   serverId: number;
-}): Promise<(Omit<Watchlist, "searchVector"> & { items: WatchlistItemWithListItem[] }) | null> => {
+}): Promise<
+  | (Omit<Watchlist, "searchVector"> & { items: WatchlistItemWithListItem[] })
+  | null
+> => {
   const result = await db.query.watchlists.findFirst({
     where: and(
       eq(watchlists.id, watchlistId),
@@ -424,7 +428,10 @@ export const updateWatchlistAsAdmin = async ({
 /**
  * Get promoted watchlists for a server
  */
-export type WatchlistWithItemCountSanitized = Omit<WatchlistWithItemCount, "searchVector">;
+export type WatchlistWithItemCountSanitized = Omit<
+  WatchlistWithItemCount,
+  "searchVector"
+>;
 
 export const getPromotedWatchlists = async ({
   serverId,

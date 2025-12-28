@@ -24,15 +24,14 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-
 /**
  * GET /api/watchlists/[id]
  * Get a single watchlist by ID with items
- * 
+ *
  * Supports two modes:
  * 1. Session auth: Returns watchlist if user owns it or it's public
  * 2. MediaBrowser auth with server identifier: Returns watchlist if public/promoted
- * 
+ *
  * Query params:
  * - format: "full" (default) or "ids" - IDs format returns only item IDs
  */

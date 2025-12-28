@@ -144,7 +144,10 @@ export const DynamicBreadcrumbs: React.FC = () => {
             <React.Fragment key={url}>
               <BreadcrumbSeparator />
               <BreadcrumbItem className="min-w-0">
-                <BreadcrumbLink href={url} className="truncate max-w-[120px] block">
+                <BreadcrumbLink
+                  href={url}
+                  className="truncate max-w-[120px] block"
+                >
                   {getLabel(segment)}
                 </BreadcrumbLink>
               </BreadcrumbItem>

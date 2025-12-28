@@ -273,10 +273,16 @@ async function buildRecommendationsResponse(args: {
   let seriesResults: SeriesRecommendationItem[] = [];
 
   if (params.type === "Movie" || params.type === "all") {
-    movieResults = await getSimilarStatistics(server.id, user.id, fetchLimit, 0, {
-      start: timeWindow.start,
-      end: timeWindow.end,
-    });
+    movieResults = await getSimilarStatistics(
+      server.id,
+      user.id,
+      fetchLimit,
+      0,
+      {
+        start: timeWindow.start,
+        end: timeWindow.end,
+      },
+    );
   }
 
   if (params.type === "Series" || params.type === "all") {
@@ -284,10 +290,9 @@ async function buildRecommendationsResponse(args: {
   }
 
   // Combine and sort by similarity (both types have compatible structure)
-  const combined = [
-    ...movieResults,
-    ...seriesResults,
-  ].sort((a, b) => b.similarity - a.similarity);
+  const combined = [...movieResults, ...seriesResults].sort(
+    (a, b) => b.similarity - a.similarity,
+  );
 
   const limitedResults = combined.slice(0, params.limit);
 

@@ -244,7 +244,6 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
     return cache;
   }, [messages]);
 
-
   useEffect(() => {
     if (open && inputRef.current) {
       inputRef.current.focus();
@@ -378,8 +377,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
                 </div>
               ) : (
                 messages.map((message, messageIndex) => {
-                  const isLastMessage =
-                    messageIndex === messages.length - 1;
+                  const isLastMessage = messageIndex === messages.length - 1;
 
                   return (
                     <Message key={message.id} from={message.role}>
@@ -462,9 +460,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
                                       key={partIndex}
                                       className="flex items-center gap-2 text-xs text-muted-foreground py-1"
                                     >
-                                      <span className="text-green-500">
-                                        ✓
-                                      </span>
+                                      <span className="text-green-500">✓</span>
                                       Found {toolDisplayName} data
                                     </div>
                                   );
@@ -514,22 +510,21 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
                   );
                 })
               )}
-              {isLoading &&
-                messages[messages.length - 1]?.role === "user" && (
-                  <Message from="assistant">
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-primary" />
-                      </div>
-                      <MessageContent>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader size={12} />
-                          Thinking...
-                        </div>
-                      </MessageContent>
+              {isLoading && messages[messages.length - 1]?.role === "user" && (
+                <Message from="assistant">
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-primary" />
                     </div>
-                  </Message>
-                )}
+                    <MessageContent>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader size={12} />
+                        Thinking...
+                      </div>
+                    </MessageContent>
+                  </div>
+                </Message>
+              )}
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
@@ -541,10 +536,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
           )}
 
           <div className="p-4 border-t shrink-0">
-            <PromptInput
-              onSubmit={handleSubmit}
-              className="rounded-lg border"
-            >
+            <PromptInput onSubmit={handleSubmit} className="rounded-lg border">
               <PromptInputTextarea
                 placeholder="Ask about your watch history..."
                 disabled={isLoading}
@@ -580,9 +572,7 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
                 AI Assistant
               </DrawerTitle>
             </DrawerHeader>
-            <div className="flex-1 min-h-0 flex flex-col">
-              {chatContent}
-            </div>
+            <div className="flex-1 min-h-0 flex flex-col">{chatContent}</div>
           </DrawerContent>
         </Drawer>
       ) : (
