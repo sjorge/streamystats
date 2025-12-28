@@ -1,5 +1,10 @@
 // Export all job functions from their respective modules
-export { syncServerDataJob, addServerJob } from "./server-jobs";
+export {
+  syncServerDataJob,
+  addServerJob,
+  backfillJellyfinIdsJob,
+  BACKFILL_JOB_NAMES,
+} from "./server-jobs";
 
 export { generateItemEmbeddingsJob } from "./embedding-jobs";
 
