@@ -2,6 +2,12 @@
 
 A small set of non-negotiable TypeScript/JavaScript conventions for this codebase.
 
+## Package manager
+
+- This project uses **Bun** as the package manager and runtime.
+- Use `bun` instead of `npm` or `yarn` for all commands (e.g., `bun install`, `bun run dev`).
+- Use `bunx` instead of `npx` to run binaries (e.g., `bunx drizzle-kit`, `bunx tsc`).
+
 ## Time and timestamps
 
 - All timestamps **must** be ISO 8601 UTC with microseconds:
