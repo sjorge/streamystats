@@ -68,6 +68,11 @@ curl "https://your-streamystats/api/search?q=matrix" \
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/search` | GET | Global search across media, people, users |
+| `/api/recommendations` | GET | Get personalized recommendations for authenticated user |
+| `/api/watchlists/promoted` | GET | Get promoted watchlists for display on home screens |
+| `/api/watchlists/[id]` | GET | Get a single watchlist by ID |
+| `/api/watchlists/[id]` | PATCH | Update a watchlist (admin-only: isPromoted flag) |
+| `/api/watchlists/[id]` | DELETE | Delete a watchlist |
 
 *More endpoints will be added as they are updated to support external authentication.*
 
@@ -119,6 +124,113 @@ curl "https://your-streamystats/api/search?q=matrix" \
 ```
 
 The IDs format returns Jellyfin item IDs that can be used directly with the Jellyfin API.
+
+## Server Identification
+
+All endpoints that require a server accept multiple identification methods. Use one of:
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `serverId` | Internal StreamyStats server ID | `?serverId=1` |
+| `serverName` | Server name (exact match, case-insensitive) | `?serverName=MyServer` |
+| `serverUrl` | Server URL (partial match) | `?serverUrl=jellyfin.example.com` |
+| `jellyfinServerId` | Jellyfin's unique server ID (from `/System/Info`) | `?jellyfinServerId=abc123...` |
+
+## Query Parameters for Recommendations
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `serverId` | Server identifier (see above) | `?serverId=1` |
+| `limit` | Max results (1-100, default: 20) | `?limit=10` |
+| `type` | Filter by type: `Movie`, `Series`, or `all` | `?type=Movie` |
+| `range` | Time range preset: `7d`, `30d`, `90d`, `thisMonth`, `all` | `?range=30d` |
+| `format` | Response format: `full` or `ids` | `?format=ids` |
+| `includeBasedOn` | Include source items (default: true) | `?includeBasedOn=false` |
+| `includeReasons` | Include recommendation reasons (default: true) | `?includeReasons=false` |
+| `targetUserId` | Admin only: get recommendations for another user | `?targetUserId=abc123` |
+
+### Response Formats for Recommendations
+
+**Full format** (default):
+```json
+{
+  "server": { "id": 1, "name": "MyServer" },
+  "user": { "id": "user-id", "name": "username" },
+  "params": { ... },
+  "data": [
+    {
+      "item": { "id": "jellyfin-id", "name": "Movie Name", "type": "Movie", ... },
+      "similarity": 0.85,
+      "basedOn": [{ "id": "...", "name": "Similar Movie", ... }],
+      "reason": "Because you watched \"Similar Movie\" (shared: Action, Sci-Fi)"
+    }
+  ]
+}
+```
+
+**IDs format** (`?format=ids`):
+```json
+{
+  "data": {
+    "movies": ["jellyfin-id-1", "jellyfin-id-2"],
+    "series": ["jellyfin-id-3"],
+    "total": 3
+  }
+}
+```
+
+## Query Parameters for Promoted Watchlists
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `serverId` | Server identifier (see Server Identification) | `?serverId=1` |
+| `limit` | Max results (1-100, default: 20) | `?limit=10` |
+| `format` | Response format: `full` or `ids` | `?format=ids` |
+| `includePreview` | Include preview items (default: true) | `?includePreview=false` |
+
+### Response Formats for Promoted Watchlists
+
+**Full format** (default):
+```json
+{
+  "server": { "id": 1, "name": "MyServer" },
+  "data": [
+    {
+      "id": 1,
+      "name": "Must Watch Movies",
+      "description": "Our top picks",
+      "isPublic": true,
+      "isPromoted": true,
+      "itemCount": 25,
+      "previewItems": [
+        { "id": "jellyfin-id", "name": "Movie Name", "type": "Movie", "primaryImageTag": "..." }
+      ]
+    }
+  ],
+  "total": 1
+}
+```
+
+**IDs format** (`?format=ids`):
+```json
+{
+  "data": {
+    "watchlists": ["1", "2", "3"],
+    "total": 3
+  }
+}
+```
+
+### Setting Promoted Status (Admin Only)
+
+Admins can mark a watchlist as promoted via PATCH:
+
+```bash
+curl -X PATCH "https://your-streamystats/api/watchlists/123" \
+  -H "Authorization: MediaBrowser Token=\"<admin-token>\"" \
+  -H "Content-Type: application/json" \
+  -d '{"isPromoted": true}'
+```
 
 ## Error Responses
 
