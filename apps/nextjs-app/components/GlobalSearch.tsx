@@ -218,7 +218,7 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
   const showDropdown = open && (query.trim().length > 0 || isLoading);
 
   return (
-    <div ref={containerRef} className="relative flex-1 max-w-md">
+    <div ref={containerRef} className="relative flex-1 w-full sm:max-w-md">
       <Command
         className="rounded-lg border shadow-none bg-background"
         shouldFilter={false}
