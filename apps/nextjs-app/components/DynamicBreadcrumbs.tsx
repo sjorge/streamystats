@@ -35,6 +35,7 @@ const _map: Record<string, string> = {
   anomalies: "Anomalies",
   map: "Map",
   watchlists: "Watchlists",
+  actors: "Actors",
 };
 
 export const DynamicBreadcrumbs: React.FC = () => {
