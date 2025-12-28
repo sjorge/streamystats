@@ -85,7 +85,7 @@ async function searchItems(
     series_id: string | null;
     rank: number;
   }>(sql`
-    SELECT 
+    SELECT
       ${items.id} as id,
       ${items.name} as name,
       ${items.type} as type,
@@ -98,10 +98,10 @@ async function searchItems(
       ${items.seriesPrimaryImageTag} as series_primary_image_tag,
       ${items.seriesId} as series_id,
       GREATEST(
-        CASE 
-          WHEN search_vector IS NOT NULL 
+        CASE
+          WHEN search_vector IS NOT NULL
           THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-          ELSE 0 
+          ELSE 0
         END,
         word_similarity(${query}, ${items.name}),
         COALESCE(word_similarity(${query}, ${items.seriesName}), 0)
@@ -171,10 +171,10 @@ async function searchUsers(
       id: users.id,
       name: users.name,
       isAdministrator: users.isAdministrator,
-      rank: sql<number>`CASE 
-        WHEN search_vector IS NOT NULL 
+      rank: sql<number>`CASE
+        WHEN search_vector IS NOT NULL
         THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-        ELSE 0 
+        ELSE 0
       END`.as("rank"),
     })
     .from(users)
@@ -219,10 +219,10 @@ async function searchWatchlists(
       description: watchlists.description,
       isPublic: watchlists.isPublic,
       ownerId: watchlists.userId,
-      rank: sql<number>`CASE 
-        WHEN search_vector IS NOT NULL 
+      rank: sql<number>`CASE
+        WHEN search_vector IS NOT NULL
         THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-        ELSE 0 
+        ELSE 0
       END`.as("rank"),
     })
     .from(watchlists)
@@ -269,10 +269,10 @@ async function searchActivities(
       type: activities.type,
       date: activities.date,
       severity: activities.severity,
-      rank: sql<number>`CASE 
-        WHEN search_vector IS NOT NULL 
+      rank: sql<number>`CASE
+        WHEN search_vector IS NOT NULL
         THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-        ELSE 0 
+        ELSE 0
       END`.as("rank"),
     })
     .from(activities)
