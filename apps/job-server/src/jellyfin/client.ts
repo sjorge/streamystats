@@ -721,6 +721,7 @@ export class JellyfinClient {
   /**
    * Fetch all played items for a specific user with UserData.
    * Used for inferring watch history from Jellyfin's played status.
+   * Uses minimal fields for efficiency - only what's needed for session creation.
    */
   async getUserPlayedItems(
     userId: string,
@@ -730,7 +731,16 @@ export class JellyfinClient {
     }
   ): Promise<JellyfinBaseItemDto[]> {
     const itemTypes = options?.includeItemTypes ?? ["Movie", "Episode"];
-    const pageSize = options?.pageSize ?? 500;
+    const pageSize = options?.pageSize ?? 1000; // Match sync page size
+
+    // Minimal fields needed for inferring sessions
+    const minimalFields = [
+      "UserData", // Contains Played, LastPlayedDate, PlayCount
+      "RunTimeTicks", // For calculating play duration
+      "SeriesId", // For TV show context
+      "SeriesName",
+      "SeasonId",
+    ];
 
     const allItems: JellyfinBaseItemDto[] = [];
     let startIndex = 0;
@@ -741,7 +751,7 @@ export class JellyfinClient {
         params: {
           UserId: userId,
           Recursive: true,
-          Fields: [...DEFAULT_ITEM_FIELDS, "UserData"].join(","),
+          Fields: minimalFields.join(","),
           IncludeItemTypes: itemTypes.join(","),
           IsPlayed: true,
           StartIndex: startIndex,
