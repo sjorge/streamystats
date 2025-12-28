@@ -43,6 +43,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { User } from "@/lib/types";
 import JellyfinAvatar from "./JellyfinAvatar";
 
@@ -316,254 +323,281 @@ export function ChatDialog({ chatConfigured, me, serverUrl }: ChatDialogProps) {
     [markdownComponents],
   );
 
+  const isMobile = useIsMobile();
+
+  const handleOpen = useCallback(() => {
+    setOpen(true);
+  }, []);
+
+  const chatContent = (
+    <>
+      {!chatConfigured ? (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center space-y-3">
+            <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground" />
+            <h3 className="font-semibold">AI Chat Not Configured</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              To use the AI assistant, configure a chat provider in Settings
+              &gt; AI Chat.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <Conversation className="flex-1 min-h-0">
+            <ConversationContent className="gap-6 px-4 py-4">
+              {messages.length === 0 ? (
+                <div className="flex size-full flex-col items-center justify-center gap-4 p-8 text-center">
+                  <Sparkles className="h-12 w-12 text-muted-foreground" />
+                  <div className="space-y-2 text-center">
+                    <h3 className="font-semibold">
+                      Ask me about your media library
+                    </h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto text-center">
+                      Try asking things like:
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center pt-2">
+                      {[
+                        "What's my most watched movie?",
+                        "Recommend something new",
+                        "Recently added movies",
+                        "Top rated series",
+                      ].map((suggestion) => (
+                        <Button
+                          key={suggestion}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => handleSubmit({ text: suggestion })}
+                        >
+                          {suggestion}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                messages.map((message, messageIndex) => {
+                  const isLastMessage =
+                    messageIndex === messages.length - 1;
+
+                  return (
+                    <Message key={message.id} from={message.role}>
+                      <div className="flex gap-3">
+                        {message.role === "assistant" && (
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Bot className="h-4 w-4 text-primary" />
+                          </div>
+                        )}
+                        <MessageContent className="flex-1">
+                          {message.parts.map((part, partIndex) => {
+                            if (part.type === "reasoning") {
+                              const reasoningPart = part as {
+                                type: "reasoning";
+                                text: string;
+                                state?: "streaming" | "done";
+                              };
+                              if (!reasoningPart.text.trim()) return null;
+                              return (
+                                <Reasoning
+                                  key={partIndex}
+                                  isStreaming={
+                                    reasoningPart.state === "streaming"
+                                  }
+                                >
+                                  <ReasoningTrigger />
+                                  <ReasoningContent>
+                                    {reasoningPart.text}
+                                  </ReasoningContent>
+                                </Reasoning>
+                              );
+                            }
+                            if (part.type === "text" && part.text.trim()) {
+                              return (
+                                <div key={partIndex}>
+                                  {renderMessageText(part.text)}
+                                </div>
+                              );
+                            }
+                            if (
+                              part.type.startsWith("tool-") ||
+                              part.type === "dynamic-tool"
+                            ) {
+                              const toolPart = part as {
+                                type: string;
+                                toolName?: string;
+                                state:
+                                  | "input-streaming"
+                                  | "input-available"
+                                  | "output-available"
+                                  | "output-error";
+                                toolCallId: string;
+                                input?: Record<string, unknown>;
+                                output?: unknown;
+                                errorText?: string;
+                              };
+                              const toolName =
+                                toolPart.toolName ||
+                                part.type.replace("tool-", "");
+                              const toolDisplayName = toolName
+                                .replace(/([A-Z])/g, " $1")
+                                .toLowerCase()
+                                .trim();
+
+                              switch (toolPart.state) {
+                                case "input-streaming":
+                                case "input-available":
+                                  return (
+                                    <div
+                                      key={partIndex}
+                                      className="flex items-center gap-2 text-xs text-muted-foreground py-1"
+                                    >
+                                      <Loader size={12} />
+                                      Looking up {toolDisplayName}...
+                                    </div>
+                                  );
+                                case "output-available":
+                                  return (
+                                    <div
+                                      key={partIndex}
+                                      className="flex items-center gap-2 text-xs text-muted-foreground py-1"
+                                    >
+                                      <span className="text-green-500">
+                                        ✓
+                                      </span>
+                                      Found {toolDisplayName} data
+                                    </div>
+                                  );
+                                case "output-error":
+                                  return (
+                                    <div
+                                      key={partIndex}
+                                      className="flex items-center gap-2 text-xs text-destructive py-1"
+                                    >
+                                      <AlertCircle className="h-3 w-3" />
+                                      Error: {toolPart.errorText}
+                                    </div>
+                                  );
+                                default:
+                                  return null;
+                              }
+                            }
+                            return null;
+                          })}
+                          {isLoading &&
+                            isLastMessage &&
+                            message.role === "assistant" &&
+                            !message.parts.some(
+                              (p) => p.type === "text" && p.text.trim(),
+                            ) &&
+                            !message.parts.some((p) =>
+                              p.type.startsWith("tool-"),
+                            ) &&
+                            !message.parts.some(
+                              (p) => p.type === "reasoning",
+                            ) && (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                                <Loader size={12} />
+                                Thinking...
+                              </div>
+                            )}
+                        </MessageContent>
+                        {message.role === "user" && me && serverUrl && (
+                          <JellyfinAvatar
+                            user={me}
+                            serverUrl={serverUrl}
+                            className="flex-shrink-0 w-8 h-8"
+                          />
+                        )}
+                      </div>
+                    </Message>
+                  );
+                })
+              )}
+              {isLoading &&
+                messages[messages.length - 1]?.role === "user" && (
+                  <Message from="assistant">
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-primary" />
+                      </div>
+                      <MessageContent>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader size={12} />
+                          Thinking...
+                        </div>
+                      </MessageContent>
+                    </div>
+                  </Message>
+                )}
+            </ConversationContent>
+            <ConversationScrollButton />
+          </Conversation>
+
+          {error && (
+            <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 shrink-0">
+              <p className="text-sm text-destructive">{error.message}</p>
+            </div>
+          )}
+
+          <div className="p-4 border-t shrink-0">
+            <PromptInput
+              onSubmit={handleSubmit}
+              className="rounded-lg border"
+            >
+              <PromptInputTextarea
+                placeholder="Ask about your watch history..."
+                disabled={isLoading}
+              />
+              <PromptInputFooter>
+                <div />
+                <PromptInputSubmit status={status} disabled={isLoading} />
+              </PromptInputFooter>
+            </PromptInput>
+          </div>
+        </>
+      )}
+    </>
+  );
+
   return (
     <>
       <Button
         variant="outline"
         size="icon"
         className="h-9 w-9"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
       >
         <Sparkles className="h-4 w-4" />
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl lg:max-w-4xl xl:max-w-5xl h-[80vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden">
-          <DialogHeader className="px-4 py-3 border-b shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              AI Assistant
-            </DialogTitle>
-          </DialogHeader>
-
-          {!chatConfigured ? (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center space-y-3">
-                <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground" />
-                <h3 className="font-semibold">AI Chat Not Configured</h3>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  To use the AI assistant, configure a chat provider in Settings
-                  &gt; AI Chat.
-                </p>
-              </div>
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerContent className="h-[80vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden">
+            <DrawerHeader className="px-4 py-3 border-b shrink-0">
+              <DrawerTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                AI Assistant
+              </DrawerTitle>
+            </DrawerHeader>
+            <div className="flex-1 min-h-0 flex flex-col">
+              {chatContent}
             </div>
-          ) : (
-            <>
-              <Conversation className="flex-1 min-h-0">
-                <ConversationContent className="gap-6 px-4 py-4">
-                  {messages.length === 0 ? (
-                    <div className="flex size-full flex-col items-center justify-center gap-4 p-8 text-center">
-                      <Sparkles className="h-12 w-12 text-muted-foreground" />
-                      <div className="space-y-2 text-center">
-                        <h3 className="font-semibold">
-                          Ask me about your media library
-                        </h3>
-                        <p className="text-sm text-muted-foreground max-w-sm mx-auto text-center">
-                          Try asking things like:
-                        </p>
-                        <div className="flex flex-wrap gap-2 justify-center pt-2">
-                          {[
-                            "What's my most watched movie?",
-                            "Recommend something new",
-                            "Recently added movies",
-                            "Top rated series",
-                          ].map((suggestion) => (
-                            <Button
-                              key={suggestion}
-                              variant="outline"
-                              size="sm"
-                              className="text-xs"
-                              onClick={() => handleSubmit({ text: suggestion })}
-                            >
-                              {suggestion}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    messages.map((message, messageIndex) => {
-                      const isLastMessage =
-                        messageIndex === messages.length - 1;
-
-                      return (
-                        <Message key={message.id} from={message.role}>
-                          <div className="flex gap-3">
-                            {message.role === "assistant" && (
-                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <Bot className="h-4 w-4 text-primary" />
-                              </div>
-                            )}
-                            <MessageContent className="flex-1">
-                              {message.parts.map((part, partIndex) => {
-                                if (part.type === "reasoning") {
-                                  const reasoningPart = part as {
-                                    type: "reasoning";
-                                    text: string;
-                                    state?: "streaming" | "done";
-                                  };
-                                  if (!reasoningPart.text.trim()) return null;
-                                  return (
-                                    <Reasoning
-                                      key={partIndex}
-                                      isStreaming={
-                                        reasoningPart.state === "streaming"
-                                      }
-                                    >
-                                      <ReasoningTrigger />
-                                      <ReasoningContent>
-                                        {reasoningPart.text}
-                                      </ReasoningContent>
-                                    </Reasoning>
-                                  );
-                                }
-                                if (part.type === "text" && part.text.trim()) {
-                                  return (
-                                    <div key={partIndex}>
-                                      {renderMessageText(part.text)}
-                                    </div>
-                                  );
-                                }
-                                if (
-                                  part.type.startsWith("tool-") ||
-                                  part.type === "dynamic-tool"
-                                ) {
-                                  const toolPart = part as {
-                                    type: string;
-                                    toolName?: string;
-                                    state:
-                                      | "input-streaming"
-                                      | "input-available"
-                                      | "output-available"
-                                      | "output-error";
-                                    toolCallId: string;
-                                    input?: Record<string, unknown>;
-                                    output?: unknown;
-                                    errorText?: string;
-                                  };
-                                  const toolName =
-                                    toolPart.toolName ||
-                                    part.type.replace("tool-", "");
-                                  const toolDisplayName = toolName
-                                    .replace(/([A-Z])/g, " $1")
-                                    .toLowerCase()
-                                    .trim();
-
-                                  switch (toolPart.state) {
-                                    case "input-streaming":
-                                    case "input-available":
-                                      return (
-                                        <div
-                                          key={partIndex}
-                                          className="flex items-center gap-2 text-xs text-muted-foreground py-1"
-                                        >
-                                          <Loader size={12} />
-                                          Looking up {toolDisplayName}...
-                                        </div>
-                                      );
-                                    case "output-available":
-                                      return (
-                                        <div
-                                          key={partIndex}
-                                          className="flex items-center gap-2 text-xs text-muted-foreground py-1"
-                                        >
-                                          <span className="text-green-500">
-                                            ✓
-                                          </span>
-                                          Found {toolDisplayName} data
-                                        </div>
-                                      );
-                                    case "output-error":
-                                      return (
-                                        <div
-                                          key={partIndex}
-                                          className="flex items-center gap-2 text-xs text-destructive py-1"
-                                        >
-                                          <AlertCircle className="h-3 w-3" />
-                                          Error: {toolPart.errorText}
-                                        </div>
-                                      );
-                                    default:
-                                      return null;
-                                  }
-                                }
-                                return null;
-                              })}
-                              {isLoading &&
-                                isLastMessage &&
-                                message.role === "assistant" &&
-                                !message.parts.some(
-                                  (p) => p.type === "text" && p.text.trim(),
-                                ) &&
-                                !message.parts.some((p) =>
-                                  p.type.startsWith("tool-"),
-                                ) &&
-                                !message.parts.some(
-                                  (p) => p.type === "reasoning",
-                                ) && (
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                                    <Loader size={12} />
-                                    Thinking...
-                                  </div>
-                                )}
-                            </MessageContent>
-                            {message.role === "user" && me && serverUrl && (
-                              <JellyfinAvatar
-                                user={me}
-                                serverUrl={serverUrl}
-                                className="flex-shrink-0 w-8 h-8"
-                              />
-                            )}
-                          </div>
-                        </Message>
-                      );
-                    })
-                  )}
-                  {isLoading &&
-                    messages[messages.length - 1]?.role === "user" && (
-                      <Message from="assistant">
-                        <div className="flex gap-3">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Bot className="h-4 w-4 text-primary" />
-                          </div>
-                          <MessageContent>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Loader size={12} />
-                              Thinking...
-                            </div>
-                          </MessageContent>
-                        </div>
-                      </Message>
-                    )}
-                </ConversationContent>
-                <ConversationScrollButton />
-              </Conversation>
-
-              {error && (
-                <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 shrink-0">
-                  <p className="text-sm text-destructive">{error.message}</p>
-                </div>
-              )}
-
-              <div className="p-4 border-t shrink-0">
-                <PromptInput
-                  onSubmit={handleSubmit}
-                  className="rounded-lg border"
-                >
-                  <PromptInputTextarea
-                    placeholder="Ask about your watch history..."
-                    disabled={isLoading}
-                  />
-                  <PromptInputFooter>
-                    <div />
-                    <PromptInputSubmit status={status} disabled={isLoading} />
-                  </PromptInputFooter>
-                </PromptInput>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-w-2xl lg:max-w-4xl xl:max-w-5xl h-[80vh] max-h-[900px] flex flex-col p-0 gap-0 overflow-hidden">
+            <DialogHeader className="px-4 py-3 border-b shrink-0">
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                AI Assistant
+              </DialogTitle>
+            </DialogHeader>
+            {chatContent}
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

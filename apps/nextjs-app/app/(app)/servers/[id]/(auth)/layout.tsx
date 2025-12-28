@@ -72,7 +72,7 @@ async function HeaderContent({ params }: { params: Promise<{ id: string }> }) {
       <div className="sm:hidden w-full">
         <GlobalSearch serverUrl={server?.url} />
       </div>
-      <div className="hidden sm:flex ml-auto items-center gap-2">
+      <div className="hidden sm:flex flex-1 items-center gap-2">
         <GlobalSearch serverUrl={server?.url} />
         <ChatDialogWrapper
           chatConfigured={chatConfigured}
