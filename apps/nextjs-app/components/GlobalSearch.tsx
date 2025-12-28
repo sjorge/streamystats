@@ -146,14 +146,9 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard shortcut (Cmd+/ or Ctrl+/)
+  // Close on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
-        e.preventDefault();
-        inputRef.current?.focus();
-        setOpen(true);
-      }
       if (e.key === "Escape" && open) {
         setOpen(false);
         inputRef.current?.blur();
@@ -238,9 +233,6 @@ export function GlobalSearch({ serverUrl }: GlobalSearchProps) {
             placeholder="Search..."
             className="flex h-9 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
           />
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-            <span className="text-xs">⌘</span>/
-          </kbd>
         </div>
 
         {showDropdown && (

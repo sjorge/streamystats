@@ -129,8 +129,8 @@ export const DynamicBreadcrumbs: React.FC = () => {
   };
 
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
+    <Breadcrumb className="min-w-0">
+      <BreadcrumbList className="flex-nowrap">
         <BreadcrumbItem>
           <BreadcrumbLink href={`${basePath}/servers/${id}/dashboard`}>
             <House className="h-4 w-4 ml-1" />
@@ -143,8 +143,10 @@ export const DynamicBreadcrumbs: React.FC = () => {
           return (
             <React.Fragment key={url}>
               <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink href={url}>{getLabel(segment)}</BreadcrumbLink>
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbLink href={url} className="truncate max-w-[120px] block">
+                  {getLabel(segment)}
+                </BreadcrumbLink>
               </BreadcrumbItem>
             </React.Fragment>
           );

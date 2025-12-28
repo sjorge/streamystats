@@ -57,11 +57,13 @@ async function HeaderContent({ params }: { params: Promise<{ id: string }> }) {
     <div className="flex flex-row items-center p-4 gap-2 relative">
       <SidebarTrigger />
       <Separator orientation="vertical" className="hidden sm:block" />
-      <DynamicBreadcrumbs />
-      <div className="flex-1 hidden sm:flex justify-center px-4">
-        <GlobalSearch serverUrl={server?.url} />
+      <div className="min-w-0 max-w-[200px] lg:max-w-[300px] shrink">
+        <DynamicBreadcrumbs />
       </div>
       <div className="ml-auto flex items-center gap-2">
+        <div className="hidden sm:block">
+          <GlobalSearch serverUrl={server?.url} />
+        </div>
         <ChatDialogWrapper
           chatConfigured={chatConfigured}
           me={me ?? undefined}
@@ -78,11 +80,9 @@ function HeaderSkeleton() {
       <Skeleton className="h-8 w-8" />
       <Separator orientation="vertical" className="hidden sm:block" />
       <Skeleton className="h-4 w-48" />
-      <div className="flex-1 hidden sm:flex justify-center px-4">
-        <Skeleton className="h-9 w-full max-w-md" />
-      </div>
       <div className="ml-auto flex items-center gap-2">
-        <Skeleton className="h-8 w-8" />
+        <Skeleton className="hidden sm:block h-9 w-64" />
+        <Skeleton className="h-9 w-9" />
       </div>
     </div>
   );
