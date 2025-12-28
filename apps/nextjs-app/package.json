@@ -16,7 +16,8 @@
     "lint:debug": "biome check . --verbose --log-level=info",
     "lint:fix": "biome check --write --unsafe .",
     "format": "biome format .",
-    "format:fix": "biome format --write ."
+    "format:fix": "biome format --write .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.56",

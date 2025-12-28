@@ -28,6 +28,9 @@
     "lint:fix": "cd apps/nextjs-app && bun run lint:fix",
     "format": "cd apps/nextjs-app && bun run format",
     "format:fix": "cd apps/nextjs-app && bun run format:fix",
+    "typecheck": "bun run typecheck:nextjs && bun run typecheck:job-server",
+    "typecheck:nextjs": "cd apps/nextjs-app && bun run typecheck",
+    "typecheck:job-server": "cd apps/job-server && bun run typecheck",
     "install:bun": "bun install"
   },
   "keywords": [
