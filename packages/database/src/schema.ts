@@ -104,6 +104,7 @@ export const servers = pgTable(
   "servers",
   {
     id: serial("id").primaryKey(),
+    jellyfinId: text("jellyfin_id"), // Unique Jellyfin server ID from /System/Info
     name: text("name").notNull(),
     url: text("url").notNull(),
     apiKey: text("api_key").notNull(),
@@ -751,6 +752,7 @@ export const watchlists = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     isPublic: boolean("is_public").notNull().default(false),
+    isPromoted: boolean("is_promoted").notNull().default(false), // Admin-only: visible on all users' home screens in external clients
     allowedItemType: text("allowed_item_type"), // If set, only items of this type can be added (Movie, Series, Episode, etc.)
     defaultSortOrder: text("default_sort_order").notNull().default("custom"), // custom, name, dateAdded, releaseDate
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -762,6 +764,7 @@ export const watchlists = pgTable(
   (table) => [
     index("watchlists_server_user_idx").on(table.serverId, table.userId),
     index("watchlists_server_public_idx").on(table.serverId, table.isPublic),
+    index("watchlists_server_promoted_idx").on(table.serverId, table.isPromoted),
     index("watchlists_search_vector_idx").using("gin", table.searchVector),
   ]
 );
