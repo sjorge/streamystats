@@ -338,7 +338,7 @@ export async function jellyfinPeopleSyncWorker(job: {
         error: error instanceof Error ? error.message : String(error),
       },
       Date.now() - startTime,
-      error
+      error instanceof Error ? error : undefined
     );
     throw error;
   }
