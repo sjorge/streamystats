@@ -1,9 +1,7 @@
 "use client";
 
-import type { WatchlistWithItemsLite } from "@/lib/db/watchlists";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import type { WatchlistWithItemsLite } from "@/lib/db/watchlists";
 
 interface EditWatchlistDialogProps {
   watchlist: WatchlistWithItemsLite;
