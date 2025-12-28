@@ -499,6 +499,9 @@ export const sessions = pgTable(
     audioSampleRate: integer("audio_sample_rate"),
     videoRangeType: text("video_range_type"),
 
+    // Inferred sessions (created from Jellyfin UserData.Played, not real playback)
+    isInferred: boolean("is_inferred").notNull().default(false),
+
     // Transcoding information
     isTranscoded: boolean("is_transcoded").notNull().default(false),
     transcodingWidth: integer("transcoding_width"),

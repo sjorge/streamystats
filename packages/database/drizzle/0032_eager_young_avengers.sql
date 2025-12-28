@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "is_inferred" boolean DEFAULT false NOT NULL;

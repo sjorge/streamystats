@@ -292,12 +292,12 @@ export function HistoryTable({
       },
     },
     {
-      accessorKey: "session.createdAt",
+      accessorKey: "session.startTime",
       header: () => {
         return (
           <Button
             variant="ghost"
-            onClick={() => handleSortChange("date_created")}
+            onClick={() => handleSortChange("start_time")}
           >
             Date
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -305,7 +305,7 @@ export function HistoryTable({
         );
       },
       cell: ({ row }) => {
-        const dateValue = row.original.session.createdAt;
+        const dateValue = row.original.session.startTime;
         if (!dateValue) {
           return <div>No Date</div>;
         }

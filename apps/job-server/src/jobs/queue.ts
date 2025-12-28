@@ -19,6 +19,8 @@ import {
   jellyfinRecentActivitiesSyncWorker,
   jellyfinPeopleSyncWorker,
   JELLYFIN_JOB_NAMES,
+  inferWatchtimeJob,
+  INFER_WATCHTIME_JOB_NAME,
 } from "./workers";
 import {
   securityFullSyncJob,
@@ -59,11 +61,11 @@ export async function getJobQueue(): Promise<PgBoss> {
   // Check if old v9 schema exists (has 'job' table without 'queue' table)
   const schemaCheck = await sql`
     SELECT EXISTS (
-      SELECT 1 FROM information_schema.tables 
+      SELECT 1 FROM information_schema.tables
       WHERE table_schema = 'pgboss' AND table_name = 'job'
     ) as has_job,
     EXISTS (
-      SELECT 1 FROM information_schema.tables 
+      SELECT 1 FROM information_schema.tables
       WHERE table_schema = 'pgboss' AND table_name = 'queue'
     ) as has_queue
   `;
@@ -112,6 +114,7 @@ async function createQueues(boss: PgBoss) {
     GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
     SECURITY_SYNC_JOB_NAME,
     BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS,
+    INFER_WATCHTIME_JOB_NAME,
   ];
 
   for (const name of queueNames) {
@@ -209,6 +212,13 @@ async function registerJobHandlers(boss: PgBoss) {
     BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS,
     { batchSize: 1 },
     wrapHandler(backfillJellyfinIdsJob)
+  );
+
+  // Register infer watchtime job
+  await boss.work(
+    INFER_WATCHTIME_JOB_NAME,
+    { batchSize: 1 },
+    wrapHandler(inferWatchtimeJob)
   );
 
   console.log("All job handlers registered successfully");

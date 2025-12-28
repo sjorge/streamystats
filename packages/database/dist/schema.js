@@ -375,6 +375,8 @@ exports.sessions = (0, pg_core_1.pgTable)("sessions", {
     audioChannels: (0, pg_core_1.integer)("audio_channels"),
     audioSampleRate: (0, pg_core_1.integer)("audio_sample_rate"),
     videoRangeType: (0, pg_core_1.text)("video_range_type"),
+    // Inferred sessions (created from Jellyfin UserData.Played, not real playback)
+    isInferred: (0, pg_core_1.boolean)("is_inferred").notNull().default(false),
     // Transcoding information
     isTranscoded: (0, pg_core_1.boolean)("is_transcoded").notNull().default(false),
     transcodingWidth: (0, pg_core_1.integer)("transcoding_width"),

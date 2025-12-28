@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { Container } from "@/components/Container";
 import { ServerJobStatusCard } from "@/components/ServerJobStatusCard";
+import { getInferredSessionCount } from "@/lib/db/infer-watchtime";
 import { getServer } from "@/lib/db/server";
-import { isUserAdmin } from "@/lib/db/users";
+import { getUsers, isUserAdmin } from "@/lib/db/users";
 import { CleanupManager } from "../CleanupManager";
 import { DangerousMergeManager } from "../DangerousMergeManager";
 import { DangerousSeriesMergeManager } from "../DangerousSeriesMergeManager";
 import { DeleteServer } from "../DeleteServer";
+import { InferWatchtimeAdminManager } from "../InferWatchtimeAdminManager";
 import { LibrarySyncManager } from "../LibrarySyncManager";
 import { MergeItemsManager } from "../MergeItemsManager";
 import { PeopleSyncManager } from "../PeopleSyncManager";
@@ -22,7 +24,12 @@ export default async function GeneralSettings(props: {
   if (!server) {
     redirect("/setup");
   }
-  const isAdmin = await isUserAdmin();
+
+  const [isAdmin, users, totalInferredSessions] = await Promise.all([
+    isUserAdmin(),
+    getUsers({ serverId: server.id }),
+    getInferredSessionCount(server.id),
+  ]);
 
   return (
     <Container className="flex flex-col">
@@ -35,6 +42,13 @@ export default async function GeneralSettings(props: {
         <SyncManager serverId={server.id} serverName={server.name} />
         {isAdmin ? <PeopleSyncManager serverId={server.id} /> : null}
         {isAdmin ? <LibrarySyncManager serverId={server.id} /> : null}
+        {isAdmin ? (
+          <InferWatchtimeAdminManager
+            serverId={server.id}
+            users={users.map((u) => ({ id: u.id, name: u.name }))}
+            totalInferredSessions={totalInferredSessions}
+          />
+        ) : null}
         {isAdmin ? <CleanupManager serverId={server.id} /> : null}
         {isAdmin ? <MergeItemsManager server={server} /> : null}
         {isAdmin ? <DangerousMergeManager server={server} /> : null}
