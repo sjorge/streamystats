@@ -10,7 +10,6 @@ import {
 import {
   and,
   cosineDistance,
-  count,
   desc,
   eq,
   gte,
@@ -20,8 +19,8 @@ import {
   notInArray,
   sql,
 } from "drizzle-orm";
-import { cacheLife, cacheTag, revalidateTag } from "next/cache";
-import { getExclusionSettings } from "./exclusions";
+import { revalidateTag } from "next/cache";
+
 import { getMe } from "./users";
 
 const debugLog = (..._args: unknown[]) => {};
@@ -121,50 +120,25 @@ const stripEmbedding = (
 
 const RECOMMENDATION_POOL_SIZE = 500;
 
-async function getSimilarStatisticsCached(
+async function getRecommendations(
   serverIdNum: number,
   userId: string,
   poolSize: number,
   timeWindow?: RecommendationTimeWindow,
 ): Promise<RecommendationItem[]> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag(
-    `recommendations-${serverIdNum}`,
-    `recommendations-${serverIdNum}-${userId}`,
-  );
-
   try {
     debugLog(
       `\n🚀 Starting recommendation process for server ${serverIdNum}, user ${userId}, pool size ${poolSize}`,
     );
 
-    let recommendations: RecommendationItem[] = [];
-
     debugLog("\n📊 Getting user-specific recommendations...");
-    recommendations = await getUserSpecificRecommendations(
+    const recommendations = await getUserSpecificRecommendations(
       serverIdNum,
       userId,
       poolSize,
       timeWindow,
     );
     debugLog(`✅ Got ${recommendations.length} user-specific recommendations`);
-
-    if (recommendations.length < poolSize) {
-      const remainingLimit = poolSize - recommendations.length;
-      debugLog(
-        `\n🔥 Need ${remainingLimit} more recommendations, getting popular items...`,
-      );
-      const popularRecommendations = await getPopularRecommendations(
-        serverIdNum,
-        remainingLimit,
-        userId,
-      );
-      debugLog(
-        `✅ Got ${popularRecommendations.length} popular recommendations`,
-      );
-      recommendations = [...recommendations, ...popularRecommendations];
-    }
 
     debugLog(
       `\n🎉 Final result: ${recommendations.length} total recommendations`,
@@ -197,7 +171,7 @@ export async function getSimilarStatistics(
     }
   }
 
-  const allRecommendations = await getSimilarStatisticsCached(
+  const allRecommendations = await getRecommendations(
     serverIdNum,
     targetUserId,
     RECOMMENDATION_POOL_SIZE,
@@ -560,121 +534,6 @@ async function getUserSpecificRecommendations(
   return recommendations.slice(0, limit);
 }
 
-async function getPopularRecommendations(
-  serverId: number,
-  limit: number,
-  excludeUserId?: string,
-): Promise<RecommendationItem[]> {
-  debugLog(
-    `\n🔥 Getting popular recommendations for server ${serverId}, limit ${limit}, excluding user ${
-      excludeUserId || "none"
-    }`,
-  );
-
-  // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } =
-    await getExclusionSettings(serverId);
-
-  // Get items that are popular (most watched) but exclude items already watched by the current user
-  let watchedItemIds: string[] = [];
-  let hiddenItemIds: string[] = [];
-
-  if (excludeUserId) {
-    const userWatchedItems = await db
-      .select({ itemId: sessions.itemId })
-      .from(sessions)
-      .where(
-        and(
-          eq(sessions.serverId, serverId),
-          eq(sessions.userId, excludeUserId),
-          isNotNull(sessions.itemId),
-        ),
-      )
-      .groupBy(sessions.itemId);
-
-    watchedItemIds = userWatchedItems
-      .map((w) => w.itemId)
-      .filter((id): id is string => id !== null);
-
-    debugLog(`🚫 Excluding ${watchedItemIds.length} already watched items`);
-
-    // Get hidden recommendations for this user
-    let hiddenItems: { itemId: string }[] = [];
-    try {
-      hiddenItems = await db
-        .select({ itemId: hiddenRecommendations.itemId })
-        .from(hiddenRecommendations)
-        .where(
-          and(
-            eq(hiddenRecommendations.serverId, serverId),
-            eq(hiddenRecommendations.userId, excludeUserId),
-          ),
-        );
-    } catch (error) {
-      debugLog("Error fetching hidden recommendations:", error);
-      hiddenItems = [];
-    }
-
-    hiddenItemIds = hiddenItems.map((h) => h.itemId).filter(Boolean);
-    debugLog(`🙈 Excluding ${hiddenItemIds.length} hidden items`);
-  }
-
-  // Get popular items based on watch count
-  const popularItemsQuery = db
-    .select({
-      item: itemCardSelect,
-      watchCount: count(sessions.id).as("watchCount"),
-    })
-    .from(items)
-    .leftJoin(sessions, eq(items.id, sessions.itemId))
-    .where(
-      and(
-        eq(items.serverId, serverId),
-        isNull(items.deletedAt),
-        eq(items.type, "Movie"),
-        isNotNull(items.embedding),
-        // Exclude user's watched items if we have a user
-        watchedItemIds.length > 0
-          ? notInArray(items.id, watchedItemIds)
-          : sql`true`,
-        // Exclude user's hidden items if we have a user
-        hiddenItemIds.length > 0
-          ? notInArray(items.id, hiddenItemIds)
-          : sql`true`,
-        // Exclude items from excluded libraries
-        excludedLibraryIds.length > 0
-          ? notInArray(items.libraryId, excludedLibraryIds)
-          : sql`true`,
-        // Exclude sessions from excluded users in the count
-        excludedUserIds.length > 0
-          ? notInArray(sessions.userId, excludedUserIds)
-          : sql`true`,
-      ),
-    )
-    .groupBy(items.id)
-    .orderBy(desc(count(sessions.id)))
-    .limit(limit);
-
-  const popularItems = await popularItemsQuery;
-
-  debugLog(`📈 Found ${popularItems.length} popular items:`);
-  popularItems.slice(0, 5).forEach((item, index) => {
-    debugLog(
-      `  ${index + 1}. "${item.item.name}" - ${item.watchCount} watches`,
-    );
-  });
-  if (popularItems.length > 5) {
-    debugLog(`  ... and ${popularItems.length - 5} more`);
-  }
-
-  // Transform to recommendation format (no specific similarity since these are popularity-based)
-  return popularItems.map((item) => ({
-    item: item.item,
-    similarity: 0.5, // Default similarity for popular recommendations
-    basedOn: [], // No specific items these are based on
-  }));
-}
-
 /**
  * Get items similar to a specific item (not user-based)
  */
@@ -683,8 +542,6 @@ export const getSimilarItemsForItem = async (
   itemId: string,
   limit = 10,
 ): Promise<RecommendationItem[]> => {
-  "use cache";
-  cacheLife("hours");
   try {
     debugLog(
       `\n🎯 Getting items similar to specific item ${itemId} in server ${serverId}, limit ${limit}`,

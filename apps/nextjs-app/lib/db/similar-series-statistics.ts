@@ -10,7 +10,6 @@ import {
 import {
   and,
   cosineDistance,
-  count,
   desc,
   eq,
   inArray,
@@ -19,8 +18,8 @@ import {
   notInArray,
   sql,
 } from "drizzle-orm";
-import { cacheLife, cacheTag, revalidateTag } from "next/cache";
-import { getExclusionSettings } from "./exclusions";
+import { revalidateTag } from "next/cache";
+
 import { getMe } from "./users";
 
 const enableDebug = false;
@@ -128,27 +127,18 @@ const stripEmbedding = (
 
 const RECOMMENDATION_POOL_SIZE = 500;
 
-async function getSimilarSeriesCached(
+async function getSeriesRecommendations(
   serverIdNum: number,
   userId: string,
   poolSize: number,
 ): Promise<SeriesRecommendationItem[]> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag(
-    `series-recommendations-${serverIdNum}`,
-    `series-recommendations-${serverIdNum}-${userId}`,
-  );
-
   try {
     debugLog(
       `\n🚀 Starting series recommendation process for server ${serverIdNum}, user ${userId}, pool size ${poolSize}`,
     );
 
-    let recommendations: SeriesRecommendationItem[] = [];
-
     debugLog("\n📺 Getting user-specific series recommendations...");
-    recommendations = await getUserSpecificSeriesRecommendations(
+    const recommendations = await getUserSpecificSeriesRecommendations(
       serverIdNum,
       userId,
       poolSize,
@@ -156,22 +146,6 @@ async function getSimilarSeriesCached(
     debugLog(
       `✅ Got ${recommendations.length} user-specific series recommendations`,
     );
-
-    if (recommendations.length < poolSize) {
-      const remainingLimit = poolSize - recommendations.length;
-      debugLog(
-        `\n🔥 Need ${remainingLimit} more series recommendations, getting popular series...`,
-      );
-      const popularRecommendations = await getPopularSeriesRecommendations(
-        serverIdNum,
-        remainingLimit,
-        userId,
-      );
-      debugLog(
-        `✅ Got ${popularRecommendations.length} popular series recommendations`,
-      );
-      recommendations = [...recommendations, ...popularRecommendations];
-    }
 
     debugLog(
       `\n🎉 Final result: ${recommendations.length} total series recommendations`,
@@ -203,7 +177,7 @@ export async function getSimilarSeries(
     }
   }
 
-  const allRecommendations = await getSimilarSeriesCached(
+  const allRecommendations = await getSeriesRecommendations(
     serverIdNum,
     targetUserId,
     RECOMMENDATION_POOL_SIZE,
@@ -513,123 +487,6 @@ async function getUserSpecificSeriesRecommendations(
   return finalRecommendations;
 }
 
-async function getPopularSeriesRecommendations(
-  serverId: number,
-  limit: number,
-  excludeUserId?: string,
-): Promise<SeriesRecommendationItem[]> {
-  debugLog(
-    `\n🔥 Getting popular series recommendations for server ${serverId}, limit ${limit}, excluding user ${
-      excludeUserId || "none"
-    }`,
-  );
-
-  // Get exclusion settings
-  const { excludedUserIds, excludedLibraryIds } =
-    await getExclusionSettings(serverId);
-
-  // Get series that are popular (most episodes watched) but exclude series already watched by the current user
-  let watchedSeriesIds: string[] = [];
-  let hiddenItemIds: string[] = [];
-
-  if (excludeUserId) {
-    const userWatchedSeries = await db
-      .select({ seriesId: sessions.seriesId })
-      .from(sessions)
-      .where(
-        and(
-          eq(sessions.serverId, serverId),
-          eq(sessions.userId, excludeUserId),
-          isNotNull(sessions.seriesId),
-        ),
-      )
-      .groupBy(sessions.seriesId);
-
-    watchedSeriesIds = userWatchedSeries
-      .map((w) => w.seriesId)
-      .filter((id): id is string => id !== null);
-
-    debugLog(`🚫 Excluding ${watchedSeriesIds.length} already watched series`);
-
-    // Get hidden recommendations for this user
-    let hiddenItems: { itemId: string }[] = [];
-    try {
-      hiddenItems = await db
-        .select({ itemId: hiddenRecommendations.itemId })
-        .from(hiddenRecommendations)
-        .where(
-          and(
-            eq(hiddenRecommendations.serverId, serverId),
-            eq(hiddenRecommendations.userId, excludeUserId),
-          ),
-        );
-    } catch (error) {
-      debugLog("Error fetching hidden recommendations:", error);
-      hiddenItems = [];
-    }
-
-    hiddenItemIds = hiddenItems.map((h) => h.itemId).filter(Boolean);
-    debugLog(`🙈 Excluding ${hiddenItemIds.length} hidden series`);
-  }
-
-  // Get popular series based on episode watch count
-  const popularSeriesQuery = db
-    .select({
-      item: itemCardSelect,
-      episodeWatchCount: count(sessions.id).as("episodeWatchCount"),
-    })
-    .from(items)
-    .leftJoin(sessions, eq(items.id, sessions.seriesId))
-    .where(
-      and(
-        eq(items.serverId, serverId),
-        isNull(items.deletedAt),
-        eq(items.type, "Series"),
-        isNotNull(items.embedding),
-        // Exclude user's watched series if we have a user
-        watchedSeriesIds.length > 0
-          ? notInArray(items.id, watchedSeriesIds)
-          : sql`true`,
-        // Exclude user's hidden series if we have a user
-        hiddenItemIds.length > 0
-          ? notInArray(items.id, hiddenItemIds)
-          : sql`true`,
-        // Exclude series from excluded libraries
-        excludedLibraryIds.length > 0
-          ? notInArray(items.libraryId, excludedLibraryIds)
-          : sql`true`,
-        // Exclude sessions from excluded users in the count
-        excludedUserIds.length > 0
-          ? notInArray(sessions.userId, excludedUserIds)
-          : sql`true`,
-      ),
-    )
-    .groupBy(items.id)
-    .orderBy(desc(count(sessions.id)))
-    .limit(limit);
-
-  const popularSeries = await popularSeriesQuery;
-
-  debugLog(`📈 Found ${popularSeries.length} popular series:`);
-  popularSeries.slice(0, 5).forEach((item, index) => {
-    debugLog(
-      `  ${index + 1}. "${item.item.name}" - ${
-        item.episodeWatchCount
-      } episode watches`,
-    );
-  });
-  if (popularSeries.length > 5) {
-    debugLog(`  ... and ${popularSeries.length - 5} more`);
-  }
-
-  // Transform to recommendation format
-  return popularSeries.map((item) => ({
-    item: item.item,
-    similarity: 0.5, // Default similarity for popular recommendations
-    basedOn: [], // No specific series these are based on
-  }));
-}
-
 /**
  * Get series similar to a specific series (not user-based)
  */
@@ -638,8 +495,6 @@ export const getSimilarSeriesForItem = async (
   itemId: string,
   limit = 10,
 ): Promise<SeriesRecommendationItem[]> => {
-  "use cache";
-  cacheLife("hours");
   try {
     debugLog(
       `\n🎯 Getting series similar to specific series ${itemId} in server ${serverId}, limit ${limit}`,

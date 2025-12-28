@@ -106,8 +106,12 @@ async function GeneralStats({
       {seasonalData && (
         <SeasonalRecommendations data={seasonalData} server={server} />
       )}
-      <SimilarMovieStatistics data={similarData} server={server} />
-      <SimilarSeriesStatistics data={similarSeriesData} server={server} />
+      {similarData.length > 0 && (
+        <SimilarMovieStatistics data={similarData} server={server} />
+      )}
+      {similarSeriesData.length > 0 && (
+        <SimilarSeriesStatistics data={similarSeriesData} server={server} />
+      )}
       <MostWatchedItems data={data} server={server} />
       {isAdmin ? (
         <>
