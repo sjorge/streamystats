@@ -1,5 +1,6 @@
 import { db, items, libraries, itemPeople } from "@streamystats/database";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { requireAdmin } from "@/lib/api-auth";
 
 interface RouteParams {
   params: Promise<{
@@ -11,6 +12,9 @@ const LIBRARY_TYPES_WITH_PEOPLE = ["movies", "tvshows", "music"] as const;
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
+    const { error } = await requireAdmin();
+    if (error) return error;
+
     const { serverId } = await params;
 
     if (!serverId) {
