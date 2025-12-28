@@ -1,30 +1,31 @@
 import "server-only";
-import { db, items, sessions } from "@streamystats/database";
-import { and, count, eq, isNotNull, sql, sum } from "drizzle-orm";
 import {
-  type ActorDetailsResponse,
-  type ActorItem,
-  type Person,
-  parsePeople,
-} from "./actor-types";
+  db,
+  itemPeople,
+  items,
+  people,
+  sessions,
+} from "@streamystats/database";
+import { and, count, eq, isNotNull, sql, sum } from "drizzle-orm";
+import type { ActorDetailsResponse, ActorItem } from "./actor-types";
 import { getStatisticsExclusions } from "./exclusions";
 
 export type {
   ActorDetailsResponse,
   ActorItem,
   ActorStats,
-  Person,
+  PersonFromDb,
 } from "./actor-types";
 export {
   getItemCast,
   getItemDirectors,
   getItemPeopleGrouped,
   getItemWriters,
-  parsePeople,
 } from "./actor-types";
 
 /**
- * Get actor details with all items they appear in and statistics
+ * Get actor/person details with all items they appear in and statistics
+ * Uses the normalized people and item_people tables for fast lookups
  */
 export const getActorDetails = async ({
   serverId,
@@ -36,49 +37,45 @@ export const getActorDetails = async ({
   // Get exclusion settings
   const exclusions = await getStatisticsExclusions(serverId);
 
-  // Find all items that have this actor using array containment check
-  const allItems = await db
-    .select({
-      item: items,
-    })
-    .from(items)
-    .where(
-      and(
-        eq(items.serverId, serverId),
-        isNotNull(items.people),
-        sql`jsonb_typeof(${items.people}) = 'array'`,
-        sql`EXISTS (
-          SELECT 1 FROM jsonb_array_elements(${items.people}) AS person
-          WHERE person->>'Id' = ${actorId}
-        )`,
-      ),
-    );
+  // Get the person info from the people table
+  const personResult = await db
+    .select()
+    .from(people)
+    .where(and(eq(people.id, actorId), eq(people.serverId, serverId)))
+    .limit(1);
 
-  if (allItems.length === 0) {
+  if (personResult.length === 0) {
     return null;
   }
 
-  // Find the actor info from the first item
-  let actorInfo: Person | null = null;
-  for (const { item } of allItems) {
-    const people = parsePeople(item.people);
-    const actor = people.find((p) => p.Id === actorId);
-    if (actor) {
-      actorInfo = actor;
-      break;
-    }
-  }
+  const personInfo = personResult[0];
 
-  if (!actorInfo) {
+  // Get all items for this person via the junction table
+  // type is stored per item-person relationship, so we select it here
+  const itemsWithRoles = await db
+    .select({
+      item: items,
+      role: itemPeople.role,
+      type: itemPeople.type,
+    })
+    .from(itemPeople)
+    .innerJoin(items, eq(itemPeople.itemId, items.id))
+    .where(
+      and(
+        eq(itemPeople.personId, actorId),
+        eq(itemPeople.serverId, serverId),
+        sql`${items.deletedAt} IS NULL`,
+      ),
+    )
+    .orderBy(itemPeople.sortOrder);
+
+  if (itemsWithRoles.length === 0) {
     return null;
   }
 
   // Get statistics for each item
   const itemsWithStats: ActorItem[] = await Promise.all(
-    allItems.map(async ({ item }) => {
-      const people = parsePeople(item.people);
-      const personInItem = people.find((p) => p.Id === actorId);
-
+    itemsWithRoles.map(async ({ item, role }) => {
       // Get stats for this item - handle both Movies and Series
       let itemIdsToQuery: string[] = [item.id];
 
@@ -92,7 +89,7 @@ export const getActorDetails = async ({
         if (itemIdsToQuery.length === 0) {
           return {
             item,
-            role: personInItem?.Role,
+            role: role ?? undefined,
             totalViews: 0,
             totalWatchTime: 0,
           };
@@ -123,9 +120,9 @@ export const getActorDetails = async ({
 
       return {
         item,
-        role: personInItem?.Role,
-        totalViews: stats[0]?.totalViews || 0,
-        totalWatchTime: Number(stats[0]?.totalWatchTime || 0),
+        role: role ?? undefined,
+        totalViews: stats[0]?.totalViews ?? 0,
+        totalWatchTime: Number(stats[0]?.totalWatchTime ?? 0),
       };
     }),
   );
@@ -134,17 +131,32 @@ export const getActorDetails = async ({
   itemsWithStats.sort((a, b) => b.totalWatchTime - a.totalWatchTime);
 
   // Calculate totals
-  const totalViews = itemsWithStats.reduce((sum, i) => sum + i.totalViews, 0);
+  const totalViews = itemsWithStats.reduce((acc, i) => acc + i.totalViews, 0);
   const totalWatchTime = itemsWithStats.reduce(
-    (sum, i) => sum + i.totalWatchTime,
+    (acc, i) => acc + i.totalWatchTime,
     0,
   );
 
+  // Get the most common type for this person across all their items
+  // (since type is per item-person relationship now)
+  const typeCounts = new Map<string, number>();
+  for (const { type } of itemsWithRoles) {
+    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1);
+  }
+  let primaryType = "Unknown";
+  let maxCount = 0;
+  for (const [type, typeCount] of typeCounts) {
+    if (typeCount > maxCount) {
+      maxCount = typeCount;
+      primaryType = type;
+    }
+  }
+
   return {
-    id: actorInfo.Id,
-    name: actorInfo.Name,
-    type: actorInfo.Type,
-    primaryImageTag: actorInfo.PrimaryImageTag,
+    id: personInfo.id,
+    name: personInfo.name,
+    type: primaryType,
+    primaryImageTag: personInfo.primaryImageTag ?? undefined,
     totalItems: itemsWithStats.length,
     totalViews,
     totalWatchTime,

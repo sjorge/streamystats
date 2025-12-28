@@ -1,13 +1,13 @@
 "use server";
 
-import { db } from "@streamystats/database";
 import {
   activities,
+  db,
   items,
   sessions,
   users,
   watchlists,
-} from "@streamystats/database/schema";
+} from "@streamystats/database";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 /**
@@ -85,7 +85,7 @@ async function searchItems(
     series_id: string | null;
     rank: number;
   }>(sql`
-    SELECT 
+    SELECT
       ${items.id} as id,
       ${items.name} as name,
       ${items.type} as type,
@@ -98,10 +98,10 @@ async function searchItems(
       ${items.seriesPrimaryImageTag} as series_primary_image_tag,
       ${items.seriesId} as series_id,
       GREATEST(
-        CASE 
-          WHEN search_vector IS NOT NULL 
+        CASE
+          WHEN search_vector IS NOT NULL
           THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-          ELSE 0 
+          ELSE 0
         END,
         word_similarity(${query}, ${items.name}),
         COALESCE(word_similarity(${query}, ${items.seriesName}), 0)
@@ -171,10 +171,10 @@ async function searchUsers(
       id: users.id,
       name: users.name,
       isAdministrator: users.isAdministrator,
-      rank: sql<number>`CASE 
-        WHEN search_vector IS NOT NULL 
+      rank: sql<number>`CASE
+        WHEN search_vector IS NOT NULL
         THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-        ELSE 0 
+        ELSE 0
       END`.as("rank"),
     })
     .from(users)
@@ -219,10 +219,10 @@ async function searchWatchlists(
       description: watchlists.description,
       isPublic: watchlists.isPublic,
       ownerId: watchlists.userId,
-      rank: sql<number>`CASE 
-        WHEN search_vector IS NOT NULL 
+      rank: sql<number>`CASE
+        WHEN search_vector IS NOT NULL
         THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-        ELSE 0 
+        ELSE 0
       END`.as("rank"),
     })
     .from(watchlists)
@@ -269,10 +269,10 @@ async function searchActivities(
       type: activities.type,
       date: activities.date,
       severity: activities.severity,
-      rank: sql<number>`CASE 
-        WHEN search_vector IS NOT NULL 
+      rank: sql<number>`CASE
+        WHEN search_vector IS NOT NULL
         THEN ts_rank_cd(search_vector, plainto_tsquery('english', ${searchQuery}))
-        ELSE 0 
+        ELSE 0
       END`.as("rank"),
     })
     .from(activities)
@@ -351,8 +351,9 @@ async function searchSessions(
 }
 
 /**
- * Search actors/people across all items using PostgreSQL fuzzy matching
- * Uses jsonb_array_elements() with word_similarity for typo tolerance
+ * Search people (actors, directors, etc.) using the normalized people table
+ * Uses GIN trigram indexes and full-text search for fast fuzzy matching
+ * Note: type is now stored per item-person relationship, so we get the most common type
  */
 async function searchActors(
   serverId: number,
@@ -361,51 +362,60 @@ async function searchActors(
 ): Promise<SearchResult[]> {
   if (!query.trim()) return [];
 
-  // Use PostgreSQL to extract and search people from JSONB, with fuzzy matching
-  // Uses word_similarity for better partial matching (handles "ian mckellen" -> "Ian McKellen")
-  // Threshold of 0.4 balances typo tolerance vs false positives
+  const searchQuery = buildTsQuery(query);
+
+  // Query the normalized people table with proper indexes
+  // Uses GIN trigram index for ILIKE and word_similarity
+  // Uses GIN index on search_vector for full-text search
+  // Joins with item_people to get the most common type for each person
   const results = await db.execute<{
     id: string;
     name: string;
-    type: string;
-    role: string | null;
+    primary_type: string;
     primary_image_tag: string | null;
     similarity_score: number;
   }>(sql`
-    SELECT DISTINCT ON (person->>'Id')
-      person->>'Id' as id,
-      person->>'Name' as name,
-      person->>'Type' as type,
-      person->>'Role' as role,
-      person->>'PrimaryImageTag' as primary_image_tag,
+    SELECT
+      p.id as id,
+      p.name as name,
+      COALESCE(
+        (
+          SELECT ip.type
+          FROM item_people ip
+          WHERE ip.person_id = p.id AND ip.server_id = p.server_id
+          GROUP BY ip.type
+          ORDER BY COUNT(*) DESC
+          LIMIT 1
+        ),
+        'Unknown'
+      ) as primary_type,
+      p.primary_image_tag as primary_image_tag,
       GREATEST(
-        word_similarity(${query}, (person->>'Name')),
-        CASE WHEN (person->>'Name') ILIKE ${`%${query}%`} THEN 1.0 ELSE 0 END
+        word_similarity(${query}, p.name),
+        CASE WHEN p.name ILIKE ${`%${query}%`} THEN 1.0 ELSE 0 END,
+        CASE
+          WHEN p.search_vector IS NOT NULL
+          THEN ts_rank_cd(p.search_vector, plainto_tsquery('english', ${searchQuery}))
+          ELSE 0
+        END
       ) as similarity_score
-    FROM ${items},
-      jsonb_array_elements(${items.people}) as person
-    WHERE ${items.serverId} = ${serverId}
-      AND ${items.deletedAt} IS NULL
-      AND ${items.people} IS NOT NULL
-      AND jsonb_typeof(${items.people}) = 'array'
+    FROM people p
+    WHERE p.server_id = ${serverId}
       AND (
-        (person->>'Name') ILIKE ${`%${query}%`}
-        OR word_similarity(${query}, (person->>'Name')) > 0.3
+        p.name ILIKE ${`%${query}%`}
+        OR word_similarity(${query}, p.name) > 0.3
+        OR p.search_vector @@ plainto_tsquery('english', ${searchQuery})
       )
-    ORDER BY person->>'Id', similarity_score DESC
+    ORDER BY similarity_score DESC
+    LIMIT ${limit}
   `);
 
-  // Re-sort by similarity and limit
-  const sorted = [...results]
-    .sort((a, b) => b.similarity_score - a.similarity_score)
-    .slice(0, limit);
-
-  return sorted.map((person) => ({
+  return [...results].map((person) => ({
     id: person.id,
     type: "actor" as const,
-    subtype: person.type,
+    subtype: person.primary_type,
     title: person.name,
-    subtitle: person.type,
+    subtitle: person.primary_type,
     imageId: person.id,
     imageTag: person.primary_image_tag ?? undefined,
     href: `/actors/${encodeURIComponent(person.id)}`,

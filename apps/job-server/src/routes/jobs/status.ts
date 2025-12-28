@@ -82,6 +82,12 @@ app.get("/servers/:serverId/status", async (c) => {
         name: JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
         category: "background",
       },
+      {
+        key: "jellyfin-people-sync",
+        label: "Jellyfin people",
+        name: JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+        category: "background",
+      },
     ];
 
     const jobNames = jobDefinitions.map((j) => j.name);
@@ -508,4 +514,3 @@ app.get("/server-status", async (c) => {
 });
 
 export default app;
-

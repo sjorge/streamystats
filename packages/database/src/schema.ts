@@ -396,9 +396,6 @@ export const items = pgTable(
     tags: text("tags").array(),
     seriesStudio: text("series_studio"),
 
-    // People data - actors, directors, producers, etc.
-    people: jsonb("people"), // Array of people objects with Name, Id, Role, Type, etc.
-
     // Hybrid approach - complete BaseItemDto storage
     rawData: jsonb("raw_data").notNull(), // Full Jellyfin BaseItemDto
 
@@ -740,6 +737,60 @@ export const anomalyEvents = pgTable(
   ]
 );
 
+// People table - unique people (actors, directors, etc.) per server
+// Note: type is stored per item-person relationship in item_people, not here
+export const people = pgTable(
+  "people",
+  {
+    id: text("id").notNull(), // Jellyfin person ID
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    primaryImageTag: text("primary_image_tag"),
+    searchVector: tsvector("search_vector"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id, table.serverId] }),
+    index("people_name_trgm_idx").using(
+      "gin",
+      table.name
+    ),
+    index("people_search_vector_idx").using("gin", table.searchVector),
+    index("people_server_id_idx").on(table.serverId),
+  ]
+);
+
+// Item-People junction table - links items to people with role info
+// type is stored here because same person can have different roles in different items
+// (e.g., Clint Eastwood can be Actor in one movie and Director in another)
+export const itemPeople = pgTable(
+  "item_people",
+  {
+    id: serial("id").primaryKey(),
+    itemId: text("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    personId: text("person_id").notNull(),
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // Actor, Director, Writer, Producer, etc.
+    role: text("role"), // Character name for actors
+    sortOrder: integer("sort_order"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Unique per item+person+type (same person can be Actor AND Director in same item)
+    unique("item_people_unique").on(table.itemId, table.personId, table.type),
+    index("item_people_person_idx").on(table.personId, table.serverId),
+    index("item_people_item_idx").on(table.itemId),
+    index("item_people_type_idx").on(table.serverId, table.type),
+  ]
+);
+
 // Watchlists table - user-created lists of media items
 export const watchlists = pgTable(
   "watchlists",
@@ -801,6 +852,8 @@ export const serversRelations = relations(servers, ({ many }) => ({
   userFingerprints: many(userFingerprints),
   anomalyEvents: many(anomalyEvents),
   watchlists: many(watchlists),
+  people: many(people),
+  itemPeople: many(itemPeople),
 }));
 
 export const librariesRelations = relations(libraries, ({ one, many }) => ({
@@ -851,6 +904,7 @@ export const itemsRelations = relations(items, ({ one, many }) => ({
   sessions: many(sessions),
   hiddenRecommendations: many(hiddenRecommendations),
   watchlistItems: many(watchlistItems),
+  itemPeople: many(itemPeople),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
@@ -940,6 +994,29 @@ export const watchlistItemsRelations = relations(watchlistItems, ({ one }) => ({
   }),
 }));
 
+export const peopleRelations = relations(people, ({ one, many }) => ({
+  server: one(servers, {
+    fields: [people.serverId],
+    references: [servers.id],
+  }),
+  itemPeople: many(itemPeople),
+}));
+
+export const itemPeopleRelations = relations(itemPeople, ({ one }) => ({
+  item: one(items, {
+    fields: [itemPeople.itemId],
+    references: [items.id],
+  }),
+  person: one(people, {
+    fields: [itemPeople.personId, itemPeople.serverId],
+    references: [people.id, people.serverId],
+  }),
+  server: one(servers, {
+    fields: [itemPeople.serverId],
+    references: [servers.id],
+  }),
+}));
+
 // Type exports
 export type Server = typeof servers.$inferSelect;
 export type NewServer = typeof servers.$inferInsert;
@@ -985,3 +1062,9 @@ export type NewWatchlist = typeof watchlists.$inferInsert;
 
 export type WatchlistItem = typeof watchlistItems.$inferSelect;
 export type NewWatchlistItem = typeof watchlistItems.$inferInsert;
+
+export type Person = typeof people.$inferSelect;
+export type NewPerson = typeof people.$inferInsert;
+
+export type ItemPerson = typeof itemPeople.$inferSelect;
+export type NewItemPerson = typeof itemPeople.$inferInsert;
