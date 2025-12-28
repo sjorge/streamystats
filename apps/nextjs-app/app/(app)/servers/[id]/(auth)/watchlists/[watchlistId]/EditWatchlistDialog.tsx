@@ -3,6 +3,10 @@
 import type { Watchlist } from "@streamystats/database";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+// Extended type to include isPromoted (added in migration 0026)
+type WatchlistWithPromoted = Watchlist & { isPromoted?: boolean };
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,21 +29,24 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 interface EditWatchlistDialogProps {
-  watchlist: Watchlist;
+  watchlist: WatchlistWithPromoted;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isAdmin?: boolean;
 }
 
 export function EditWatchlistDialog({
   watchlist,
   open,
   onOpenChange,
+  isAdmin = false,
 }: EditWatchlistDialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(watchlist.name);
   const [description, setDescription] = useState(watchlist.description ?? "");
   const [isPublic, setIsPublic] = useState(watchlist.isPublic);
+  const [isPromoted, setIsPromoted] = useState(watchlist.isPromoted ?? false);
   const [allowedItemType, setAllowedItemType] = useState(
     watchlist.allowedItemType ?? "",
   );
@@ -52,6 +59,7 @@ export function EditWatchlistDialog({
       setName(watchlist.name);
       setDescription(watchlist.description ?? "");
       setIsPublic(watchlist.isPublic);
+      setIsPromoted(watchlist.isPromoted ?? false);
       setAllowedItemType(watchlist.allowedItemType ?? "");
       setDefaultSortOrder(watchlist.defaultSortOrder);
     }
@@ -63,16 +71,23 @@ export function EditWatchlistDialog({
 
     setLoading(true);
     try {
+      const body: Record<string, unknown> = {
+        name: name.trim(),
+        description: description.trim() || null,
+        isPublic,
+        allowedItemType: allowedItemType || null,
+        defaultSortOrder,
+      };
+
+      // Only include isPromoted if admin and value changed
+      if (isAdmin && isPromoted !== (watchlist.isPromoted ?? false)) {
+        body.isPromoted = isPromoted;
+      }
+
       const res = await fetch(`/api/watchlists/${watchlist.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          isPublic,
-          allowedItemType: allowedItemType || null,
-          defaultSortOrder,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
@@ -161,6 +176,23 @@ export function EditWatchlistDialog({
                 onCheckedChange={setIsPublic}
               />
             </div>
+            {isAdmin && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="edit-promoted" className="cursor-pointer">
+                    Promote Watchlist
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Show on all users' home screens in external clients
+                  </p>
+                </div>
+                <Switch
+                  id="edit-promoted"
+                  checked={isPromoted}
+                  onCheckedChange={setIsPromoted}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

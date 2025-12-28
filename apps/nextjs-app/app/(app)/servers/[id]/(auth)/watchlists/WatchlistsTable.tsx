@@ -10,7 +10,7 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Globe, Lock } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Globe, Lock, Megaphone } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import JellyfinAvatar from "@/components/JellyfinAvatar";
@@ -84,6 +84,15 @@ export function WatchlistsTable({
                     className="text-xs font-medium px-2 py-0.5 text-muted-foreground border-border/50 shrink-0"
                   >
                     Shared
+                  </Badge>
+                )}
+                {(watchlist as { isPromoted?: boolean }).isPromoted && (
+                  <Badge
+                    variant="default"
+                    className="text-xs font-medium px-2 py-0.5 gap-1 shrink-0"
+                  >
+                    <Megaphone className="w-3 h-3" />
+                    Promoted
                   </Badge>
                 )}
               </div>

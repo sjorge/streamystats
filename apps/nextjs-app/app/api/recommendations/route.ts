@@ -1,12 +1,21 @@
-import { db, type Server, servers } from "@streamystats/database";
-import { ilike } from "drizzle-orm";
+import type { Server } from "@streamystats/database";
 import type { NextRequest } from "next/server";
-import { getServer } from "@/lib/db/server";
+import {
+  authenticateMediaBrowser,
+  validateJellyfinToken,
+} from "@/lib/api-auth";
+import {
+  hasServerIdentifier,
+  parseServerIdentifier,
+  resolveServer,
+  type ServerIdentifier,
+} from "@/lib/db/server-resolver";
 import { getSimilarStatistics } from "@/lib/db/similar-statistics";
-import { authenticateByName, getUserFromEmbyToken } from "@/lib/jellyfin-auth";
+import { authenticateByName } from "@/lib/jellyfin-auth";
 
 type RecommendationType = "Movie" | "Series" | "all";
 type RangePreset = "7d" | "30d" | "90d" | "thisMonth" | "all";
+type ResponseFormat = "full" | "ids";
 
 type ResolvedParams = {
   serverId: number;
@@ -19,6 +28,16 @@ type ResolvedParams = {
   includeBasedOn: boolean;
   includeReasons: boolean;
   targetUserId: string | null;
+  format: ResponseFormat;
+};
+
+/**
+ * IDs-only response format for Jellyfin API integration
+ */
+export type RecommendationIdsResponse = {
+  movies: string[];
+  series: string[];
+  total: number;
 };
 
 type ApiUser = {
@@ -92,27 +111,6 @@ function getPresetWindow(preset: RangePreset): { start?: Date; end?: Date } {
   return { start, end: now };
 }
 
-async function getServerByName(name: string): Promise<Server | undefined> {
-  const result = await db
-    .select()
-    .from(servers)
-    .where(ilike(servers.name, name))
-    .limit(1);
-  return result[0];
-}
-
-async function resolveServer({
-  serverId,
-  serverName,
-}: {
-  serverId: string | null;
-  serverName: string | null;
-}): Promise<Server | undefined> {
-  if (serverId) return getServer({ serverId });
-  if (serverName) return getServerByName(serverName);
-  return undefined;
-}
-
 function getRecommendationReason(args: {
   recommendation: {
     item: { name: string; genres: string[] | null };
@@ -142,22 +140,25 @@ function getRecommendationReason(args: {
   return `${baseReason} (shared: ${uniqueShared.join(", ")})`;
 }
 
+function isValidFormat(value: string): value is ResponseFormat {
+  return value === "full" || value === "ids";
+}
+
 function parseQueryParams(searchParams: URLSearchParams):
   | {
       ok: true;
       params: Omit<ResolvedParams, "serverId" | "serverName">;
-      serverIdRaw: string | null;
-      serverNameRaw: string | null;
+      serverIdentifier: ServerIdentifier;
       timeWindow: { start?: Date; end?: Date };
       targetUserId: string | null;
     }
   | { ok: false; error: string } {
-  const serverId = searchParams.get("serverId");
-  const serverName = searchParams.get("serverName");
-  if (!serverId && !serverName) {
+  const serverIdentifier = parseServerIdentifier(searchParams);
+  if (!hasServerIdentifier(serverIdentifier)) {
     return {
       ok: false,
-      error: "Either 'serverId' or 'serverName' is required",
+      error:
+        "Server identifier required. Use one of: serverId, serverName, serverUrl, or jellyfinServerId",
     };
   }
 
@@ -180,6 +181,14 @@ function parseQueryParams(searchParams: URLSearchParams):
     return {
       ok: false,
       error: "Invalid 'range'. Must be 7d, 30d, 90d, thisMonth, or all.",
+    };
+  }
+
+  const formatRaw = searchParams.get("format") ?? "full";
+  if (!isValidFormat(formatRaw)) {
+    return {
+      ok: false,
+      error: "Invalid 'format'. Must be full or ids.",
     };
   }
 
@@ -225,8 +234,7 @@ function parseQueryParams(searchParams: URLSearchParams):
 
   return {
     ok: true,
-    serverIdRaw: serverId,
-    serverNameRaw: serverName,
+    serverIdentifier,
     timeWindow,
     targetUserId,
     params: {
@@ -238,6 +246,7 @@ function parseQueryParams(searchParams: URLSearchParams):
       includeBasedOn,
       includeReasons,
       targetUserId,
+      format: formatRaw,
     },
   };
 }
@@ -251,7 +260,7 @@ async function buildRecommendationsResponse(args: {
   const { server, user, params, timeWindow } = args;
 
   const fetchLimit = Math.min(200, Math.max(params.limit * 4, params.limit));
-  const raw = await getSimilarStatistics(server.id, user.id, fetchLimit, {
+  const raw = await getSimilarStatistics(server.id, user.id, fetchLimit, 0, {
     start: timeWindow.start,
     end: timeWindow.end,
   });
@@ -261,7 +270,32 @@ async function buildRecommendationsResponse(args: {
       ? raw
       : raw.filter((r) => r.item.type === params.type);
 
-  const data = filtered.slice(0, params.limit).map((r) => {
+  const limitedResults = filtered.slice(0, params.limit);
+
+  // Return IDs-only format for Jellyfin API integration
+  if (params.format === "ids") {
+    const movies: string[] = [];
+    const series: string[] = [];
+
+    for (const r of limitedResults) {
+      if (r.item.type === "Movie") {
+        movies.push(r.item.id);
+      } else if (r.item.type === "Series") {
+        series.push(r.item.id);
+      }
+    }
+
+    const idsResponse: RecommendationIdsResponse = {
+      movies,
+      series,
+      total: movies.length + series.length,
+    };
+
+    return { data: idsResponse };
+  }
+
+  // Full format (default)
+  const data = limitedResults.map((r) => {
     const base = {
       item: r.item,
       similarity: r.similarity,
@@ -305,35 +339,65 @@ export async function GET(request: NextRequest) {
     return jsonResponse({ error: parsed.error }, 400);
   }
 
-  const server = await resolveServer({
-    serverId: parsed.serverIdRaw,
-    serverName: parsed.serverNameRaw,
-  });
+  const server = await resolveServer(parsed.serverIdentifier);
   if (!server) {
     return jsonResponse({ error: "Server not found" }, 404);
   }
 
-  const token = request.headers.get("x-emby-token");
-  if (!token) {
-    return jsonResponse({ error: "Missing X-Emby-Token header" }, 401);
+  // Try MediaBrowser auth (Authorization: MediaBrowser Token="...")
+  const mediaBrowserAuth = await authenticateMediaBrowser(request);
+  if (!mediaBrowserAuth) {
+    return jsonResponse(
+      {
+        error: "Unauthorized",
+        message:
+          'Valid Jellyfin token required. Use Authorization: MediaBrowser Token="..." header.',
+      },
+      401,
+    );
   }
 
-  const jellyfinUser = await getUserFromEmbyToken({
-    serverUrl: server.url,
-    token,
-  });
-  if (!jellyfinUser.ok) {
+  // Verify the authenticated server matches the requested server
+  if (mediaBrowserAuth.server.id !== server.id) {
+    // Token is valid but for a different server - try validating against requested server
+    const authHeader = request.headers.get("authorization");
+    const tokenMatch = authHeader?.match(/Token="([^"]*)"/i);
+    const token = tokenMatch?.[1];
+
+    if (token) {
+      const userInfo = await validateJellyfinToken(server.url, token);
+      if (userInfo) {
+        let targetUser: ApiUser = { id: userInfo.userId, name: userInfo.userName };
+        if (userInfo.isAdmin && parsed.targetUserId) {
+          targetUser = { id: parsed.targetUserId, name: null };
+        }
+        const payload = await buildRecommendationsResponse({
+          server,
+          user: targetUser,
+          params: parsed.params,
+          timeWindow: parsed.timeWindow,
+        });
+        return jsonResponse(payload, 200);
+      }
+    }
+
     return jsonResponse(
-      { error: "Unauthorized", message: jellyfinUser.error },
+      {
+        error: "Unauthorized",
+        message: "Token is not valid for the requested server.",
+      },
       401,
     );
   }
 
   // DEFAULT: Use the authenticated user
-  let targetUser = { id: jellyfinUser.user.id, name: jellyfinUser.user.name };
+  let targetUser: ApiUser = {
+    id: mediaBrowserAuth.session.id,
+    name: mediaBrowserAuth.session.name,
+  };
 
   // OVERRIDE: If Admin, allow fetching for another user
-  if (jellyfinUser.user.isAdmin && parsed.targetUserId) {
+  if (mediaBrowserAuth.session.isAdmin && parsed.targetUserId) {
     targetUser = { id: parsed.targetUserId, name: null };
   }
 
@@ -353,10 +417,7 @@ export async function POST(request: NextRequest) {
     return jsonResponse({ error: parsed.error }, 400);
   }
 
-  const server = await resolveServer({
-    serverId: parsed.serverIdRaw,
-    serverName: parsed.serverNameRaw,
-  });
+  const server = await resolveServer(parsed.serverIdentifier);
   if (!server) {
     return jsonResponse({ error: "Server not found" }, 404);
   }

@@ -308,6 +308,7 @@ export const updateWatchlist = async ({
       | "name"
       | "description"
       | "isPublic"
+      | "isPromoted"
       | "allowedItemType"
       | "defaultSortOrder"
     >
@@ -320,6 +321,56 @@ export const updateWatchlist = async ({
     .returning();
 
   return result ?? null;
+};
+
+/**
+ * Update a watchlist as admin (bypasses ownership check)
+ */
+export const updateWatchlistAsAdmin = async ({
+  watchlistId,
+  serverId,
+  data,
+}: {
+  watchlistId: number;
+  serverId: number;
+  data: Partial<Pick<Watchlist, "isPromoted">>;
+}): Promise<Watchlist | null> => {
+  const [result] = await db
+    .update(watchlists)
+    .set({ ...data, updatedAt: new Date() })
+    .where(
+      and(eq(watchlists.id, watchlistId), eq(watchlists.serverId, serverId)),
+    )
+    .returning();
+
+  return result ?? null;
+};
+
+/**
+ * Get promoted watchlists for a server
+ */
+export const getPromotedWatchlists = async ({
+  serverId,
+}: {
+  serverId: number;
+}): Promise<WatchlistWithItemCount[]> => {
+  const result = await db
+    .select({
+      watchlist: watchlists,
+      itemCount: count(watchlistItems.id),
+    })
+    .from(watchlists)
+    .leftJoin(watchlistItems, eq(watchlists.id, watchlistItems.watchlistId))
+    .where(
+      and(eq(watchlists.serverId, serverId), eq(watchlists.isPromoted, true)),
+    )
+    .groupBy(watchlists.id)
+    .orderBy(desc(watchlists.createdAt));
+
+  return result.map((r) => ({
+    ...r.watchlist,
+    itemCount: Number(r.itemCount),
+  }));
 };
 
 /**

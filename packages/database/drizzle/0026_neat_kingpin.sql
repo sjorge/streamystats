@@ -1,0 +1,2 @@
+ALTER TABLE "watchlists" ADD COLUMN "is_promoted" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE INDEX "watchlists_server_promoted_idx" ON "watchlists" USING btree ("server_id","is_promoted");

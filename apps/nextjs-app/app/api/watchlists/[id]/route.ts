@@ -1,9 +1,10 @@
 import type { NextRequest } from "next/server";
-import { requireSession } from "@/lib/api-auth";
+import { requireAuth } from "@/lib/api-auth";
 import {
   deleteWatchlist,
   getWatchlistById,
   updateWatchlist,
+  updateWatchlistAsAdmin,
 } from "@/lib/db/watchlists";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -18,10 +19,10 @@ function jsonResponse(body: unknown, status = 200) {
  * Get a single watchlist by ID
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireSession();
+  const auth = await requireAuth(request);
   if (auth.error) return auth.error;
 
   const { session } = auth;
@@ -47,12 +48,13 @@ export async function GET(
 /**
  * PATCH /api/watchlists/[id]
  * Update a watchlist
+ * Admin-only: isPromoted field
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireSession();
+  const auth = await requireAuth(request);
   if (auth.error) return auth.error;
 
   const { session } = auth;
@@ -74,8 +76,52 @@ export async function PATCH(
     return jsonResponse({ error: "Request body must be an object" }, 400);
   }
 
-  const { name, description, isPublic, allowedItemType, defaultSortOrder } =
-    body as Record<string, unknown>;
+  const {
+    name,
+    description,
+    isPublic,
+    isPromoted,
+    allowedItemType,
+    defaultSortOrder,
+  } = body as Record<string, unknown>;
+
+  // Handle admin-only isPromoted field
+  if (isPromoted !== undefined) {
+    if (!session.isAdmin) {
+      return jsonResponse(
+        { error: "Only admins can set the isPromoted flag" },
+        403,
+      );
+    }
+    if (typeof isPromoted !== "boolean") {
+      return jsonResponse({ error: "isPromoted must be a boolean" }, 400);
+    }
+
+    const updated = await updateWatchlistAsAdmin({
+      watchlistId,
+      serverId: session.serverId,
+      data: { isPromoted },
+    });
+
+    if (!updated) {
+      return jsonResponse({ error: "Watchlist not found" }, 404);
+    }
+
+    // If only isPromoted was passed, return early
+    const otherFields = {
+      name,
+      description,
+      isPublic,
+      allowedItemType,
+      defaultSortOrder,
+    };
+    const hasOtherFields = Object.values(otherFields).some(
+      (v) => v !== undefined,
+    );
+    if (!hasOtherFields) {
+      return jsonResponse({ data: updated });
+    }
+  }
 
   const updateData: Record<string, unknown> = {};
 
@@ -142,10 +188,10 @@ export async function PATCH(
  * Delete a watchlist
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireSession();
+  const auth = await requireAuth(request);
   if (auth.error) return auth.error;
 
   const { session } = auth;
