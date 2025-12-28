@@ -107,6 +107,36 @@ app.post("/scheduler/trigger-full-sync", async (c) => {
   }
 });
 
+app.post("/scheduler/trigger-people-sync", async (c) => {
+  try {
+    const { serverId } = await c.req.json();
+
+    if (!serverId) {
+      return c.json({ error: "Server ID is required" }, 400);
+    }
+
+    const server = await db
+      .select({ id: servers.id, name: servers.name })
+      .from(servers)
+      .where(eq(servers.id, Number.parseInt(serverId)))
+      .limit(1);
+
+    if (!server.length) {
+      return c.json({ error: "Server not found" }, 404);
+    }
+
+    await activityScheduler.triggerServerPeopleSync(Number.parseInt(serverId));
+
+    return c.json({
+      success: true,
+      message: `People sync triggered for server: ${server[0].name}`,
+    });
+  } catch (error) {
+    console.error("Error triggering people sync:", error);
+    return c.json({ error: "Failed to trigger people sync" }, 500);
+  }
+});
+
 app.post("/scheduler/trigger-library-sync", async (c) => {
   try {
     const { serverId, libraryId } = await c.req.json();

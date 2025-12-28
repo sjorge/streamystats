@@ -77,11 +77,11 @@ class SyncScheduler {
 
     await this.performStartupCleanup();
     await this.triggerJellyfinIdBackfill();
-    
-    const skipStartupFullSync = 
+
+    const skipStartupFullSync =
       Bun.env.SKIP_STARTUP_FULL_SYNC?.toLowerCase() === "true" ||
       Bun.env.SKIP_STARTUP_FULL_SYNC === "1";
-    
+
     if (skipStartupFullSync) {
       console.log("[scheduler] trigger=startup-full-sync status=skipped reason=SKIP_STARTUP_FULL_SYNC");
     } else {
@@ -1189,6 +1189,35 @@ class SyncScheduler {
       }
     } catch (error) {
       console.error("[scheduler] trigger=fingerprint-sync status=error", error);
+    }
+  }
+
+  /**
+   * Manually trigger people sync for a specific server.
+   * Syncs actors, directors, and other people data from Jellyfin.
+   */
+  async triggerServerPeopleSync(serverId: number): Promise<void> {
+    try {
+      const boss = await getJobQueue();
+
+      await boss.send(
+        JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
+        { serverId },
+        {
+          singletonKey: `jellyfin-people-sync-${serverId}`,
+          expireInSeconds: 3600,
+          retryLimit: 1,
+          retryDelay: 60,
+        }
+      );
+
+      console.log(`[scheduler] queued=manual-people-sync serverId=${serverId}`);
+    } catch (error) {
+      console.error(
+        `[scheduler] queued=manual-people-sync serverId=${serverId} status=error`,
+        error
+      );
+      throw error;
     }
   }
 

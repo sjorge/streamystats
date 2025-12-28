@@ -9,6 +9,7 @@ import { DangerousSeriesMergeManager } from "../DangerousSeriesMergeManager";
 import { DeleteServer } from "../DeleteServer";
 import { LibrarySyncManager } from "../LibrarySyncManager";
 import { MergeItemsManager } from "../MergeItemsManager";
+import { PeopleSyncManager } from "../PeopleSyncManager";
 import { SyncManager } from "../SyncManager";
 import { UpdateConnection } from "../UpdateConnection";
 import { VersionSection } from "../VersionSection";
@@ -32,6 +33,7 @@ export default async function GeneralSettings(props: {
         {isAdmin ? <ServerJobStatusCard serverId={server.id} /> : null}
         <UpdateConnection serverId={server.id} />
         <SyncManager serverId={server.id} serverName={server.name} />
+        {isAdmin ? <PeopleSyncManager serverId={server.id} /> : null}
         {isAdmin ? <LibrarySyncManager serverId={server.id} /> : null}
         {isAdmin ? <CleanupManager serverId={server.id} /> : null}
         {isAdmin ? <MergeItemsManager server={server} /> : null}
