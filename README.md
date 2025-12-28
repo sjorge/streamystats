@@ -2,19 +2,20 @@
 
 Streamystats is a statistics service for Jellyfin, providing analytics and data visualization. 📈 Built with modern advanced frameworks.
 
-> This is a hobby project of mine. Don't expect fast development.
+> This is a personal hobby project, so please don't expect rapid development. Even though I am a full-time experienced developer, this project is prone to bugs, and **I am using** AI-assisted development for tasks ranging from PR reviews to refactoring and coding new features.
 
-## ✨ Features
+## Features
 
-- 🖥️ Dashboard with overview statistics, live sessions and more!
-- 👤 User-specific watch history and statistics
-- 🌟 Most popular item tracking
-- 📚 Library statistics
-- ⏱️ Watch time graphs with advanced filtering
-- 🏠 Multi-server and user support
-- ✨ AI Chat with you library and get watch recomendations
-- 🧹 Supported by Janitorr (beta)
-- ⬇️ Import data from Jellystat and Playback Reporting Plugin to get started
+- Dashboard with overview statistics, live sessions, recomendations, and more
+- User-specific watch history and statistics
+- Library statistics
+- Watch time graphs with advanced filtering
+- Client statistics
+- Multi-server and user support
+- AI chat with your library and get watch recommendations
+- Embedding supported watch recommendations
+- Supported by Janitorr (beta)
+- Import data from Jellystat and Playback Reporting Plugin to get started
 
 ### Embeddings
 
@@ -44,7 +45,7 @@ Recommendations use vector similarity (cosine distance) to find content similar 
 - [x] Only sync certain libraries
 - [x] More AI tools for better chat
 
-## 🚀 Getting started
+## Getting started
 
 > Playback reporting plugin is no longer needed and Streamystats solely relies on the Jellyfin API for statistics.
 
@@ -72,7 +73,7 @@ Docker is currently the easiest and recommended way to run streamystats. However
 
 [See the documentation](DOCKERLESS.md)
 
-## 📸 Screenshots
+## Screenshots
 
 <img width="1625" height="1083" alt="Screenshot 2025-12-23 at 11 46 07" src="https://github.com/user-attachments/assets/bcb5c90a-082e-40c2-b567-842ae6c61cf0" />
 <img width="1625" height="1083" alt="Screenshot 2025-12-23 at 11 49 35" src="https://github.com/user-attachments/assets/3c3276ad-93b2-479b-a783-a1f1a7c9afb3" />
@@ -82,7 +83,7 @@ Docker is currently the easiest and recommended way to run streamystats. However
 <img width="1625" height="1083" alt="Screenshot 2025-12-23 at 11 46 32" src="https://github.com/user-attachments/assets/5628c261-adb5-4e25-9dc9-97b12d161897" />
 <img width="1625" height="1083" alt="Screenshot 2025-12-23 at 11 46 25" src="https://github.com/user-attachments/assets/79790df1-880a-47fb-8259-c22924343cb8" />
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - Frontend: Next.js, React, TypeScript
 - Backend: Hono with Bun v1.3
