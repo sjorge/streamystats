@@ -1,11 +1,8 @@
 "use client";
 
-import type { Watchlist } from "@streamystats/database";
+import type { WatchlistWithItemsLite } from "@/lib/db/watchlists";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-// Extended type to include isPromoted (added in migration 0026)
-type WatchlistWithPromoted = Watchlist & { isPromoted?: boolean };
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 interface EditWatchlistDialogProps {
-  watchlist: WatchlistWithPromoted;
+  watchlist: WatchlistWithItemsLite;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isAdmin?: boolean;
