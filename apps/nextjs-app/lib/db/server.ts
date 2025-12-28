@@ -3,12 +3,85 @@
 import { db, items, jobResults, servers } from "@streamystats/database";
 import type { EmbeddingJobResult, Server } from "@streamystats/database/schema";
 import { and, count, desc, eq, sql } from "drizzle-orm";
+import type { ServerPublic } from "@/lib/types";
 
-export const getServers = async (): Promise<Server[]> => {
+type ServerPublicSelectRow = Omit<
+  ServerPublic,
+  "hasChatApiKey" | "hasEmbeddingApiKey"
+> & {
+  embeddingApiKey: string | null;
+  chatApiKey: string | null;
+};
+
+const SERVER_PUBLIC_SELECT = {
+  id: servers.id,
+  jellyfinId: servers.jellyfinId,
+  name: servers.name,
+  url: servers.url,
+  lastSyncedPlaybackId: servers.lastSyncedPlaybackId,
+  localAddress: servers.localAddress,
+  version: servers.version,
+  productName: servers.productName,
+  operatingSystem: servers.operatingSystem,
+  startupWizardCompleted: servers.startupWizardCompleted,
+  autoGenerateEmbeddings: servers.autoGenerateEmbeddings,
+  testMigrationField: servers.testMigrationField,
+  embeddingProvider: servers.embeddingProvider,
+  embeddingBaseUrl: servers.embeddingBaseUrl,
+  embeddingModel: servers.embeddingModel,
+  embeddingDimensions: servers.embeddingDimensions,
+  chatProvider: servers.chatProvider,
+  chatBaseUrl: servers.chatBaseUrl,
+  chatModel: servers.chatModel,
+  syncStatus: servers.syncStatus,
+  syncProgress: servers.syncProgress,
+  syncError: servers.syncError,
+  lastSyncStarted: servers.lastSyncStarted,
+  lastSyncCompleted: servers.lastSyncCompleted,
+  disabledHolidays: servers.disabledHolidays,
+  excludedUserIds: servers.excludedUserIds,
+  excludedLibraryIds: servers.excludedLibraryIds,
+  embeddingStopRequested: servers.embeddingStopRequested,
+  createdAt: servers.createdAt,
+  updatedAt: servers.updatedAt,
+  // Select secrets only to compute boolean flags; never return them to callers
+  embeddingApiKey: servers.embeddingApiKey,
+  chatApiKey: servers.chatApiKey,
+} satisfies Record<string, unknown>;
+
+function toServerPublic(row: ServerPublicSelectRow): ServerPublic {
+  const { embeddingApiKey, chatApiKey, ...rest } = row;
+  return {
+    ...(rest as Omit<ServerPublic, "hasChatApiKey" | "hasEmbeddingApiKey">),
+    hasEmbeddingApiKey: Boolean(embeddingApiKey),
+    hasChatApiKey: Boolean(chatApiKey),
+  };
+}
+
+export const getServersWithSecrets = async (): Promise<Server[]> => {
   return await db.select().from(servers);
 };
 
+export const getServers = async (): Promise<ServerPublic[]> => {
+  const rows = await db.select(SERVER_PUBLIC_SELECT).from(servers);
+  return rows.map((r) => toServerPublic(r as ServerPublicSelectRow));
+};
+
 export const getServer = async ({
+  serverId,
+}: {
+  serverId: number | string;
+}): Promise<ServerPublic | undefined> => {
+  const result = await db
+    .select(SERVER_PUBLIC_SELECT)
+    .from(servers)
+    .where(eq(servers.id, Number(serverId)))
+    .limit(1);
+  const row = result[0] as ServerPublicSelectRow | undefined;
+  return row ? toServerPublic(row) : undefined;
+};
+
+export const getServerWithSecrets = async ({
   serverId,
 }: {
   serverId: number | string;
@@ -317,7 +390,7 @@ export const getEmbeddingProgress = async ({
 
         if (isHeartbeatStale) {
           console.warn(
-            `Detected stale embedding job for server ${serverId}, marking as failed`,
+            `[embeddings] serverId=${serverId} action=staleDetected status=markFailed heartbeatAgeMs=${heartbeatAge}`,
           );
 
           // Mark the stale job as failed
@@ -799,7 +872,7 @@ export const getChatConfig = async ({
   serverId: number;
 }): Promise<ChatAIConfig | null> => {
   try {
-    const server = await getServer({ serverId });
+    const server = await getServerWithSecrets({ serverId });
     if (!server || !server.chatProvider || !server.chatModel) {
       return null;
     }

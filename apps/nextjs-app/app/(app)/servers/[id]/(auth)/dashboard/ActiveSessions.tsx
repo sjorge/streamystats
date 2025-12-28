@@ -1,6 +1,5 @@
 "use client";
 
-import type { Server } from "@streamystats/database/schema";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -39,6 +38,7 @@ import {
   type ActiveSession,
   getActiveSessions,
 } from "@/lib/db/active-sessions";
+import type { ServerPublic } from "@/lib/types";
 import LoadingSessions from "./LoadingSessions";
 import { Poster } from "./Poster";
 
@@ -55,7 +55,7 @@ function _formatDistanceWithSeconds(date: Date) {
   return formatDistanceToNow(date, { addSuffix: true });
 }
 
-export function ActiveSessions({ server }: { server: Server }) {
+export function ActiveSessions({ server }: { server: ServerPublic }) {
   const { data, isPending, error } = useQuery({
     queryKey: ["activeSessions", server.id],
     queryFn: () => getActiveSessions(server.id),

@@ -4,6 +4,7 @@ import { type PropsWithChildren, Suspense } from "react";
 import { ChatDialogWrapper } from "@/components/ChatDialogWrapper";
 import { DynamicBreadcrumbs } from "@/components/DynamicBreadcrumbs";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { SideBar } from "@/components/SideBar";
 import { SuspenseLoading } from "@/components/SuspenseLoading";
 import { UpdateNotifier } from "@/components/UpdateNotifier";
@@ -53,11 +54,26 @@ async function HeaderContent({ params }: { params: Promise<{ id: string }> }) {
   const chatConfigured = !!(server?.chatProvider && server?.chatModel);
 
   return (
-    <div className="flex flex-row items-center p-4 gap-2 relative">
-      <SidebarTrigger />
-      <Separator orientation="vertical" />
-      <DynamicBreadcrumbs />
-      <div className="ml-auto">
+    <div className="flex flex-col sm:flex-row sm:items-center p-4 gap-2 relative">
+      <div className="flex flex-row items-center gap-2">
+        <SidebarTrigger />
+        <Separator orientation="vertical" className="hidden sm:block" />
+        <div className="min-w-0 max-w-[200px] lg:max-w-[300px] shrink">
+          <DynamicBreadcrumbs />
+        </div>
+        <div className="ml-auto flex items-center gap-2 sm:hidden">
+          <ChatDialogWrapper
+            chatConfigured={chatConfigured}
+            me={me ?? undefined}
+            serverUrl={server?.url}
+          />
+        </div>
+      </div>
+      <div className="sm:hidden w-full">
+        <GlobalSearch serverUrl={server?.url} />
+      </div>
+      <div className="hidden sm:flex flex-1 items-center gap-2">
+        <GlobalSearch serverUrl={server?.url} />
         <ChatDialogWrapper
           chatConfigured={chatConfigured}
           me={me ?? undefined}
@@ -70,12 +86,19 @@ async function HeaderContent({ params }: { params: Promise<{ id: string }> }) {
 
 function HeaderSkeleton() {
   return (
-    <div className="flex flex-row items-center p-4 gap-2 relative">
-      <Skeleton className="h-8 w-8" />
-      <Separator orientation="vertical" />
-      <Skeleton className="h-4 w-48" />
-      <div className="ml-auto">
+    <div className="flex flex-col sm:flex-row sm:items-center p-4 gap-2 relative">
+      <div className="flex flex-row items-center gap-2">
         <Skeleton className="h-8 w-8" />
+        <Separator orientation="vertical" className="hidden sm:block" />
+        <Skeleton className="h-4 w-48" />
+        <div className="ml-auto flex items-center gap-2 sm:hidden">
+          <Skeleton className="h-9 w-9" />
+        </div>
+      </div>
+      <Skeleton className="sm:hidden h-9 w-full" />
+      <div className="hidden sm:flex ml-auto items-center gap-2">
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-9 w-9" />
       </div>
     </div>
   );

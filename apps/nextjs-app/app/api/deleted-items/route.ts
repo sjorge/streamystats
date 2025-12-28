@@ -2,7 +2,7 @@ import { db, items, type Server, servers } from "@streamystats/database";
 import { and, count, desc, eq, gte, ilike, isNotNull } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { requireApiKey } from "@/lib/api-auth";
-import { getServer } from "@/lib/db/server";
+import { getServerWithSecrets } from "@/lib/db/server";
 
 /**
  * API Route: GET /api/deleted-items?serverId=123 OR ?serverName=MyServer
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     // Look up server by ID or name
     let server: Server | undefined;
     if (serverId) {
-      server = await getServer({ serverId });
+      server = await getServerWithSecrets({ serverId });
     } else if (serverName) {
       server = await getServerByName(serverName);
     }

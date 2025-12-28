@@ -114,12 +114,7 @@ export const ContainerFormatCard = ({ data }: ContainerFormatCardProps) => {
               cursor={false}
               content={<ChartTooltipContent indicator="line" />}
             />
-            <Bar
-              dataKey="count"
-              layout="vertical"
-              radius={4}
-              className="fill-blue-600"
-            >
+            <Bar dataKey="count" radius={4} className="fill-blue-600">
               <LabelList
                 dataKey="labelWithPercent"
                 content={({ x, y, width: barWidth, height, value }) => (

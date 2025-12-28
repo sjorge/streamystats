@@ -1,13 +1,13 @@
-import type { Server } from "@streamystats/database";
 import { Clock } from "lucide-react";
 import { redirect } from "next/navigation";
 import type React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getMe, getTotalWatchTime, isUserAdmin } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 
 interface Props {
-  server: Server;
+  server: ServerPublic;
   startDate: string;
   endDate: string;
 }

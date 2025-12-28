@@ -1,6 +1,6 @@
 "use client";
 
-import type { Server, User } from "@streamystats/database";
+import type { User } from "@streamystats/database";
 import {
   Activity,
   ActivitySquare,
@@ -26,6 +26,7 @@ import { useParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { getUser } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { ServerSelector } from "./ServerSelector";
 import { UserMenu } from "./UserMenu";
 import {
@@ -205,7 +206,7 @@ function CollapsibleMenu({
 }
 
 interface Props {
-  servers: Server[];
+  servers: ServerPublic[];
   me?: User;
   allowedToCreateServer?: boolean;
 }

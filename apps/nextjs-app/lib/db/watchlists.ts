@@ -17,7 +17,7 @@ export interface WatchlistWithItemCount extends Watchlist {
   itemCount: number;
 }
 
-export interface WatchlistWithItems extends Watchlist {
+export interface WatchlistWithItems extends Omit<Watchlist, "searchVector"> {
   items: WatchlistItemWithDetails[];
 }
 
@@ -56,7 +56,8 @@ export interface WatchlistItemWithListItem extends WatchlistItem {
   item: WatchlistListItem;
 }
 
-export interface WatchlistWithItemsLite extends Watchlist {
+export interface WatchlistWithItemsLite
+  extends Omit<Watchlist, "searchVector"> {
   items: WatchlistItemWithListItem[];
 }
 
@@ -93,6 +94,16 @@ export const getWatchlistsForUser = async ({
 };
 
 /**
+ * Sanitize watchlist response by removing internal fields like searchVector
+ */
+const sanitizeWatchlist = <T extends Watchlist>(
+  watchlist: T,
+): Omit<T, "searchVector"> => {
+  const { searchVector: _, ...rest } = watchlist;
+  return rest;
+};
+
+/**
  * Get a single watchlist by ID
  */
 export const getWatchlistById = async ({
@@ -101,7 +112,7 @@ export const getWatchlistById = async ({
 }: {
   watchlistId: number;
   userId: string;
-}): Promise<Watchlist | null> => {
+}): Promise<Omit<Watchlist, "searchVector"> | null> => {
   const result = await db.query.watchlists.findFirst({
     where: and(
       eq(watchlists.id, watchlistId),
@@ -109,7 +120,75 @@ export const getWatchlistById = async ({
     ),
   });
 
-  return result ?? null;
+  return result ? sanitizeWatchlist(result) : null;
+};
+
+/**
+ * Get a public/promoted watchlist by ID with all items (no userId requirement)
+ */
+export const getPublicWatchlistWithItems = async ({
+  watchlistId,
+  serverId,
+}: {
+  watchlistId: number;
+  serverId: number;
+}): Promise<
+  | (Omit<Watchlist, "searchVector"> & { items: WatchlistItemWithListItem[] })
+  | null
+> => {
+  const result = await db.query.watchlists.findFirst({
+    where: and(
+      eq(watchlists.id, watchlistId),
+      eq(watchlists.serverId, serverId),
+      or(eq(watchlists.isPublic, true), eq(watchlists.isPromoted, true)),
+    ),
+  });
+
+  if (!result) {
+    return null;
+  }
+
+  const itemsResult = await db
+    .select({
+      watchlistItem: watchlistItems,
+      item: {
+        id: items.id,
+        name: items.name,
+        type: items.type,
+        productionYear: items.productionYear,
+        runtimeTicks: items.runtimeTicks,
+        genres: items.genres,
+        primaryImageTag: items.primaryImageTag,
+        primaryImageThumbTag: items.primaryImageThumbTag,
+        primaryImageLogoTag: items.primaryImageLogoTag,
+        backdropImageTags: items.backdropImageTags,
+        seriesId: items.seriesId,
+        seriesPrimaryImageTag: items.seriesPrimaryImageTag,
+        parentBackdropItemId: items.parentBackdropItemId,
+        parentBackdropImageTags: items.parentBackdropImageTags,
+        parentThumbItemId: items.parentThumbItemId,
+        parentThumbImageTag: items.parentThumbImageTag,
+        imageBlurHashes: items.imageBlurHashes,
+        seriesName: items.seriesName,
+        seasonName: items.seasonName,
+        indexNumber: items.indexNumber,
+        parentIndexNumber: items.parentIndexNumber,
+        premiereDate: items.premiereDate,
+        communityRating: items.communityRating,
+      },
+    })
+    .from(watchlistItems)
+    .innerJoin(items, eq(watchlistItems.itemId, items.id))
+    .where(eq(watchlistItems.watchlistId, watchlistId))
+    .orderBy(asc(watchlistItems.position));
+
+  return {
+    ...sanitizeWatchlist(result),
+    items: itemsResult.map((r) => ({
+      ...r.watchlistItem,
+      item: r.item,
+    })),
+  };
 };
 
 /**
@@ -308,6 +387,7 @@ export const updateWatchlist = async ({
       | "name"
       | "description"
       | "isPublic"
+      | "isPromoted"
       | "allowedItemType"
       | "defaultSortOrder"
     >
@@ -320,6 +400,64 @@ export const updateWatchlist = async ({
     .returning();
 
   return result ?? null;
+};
+
+/**
+ * Update a watchlist as admin (bypasses ownership check)
+ */
+export const updateWatchlistAsAdmin = async ({
+  watchlistId,
+  serverId,
+  data,
+}: {
+  watchlistId: number;
+  serverId: number;
+  data: Partial<Pick<Watchlist, "isPromoted">>;
+}): Promise<Watchlist | null> => {
+  const [result] = await db
+    .update(watchlists)
+    .set({ ...data, updatedAt: new Date() })
+    .where(
+      and(eq(watchlists.id, watchlistId), eq(watchlists.serverId, serverId)),
+    )
+    .returning();
+
+  return result ?? null;
+};
+
+/**
+ * Get promoted watchlists for a server
+ */
+export type WatchlistWithItemCountSanitized = Omit<
+  WatchlistWithItemCount,
+  "searchVector"
+>;
+
+export const getPromotedWatchlists = async ({
+  serverId,
+}: {
+  serverId: number;
+}): Promise<WatchlistWithItemCountSanitized[]> => {
+  const result = await db
+    .select({
+      watchlist: watchlists,
+      itemCount: count(watchlistItems.id),
+    })
+    .from(watchlists)
+    .leftJoin(watchlistItems, eq(watchlists.id, watchlistItems.watchlistId))
+    .where(
+      and(eq(watchlists.serverId, serverId), eq(watchlists.isPromoted, true)),
+    )
+    .groupBy(watchlists.id)
+    .orderBy(desc(watchlists.createdAt));
+
+  return result.map((r) => {
+    const { searchVector: _, ...rest } = r.watchlist;
+    return {
+      ...rest,
+      itemCount: Number(r.itemCount),
+    };
+  });
 };
 
 /**

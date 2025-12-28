@@ -1,7 +1,7 @@
 "use client";
 
 import type { Item } from "@streamystats/database";
-import { ChevronRight, Film, Globe, Lock, Tv } from "lucide-react";
+import { ChevronRight, Film, Globe, Lock, Megaphone, Tv } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -153,6 +153,15 @@ export function WatchlistCard({
                   className="text-xs font-medium px-2.5 py-0.5 text-muted-foreground border-border/50"
                 >
                   Shared
+                </Badge>
+              )}
+              {(watchlist as { isPromoted?: boolean }).isPromoted && (
+                <Badge
+                  variant="default"
+                  className="text-xs font-medium px-2.5 py-0.5 gap-1"
+                >
+                  <Megaphone className="w-3 h-3" />
+                  Promoted
                 </Badge>
               )}
             </div>

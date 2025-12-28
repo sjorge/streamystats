@@ -71,7 +71,7 @@ class PgListener {
       });
 
       this.isListening = true;
-      console.log("[pg-listener] Connected and listening for job_events");
+      console.info("[pg-listener] Connected and listening for job_events");
     } catch (error) {
       console.error("[pg-listener] Connection failed:", error);
       this.scheduleReconnect();
@@ -81,7 +81,7 @@ class PgListener {
   private handleNotification(payload: string): void {
     try {
       const event = JSON.parse(payload) as JobEvent;
-      console.log(
+      console.info(
         `[pg-listener] Received: ${event.name} state=${event.state} serverId=${event.serverId}`,
       );
 
@@ -104,7 +104,7 @@ class PgListener {
     }
 
     this.isListening = false;
-    console.log("[pg-listener] Scheduling reconnect in 5 seconds...");
+    console.info("[pg-listener] Scheduling reconnect in 5 seconds...");
 
     this.reconnectTimeout = setTimeout(async () => {
       this.reconnectTimeout = null;
@@ -152,7 +152,7 @@ class PgListener {
 
     this.isListening = false;
     this.handlers.clear();
-    console.log("[pg-listener] Disconnected");
+    console.info("[pg-listener] Disconnected");
   }
 }
 

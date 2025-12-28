@@ -42,13 +42,13 @@ import { usePersistantState } from "@/hooks/usePersistantState";
 import { useQueryParams } from "@/hooks/useQueryParams";
 import type { HistoryItem, HistoryResponse } from "@/lib/db/history";
 import { formatLocalDate } from "@/lib/timezone";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { HistoryFilters } from "./HistoryFilters";
 
 export interface HistoryTableProps {
   data: HistoryResponse;
-  server: Server;
+  server: ServerPublic;
   hideUserColumn?: boolean;
   users: { id: string; name: string }[];
   deviceNames: string[];

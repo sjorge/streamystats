@@ -1,9 +1,9 @@
 "use client";
 
-import type { Server } from "@streamystats/database";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RecommendationItem } from "@/lib/db/similar-statistics";
+import type { ServerPublic } from "@/lib/types";
 
 const SimilarStatistics = dynamic(
   () => import("./SimilarStatistics").then((mod) => mod.SimilarMovieStatistics),
@@ -20,7 +20,7 @@ const SimilarStatistics = dynamic(
 
 interface Props {
   data: RecommendationItem[];
-  server: Server;
+  server: ServerPublic;
 }
 
 export function SimilarStatisticsClient({ data, server }: Props) {

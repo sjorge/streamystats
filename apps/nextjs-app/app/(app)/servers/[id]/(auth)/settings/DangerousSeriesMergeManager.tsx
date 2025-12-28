@@ -34,11 +34,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 import { fetch } from "@/lib/utils";
 
 interface DangerousSeriesMergeManagerProps {
-  server: Server;
+  server: ServerPublic;
 }
 
 interface EpisodeMatch {

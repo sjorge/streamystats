@@ -169,6 +169,48 @@
       "when": 1766846672311,
       "tag": "0023_closed_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1766861478488,
+      "tag": "0024_common_spot",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1766866998238,
+      "tag": "0025_add_trigram_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1766868429266,
+      "tag": "0026_neat_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1766873715036,
+      "tag": "0027_abnormal_apocalypse",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1766874062023,
+      "tag": "0028_charming_wrecker",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1766874411116,
+      "tag": "0029_overrated_deathbird",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Globe,
   Lock,
+  Megaphone,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -36,9 +37,14 @@ import { EditWatchlistDialog } from "./EditWatchlistDialog";
 interface WatchlistHeaderProps {
   watchlist: WatchlistWithItemsLite;
   isOwner: boolean;
+  isAdmin: boolean;
 }
 
-export function WatchlistHeader({ watchlist, isOwner }: WatchlistHeaderProps) {
+export function WatchlistHeader({
+  watchlist,
+  isOwner,
+  isAdmin,
+}: WatchlistHeaderProps) {
   const router = useRouter();
   const params = useParams();
   const serverIdParam = params.id as string;
@@ -100,6 +106,12 @@ export function WatchlistHeader({ watchlist, isOwner }: WatchlistHeaderProps) {
               <Badge variant="outline" className="capitalize">
                 Sort: {watchlist.defaultSortOrder}
               </Badge>
+              {(watchlist as { isPromoted?: boolean }).isPromoted && (
+                <Badge variant="default" className="gap-1">
+                  <Megaphone className="w-3 h-3" />
+                  Promoted
+                </Badge>
+              )}
             </div>
           </div>
           {isOwner && (
@@ -154,6 +166,7 @@ export function WatchlistHeader({ watchlist, isOwner }: WatchlistHeaderProps) {
         watchlist={watchlist}
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
+        isAdmin={isAdmin}
       />
     </>
   );

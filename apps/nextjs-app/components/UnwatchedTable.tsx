@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 import {
   Pagination,
   PaginationContent,
@@ -52,7 +52,7 @@ export interface UnwatchedItemsResponse {
 }
 
 interface UnwatchedTableProps {
-  server: Server;
+  server: ServerPublic;
   data: UnwatchedItemsResponse;
 }
 

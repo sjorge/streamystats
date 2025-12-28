@@ -1,11 +1,11 @@
-import type { Server } from "@streamystats/database";
 import type { JSX } from "react";
 import { getWatchTimePerType } from "@/lib/db/statistics";
 import { getMe, isUserAdmin } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { WatchTimeGraph } from "./WatchTimeGraph";
 
 interface Props {
-  server: Server;
+  server: ServerPublic;
   startDate: string;
   endDate: string;
 }

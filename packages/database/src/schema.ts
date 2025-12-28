@@ -35,6 +35,23 @@ const vector = customType<{
     return `[${value.join(",")}]`;
   },
 });
+
+// Custom tsvector type for full-text search
+// This column is populated by triggers in the database
+const tsvector = customType<{
+  data: string;
+  driverData: string;
+}>({
+  dataType() {
+    return "tsvector";
+  },
+  fromDriver(value: string): string {
+    return value;
+  },
+  toDriver(value: string): string {
+    return value;
+  },
+});
 import { relations } from "drizzle-orm";
 
 // =============================================================================
@@ -87,6 +104,7 @@ export const servers = pgTable(
   "servers",
   {
     id: serial("id").primaryKey(),
+    jellyfinId: text("jellyfin_id"), // Unique Jellyfin server ID from /System/Info
     name: text("name").notNull(),
     url: text("url").notNull(),
     apiKey: text("api_key").notNull(),
@@ -158,111 +176,131 @@ export const libraries = pgTable("libraries", {
 });
 
 // Users table - users from various servers
-export const users = pgTable("users", {
-  id: text("id").primaryKey(), // External user ID from server
-  name: text("name").notNull(),
-  serverId: integer("server_id")
-    .notNull()
-    .references(() => servers.id, { onDelete: "cascade" }),
-  lastLoginDate: timestamp("last_login_date", { withTimezone: true }),
-  lastActivityDate: timestamp("last_activity_date", { withTimezone: true }),
-  hasPassword: boolean("has_password").notNull().default(false),
-  hasConfiguredPassword: boolean("has_configured_password")
-    .notNull()
-    .default(false),
-  hasConfiguredEasyPassword: boolean("has_configured_easy_password")
-    .notNull()
-    .default(false),
-  enableAutoLogin: boolean("enable_auto_login").notNull().default(false),
-  isAdministrator: boolean("is_administrator").notNull().default(false),
-  isHidden: boolean("is_hidden").notNull().default(false),
-  isDisabled: boolean("is_disabled").notNull().default(false),
-  enableUserPreferenceAccess: boolean("enable_user_preference_access")
-    .notNull()
-    .default(true),
-  enableRemoteControlOfOtherUsers: boolean(
-    "enable_remote_control_of_other_users"
-  )
-    .notNull()
-    .default(false),
-  enableSharedDeviceControl: boolean("enable_shared_device_control")
-    .notNull()
-    .default(false),
-  enableRemoteAccess: boolean("enable_remote_access").notNull().default(true),
-  enableLiveTvManagement: boolean("enable_live_tv_management")
-    .notNull()
-    .default(false),
-  enableLiveTvAccess: boolean("enable_live_tv_access").notNull().default(true),
-  enableMediaPlayback: boolean("enable_media_playback").notNull().default(true),
-  enableAudioPlaybackTranscoding: boolean("enable_audio_playback_transcoding")
-    .notNull()
-    .default(true),
-  enableVideoPlaybackTranscoding: boolean("enable_video_playback_transcoding")
-    .notNull()
-    .default(true),
-  enablePlaybackRemuxing: boolean("enable_playback_remuxing")
-    .notNull()
-    .default(true),
-  enableContentDeletion: boolean("enable_content_deletion")
-    .notNull()
-    .default(false),
-  enableContentDownloading: boolean("enable_content_downloading")
-    .notNull()
-    .default(false),
-  enableSyncTranscoding: boolean("enable_sync_transcoding")
-    .notNull()
-    .default(true),
-  enableMediaConversion: boolean("enable_media_conversion")
-    .notNull()
-    .default(false),
-  enableAllDevices: boolean("enable_all_devices").notNull().default(true),
-  enableAllChannels: boolean("enable_all_channels").notNull().default(true),
-  enableAllFolders: boolean("enable_all_folders").notNull().default(true),
-  enablePublicSharing: boolean("enable_public_sharing")
-    .notNull()
-    .default(false),
-  invalidLoginAttemptCount: integer("invalid_login_attempt_count")
-    .notNull()
-    .default(0),
-  loginAttemptsBeforeLockout: integer("login_attempts_before_lockout")
-    .notNull()
-    .default(3),
-  maxActiveSessions: integer("max_active_sessions").notNull().default(0),
-  remoteClientBitrateLimit: integer("remote_client_bitrate_limit")
-    .notNull()
-    .default(0),
-  authenticationProviderId: text("authentication_provider_id")
-    .notNull()
-    .default(
-      "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider"
-    ),
-  passwordResetProviderId: text("password_reset_provider_id")
-    .notNull()
-    .default(
-      "Jellyfin.Server.Implementations.Users.DefaultPasswordResetProvider"
-    ),
-  syncPlayAccess: text("sync_play_access")
-    .notNull()
-    .default("CreateAndJoinGroups"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: text("id").primaryKey(), // External user ID from server
+    name: text("name").notNull(),
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    lastLoginDate: timestamp("last_login_date", { withTimezone: true }),
+    lastActivityDate: timestamp("last_activity_date", { withTimezone: true }),
+    hasPassword: boolean("has_password").notNull().default(false),
+    hasConfiguredPassword: boolean("has_configured_password")
+      .notNull()
+      .default(false),
+    hasConfiguredEasyPassword: boolean("has_configured_easy_password")
+      .notNull()
+      .default(false),
+    enableAutoLogin: boolean("enable_auto_login").notNull().default(false),
+    isAdministrator: boolean("is_administrator").notNull().default(false),
+    isHidden: boolean("is_hidden").notNull().default(false),
+    isDisabled: boolean("is_disabled").notNull().default(false),
+    enableUserPreferenceAccess: boolean("enable_user_preference_access")
+      .notNull()
+      .default(true),
+    enableRemoteControlOfOtherUsers: boolean(
+      "enable_remote_control_of_other_users"
+    )
+      .notNull()
+      .default(false),
+    enableSharedDeviceControl: boolean("enable_shared_device_control")
+      .notNull()
+      .default(false),
+    enableRemoteAccess: boolean("enable_remote_access").notNull().default(true),
+    enableLiveTvManagement: boolean("enable_live_tv_management")
+      .notNull()
+      .default(false),
+    enableLiveTvAccess: boolean("enable_live_tv_access").notNull().default(true),
+    enableMediaPlayback: boolean("enable_media_playback").notNull().default(true),
+    enableAudioPlaybackTranscoding: boolean("enable_audio_playback_transcoding")
+      .notNull()
+      .default(true),
+    enableVideoPlaybackTranscoding: boolean("enable_video_playback_transcoding")
+      .notNull()
+      .default(true),
+    enablePlaybackRemuxing: boolean("enable_playback_remuxing")
+      .notNull()
+      .default(true),
+    enableContentDeletion: boolean("enable_content_deletion")
+      .notNull()
+      .default(false),
+    enableContentDownloading: boolean("enable_content_downloading")
+      .notNull()
+      .default(false),
+    enableSyncTranscoding: boolean("enable_sync_transcoding")
+      .notNull()
+      .default(true),
+    enableMediaConversion: boolean("enable_media_conversion")
+      .notNull()
+      .default(false),
+    enableAllDevices: boolean("enable_all_devices").notNull().default(true),
+    enableAllChannels: boolean("enable_all_channels").notNull().default(true),
+    enableAllFolders: boolean("enable_all_folders").notNull().default(true),
+    enablePublicSharing: boolean("enable_public_sharing")
+      .notNull()
+      .default(false),
+    invalidLoginAttemptCount: integer("invalid_login_attempt_count")
+      .notNull()
+      .default(0),
+    loginAttemptsBeforeLockout: integer("login_attempts_before_lockout")
+      .notNull()
+      .default(3),
+    maxActiveSessions: integer("max_active_sessions").notNull().default(0),
+    remoteClientBitrateLimit: integer("remote_client_bitrate_limit")
+      .notNull()
+      .default(0),
+    authenticationProviderId: text("authentication_provider_id")
+      .notNull()
+      .default(
+        "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider"
+      ),
+    passwordResetProviderId: text("password_reset_provider_id")
+      .notNull()
+      .default(
+        "Jellyfin.Server.Implementations.Users.DefaultPasswordResetProvider"
+      ),
+    syncPlayAccess: text("sync_play_access")
+      .notNull()
+      .default("CreateAndJoinGroups"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+
+    // Full-text search vector - populated by database trigger
+    searchVector: tsvector("search_vector"),
+  },
+  (table) => [
+    index("users_server_id_idx").on(table.serverId),
+    index("users_search_vector_idx").using("gin", table.searchVector),
+  ]
+);
 
 // Activities table - user activities and server events
-export const activities = pgTable("activities", {
-  id: text("id").primaryKey(), // External activity ID from server
-  name: text("name").notNull(),
-  shortOverview: text("short_overview"),
-  type: text("type").notNull(), // ActivityType enum from server
-  date: timestamp("date", { withTimezone: true }).notNull(),
-  severity: text("severity").notNull(), // Info, Warn, Error
-  serverId: integer("server_id")
-    .notNull()
-    .references(() => servers.id, { onDelete: "cascade" }),
-  userId: text("user_id").references(() => users.id, { onDelete: "set null" }), // Optional, some activities aren't user-specific
-  itemId: text("item_id"), // Optional, media item ID from server
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const activities = pgTable(
+  "activities",
+  {
+    id: text("id").primaryKey(), // External activity ID from server
+    name: text("name").notNull(),
+    shortOverview: text("short_overview"),
+    type: text("type").notNull(), // ActivityType enum from server
+    date: timestamp("date", { withTimezone: true }).notNull(),
+    severity: text("severity").notNull(), // Info, Warn, Error
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }), // Optional, some activities aren't user-specific
+    itemId: text("item_id"), // Optional, media item ID from server
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+
+    // Full-text search vector - populated by database trigger
+    searchVector: tsvector("search_vector"),
+  },
+  (table) => [
+    index("activities_server_id_idx").on(table.serverId),
+    index("activities_search_vector_idx").using("gin", table.searchVector),
+  ]
+);
 
 // Job results table
 export const jobResults = pgTable("job_results", {
@@ -376,6 +414,10 @@ export const items = pgTable(
 
     // Soft delete
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+
+    // Full-text search vector - populated by database trigger
+    // Contains: name, originalTitle, overview, seriesName, genres, people (actors/directors)
+    searchVector: tsvector("search_vector"),
   },
   // Note: Vector index must be created manually per dimension using:
   // CREATE INDEX items_embedding_idx ON items USING hnsw ((embedding::vector(N)) vector_cosine_ops)
@@ -383,6 +425,7 @@ export const items = pgTable(
   (table) => [
     index("items_server_type_idx").on(table.serverId, table.type),
     index("items_series_id_idx").on(table.seriesId),
+    index("items_search_vector_idx").using("gin", table.searchVector),
   ]
 );
 
@@ -709,14 +752,20 @@ export const watchlists = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     isPublic: boolean("is_public").notNull().default(false),
+    isPromoted: boolean("is_promoted").notNull().default(false), // Admin-only: visible on all users' home screens in external clients
     allowedItemType: text("allowed_item_type"), // If set, only items of this type can be added (Movie, Series, Episode, etc.)
     defaultSortOrder: text("default_sort_order").notNull().default("custom"), // custom, name, dateAdded, releaseDate
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
+
+    // Full-text search vector - populated by database trigger
+    searchVector: tsvector("search_vector"),
   },
   (table) => [
     index("watchlists_server_user_idx").on(table.serverId, table.userId),
     index("watchlists_server_public_idx").on(table.serverId, table.isPublic),
+    index("watchlists_server_promoted_idx").on(table.serverId, table.isPromoted),
+    index("watchlists_search_vector_idx").using("gin", table.searchVector),
   ]
 );
 

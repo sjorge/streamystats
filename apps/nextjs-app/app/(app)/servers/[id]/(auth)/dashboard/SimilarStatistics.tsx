@@ -1,17 +1,17 @@
 "use client";
 
-import type { Server } from "@streamystats/database";
 import { Film } from "lucide-react";
 import {
   getSimilarStatistics,
   hideRecommendation,
   type RecommendationItem,
 } from "@/lib/db/similar-statistics";
+import type { ServerPublic } from "@/lib/types";
 import { RecommendationsSection } from "./RecommendationsSection";
 
 interface Props {
   data: RecommendationItem[];
-  server: Server;
+  server: ServerPublic;
 }
 
 export const SimilarMovieStatistics = ({ data, server }: Props) => {

@@ -44,7 +44,7 @@ import type {
   WatchlistWithItemsLite,
 } from "@/lib/db/watchlists";
 import { formatLocalDate } from "@/lib/timezone";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 
 function getItemIdsInCustomOrder(items: WatchlistItemWithListItem[]): string[] {
   return [...items]
@@ -146,7 +146,7 @@ function ReorderButtons({
 interface WatchlistItemsProps {
   watchlist: WatchlistWithItemsLite;
   isOwner: boolean;
-  server: Server;
+  server: ServerPublic;
   currentType?: string;
   currentSort?: string;
 }

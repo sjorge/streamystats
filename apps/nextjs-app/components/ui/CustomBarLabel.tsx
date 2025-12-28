@@ -5,7 +5,7 @@ interface CustomBarLabelProps {
   y?: number;
   width?: number;
   height?: number;
-  value?: string | number;
+  value?: string | number | boolean | null | undefined;
   fill?: string;
   fontSize?: number;
   offset?: number;
@@ -33,6 +33,7 @@ export const CustomBarLabel: React.FC<CustomBarLabelProps> = ({
   containerWidth,
   alwaysOutside = false,
 }) => {
+  if (value === null || value === undefined || value === false) return null;
   let displayValue = String(value);
   const fixedMargin = 10;
   let estLabelWidth = displayValue.length * (fontSize * 0.6);

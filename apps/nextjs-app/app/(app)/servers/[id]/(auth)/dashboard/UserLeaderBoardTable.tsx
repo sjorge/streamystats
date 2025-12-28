@@ -1,6 +1,6 @@
 "use client";
 
-import type { Server, User } from "@streamystats/database";
+import type { User } from "@streamystats/database";
 import { Clock, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -15,12 +15,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePersistantState } from "@/hooks/usePersistantState";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { UserLeaderboardFilter } from "./UserLeaderBoardFilter";
 
 interface Props {
   users: User[];
-  server: Server;
+  server: ServerPublic;
   totalWatchTime: { [key: string]: number };
 }
 

@@ -9,7 +9,7 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo } from "react";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -19,7 +19,7 @@ import {
 } from "./ui/dropdown-menu";
 
 interface Props extends React.HTMLAttributes<HTMLButtonElement> {
-  servers: Server[];
+  servers: ServerPublic[];
   allowedToCreateServer?: boolean;
 }
 

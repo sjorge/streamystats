@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { deleteServer } from "@/lib/db/server";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 
 interface Props {
-  server: Server;
+  server: ServerPublic;
 }
 
 export const DeleteServer: React.FC<Props> = ({ server }) => {

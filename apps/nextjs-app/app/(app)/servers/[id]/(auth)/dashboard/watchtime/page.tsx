@@ -1,4 +1,3 @@
-import type { Server } from "@streamystats/database/schema";
 import { addDays } from "date-fns";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -15,6 +14,7 @@ import {
   getWatchTimePerWeekDay,
   isUserAdmin,
 } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import Graph from "../Graph";
 import TotalWatchTime from "../TotalWatchTime";
 import { WatchTimePerHour } from "../WatchTimePerHour";
@@ -73,7 +73,7 @@ async function WatchtimeStats({
   startDate,
   endDate,
 }: {
-  server: Server;
+  server: ServerPublic;
   startDate: string;
   endDate: string;
 }) {

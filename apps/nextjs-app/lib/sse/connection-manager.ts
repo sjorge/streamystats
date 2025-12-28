@@ -83,7 +83,7 @@ class SSEConnectionManager {
     };
 
     this.clients.set(id, client);
-    console.log(
+    console.info(
       `[sse-manager] Client connected: ${id} for server ${serverId} (total: ${this.clients.size})`,
     );
 
@@ -100,7 +100,7 @@ class SSEConnectionManager {
     const client = this.clients.get(clientId);
     if (client) {
       this.clients.delete(clientId);
-      console.log(
+      console.info(
         `[sse-manager] Client disconnected: ${clientId} (total: ${this.clients.size})`,
       );
     }

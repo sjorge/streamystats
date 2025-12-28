@@ -1,11 +1,11 @@
-import type { Server } from "@streamystats/database";
 import type * as React from "react";
 import { getDefaultStartDate, setEndDateToEndOfDay } from "@/dates";
 import { getUserActivityPerDay } from "@/lib/db/users";
+import type { ServerPublic } from "@/lib/types";
 import { UserActivityChart } from "./UserActivityChart";
 
 interface Props {
-  server: Server;
+  server: ServerPublic;
   startDate: string;
   endDate: string;
 }

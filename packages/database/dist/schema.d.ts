@@ -54,6 +54,23 @@ export declare const servers: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        jellyfinId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "jellyfin_id";
+            tableName: "servers";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         name: import("drizzle-orm/pg-core").PgColumn<{
             name: "name";
             tableName: "servers";
@@ -1438,6 +1455,25 @@ export declare const users: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        searchVector: import("drizzle-orm/pg-core").PgColumn<{
+            name: "search_vector";
+            tableName: "users";
+            dataType: "custom";
+            columnType: "PgCustomColumn";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            pgColumnBuilderBrand: "PgCustomColumnBuilderBrand";
+        }>;
     };
     dialect: "pg";
 }>;
@@ -1615,6 +1651,25 @@ export declare const activities: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        searchVector: import("drizzle-orm/pg-core").PgColumn<{
+            name: "search_vector";
+            tableName: "activities";
+            dataType: "custom";
+            columnType: "PgCustomColumn";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            pgColumnBuilderBrand: "PgCustomColumnBuilderBrand";
+        }>;
     };
     dialect: "pg";
 }>;
@@ -2918,6 +2973,25 @@ export declare const items: import("drizzle-orm/pg-core").PgTableWithColumns<{
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        searchVector: import("drizzle-orm/pg-core").PgColumn<{
+            name: "search_vector";
+            tableName: "items";
+            dataType: "custom";
+            columnType: "PgCustomColumn";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            pgColumnBuilderBrand: "PgCustomColumnBuilderBrand";
+        }>;
     };
     dialect: "pg";
 }>;
@@ -5115,6 +5189,23 @@ export declare const watchlists: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        isPromoted: import("drizzle-orm/pg-core").PgColumn<{
+            name: "is_promoted";
+            tableName: "watchlists";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         allowedItemType: import("drizzle-orm/pg-core").PgColumn<{
             name: "allowed_item_type";
             tableName: "watchlists";
@@ -5183,6 +5274,25 @@ export declare const watchlists: import("drizzle-orm/pg-core").PgTableWithColumn
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        searchVector: import("drizzle-orm/pg-core").PgColumn<{
+            name: "search_vector";
+            tableName: "watchlists";
+            dataType: "custom";
+            columnType: "PgCustomColumn";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            pgColumnBuilderBrand: "PgCustomColumnBuilderBrand";
+        }>;
     };
     dialect: "pg";
 }>;

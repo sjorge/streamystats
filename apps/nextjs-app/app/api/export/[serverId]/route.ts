@@ -2,7 +2,7 @@ import { db, hiddenRecommendations, sessions } from "@streamystats/database";
 import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
-import { getServer } from "@/lib/db/server";
+import { getServerWithSecrets } from "@/lib/db/server";
 
 type JellyfinSystemInfo = {
   Id?: string;
@@ -53,7 +53,7 @@ export async function GET(
       });
     }
 
-    const server = await getServer({ serverId });
+    const server = await getServerWithSecrets({ serverId });
     if (!server) {
       return new Response(JSON.stringify({ error: "Server not found" }), {
         status: 404,

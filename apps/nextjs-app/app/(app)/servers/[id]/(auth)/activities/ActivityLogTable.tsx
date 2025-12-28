@@ -1,6 +1,6 @@
 "use client";
 
-import type { Activity, Server, User } from "@streamystats/database/schema";
+import type { Activity, User } from "@streamystats/database/schema";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { usePersistantState } from "@/hooks/usePersistantState";
 import { useQueryParams } from "@/hooks/useQueryParams";
+import type { ServerPublic } from "@/lib/types";
 import { ActivityFilters } from "./ActivityFilters";
 
 interface PaginatedActivities {
@@ -49,7 +50,7 @@ interface PaginatedActivities {
 }
 
 export interface ActivityLogTableProps {
-  server: Server;
+  server: ServerPublic;
   data: PaginatedActivities;
   users: User[];
   activityTypes: string[];

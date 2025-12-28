@@ -1,6 +1,6 @@
 "use client";
 
-import type { Item, Server } from "@streamystats/database/schema";
+import type { Item } from "@streamystats/database/schema";
 import {
   ArrowLeft,
   Calendar,
@@ -15,13 +15,14 @@ import { Poster } from "@/app/(app)/servers/[id]/(auth)/dashboard/Poster";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { AddToWatchlistButton } from "./AddToWatchlistButton";
 import type { ItemDetailsResponse } from "./types";
 
 interface ItemHeaderProps {
   item: Item;
-  server: Server;
+  server: ServerPublic;
   statistics: ItemDetailsResponse;
   serverId: number;
 }

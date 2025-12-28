@@ -10,7 +10,7 @@ import {
 import { eq } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
-import { getServer } from "@/lib/db/server";
+import { getServerWithSecrets } from "@/lib/db/server";
 
 type JellyfinSystemInfo = { Id?: string };
 
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify the target server exists
-    const targetServer = await getServer({ serverId: serverIdNum });
+    const targetServer = await getServerWithSecrets({ serverId: serverIdNum });
     if (!targetServer) {
       return NextResponse.json(
         { error: "Target server not found" },

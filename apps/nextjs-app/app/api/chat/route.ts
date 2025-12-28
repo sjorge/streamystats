@@ -6,7 +6,7 @@ import {
 } from "ai";
 import { type ChatConfig, createChatModel } from "@/lib/ai/providers";
 import { createChatTools } from "@/lib/ai/tools";
-import { getServer } from "@/lib/db/server";
+import { getServerWithSecrets } from "@/lib/db/server";
 import { getMe } from "@/lib/db/users";
 
 export const maxDuration = 60;
@@ -74,7 +74,10 @@ export async function POST(req: Request) {
       });
     }
 
-    const [server, me] = await Promise.all([getServer({ serverId }), getMe()]);
+    const [server, me] = await Promise.all([
+      getServerWithSecrets({ serverId }),
+      getMe(),
+    ]);
 
     if (!server) {
       return new Response(JSON.stringify({ error: "Server not found" }), {
@@ -125,24 +128,6 @@ Current user context:
       stopWhen: stepCountIs(5),
       onError: ({ error }) => {
         console.error("[Chat API] Stream error:", error);
-      },
-      onFinish: ({
-        text,
-        toolCalls,
-        toolResults,
-        usage,
-        finishReason,
-        steps,
-      }) => {
-        console.log("[Chat API] Stream finished:", {
-          finishReason,
-          stepsCount: steps?.length,
-          textLength: text?.length,
-          text: text?.slice(0, 200),
-          toolCallsCount: toolCalls?.length,
-          toolResultsCount: toolResults?.length,
-          usage,
-        });
       },
     });
 

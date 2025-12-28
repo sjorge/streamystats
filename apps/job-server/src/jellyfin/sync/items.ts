@@ -1091,14 +1091,14 @@ function hasImageFieldsChanged(
   ];
 
   for (const field of imageFields) {
-    if (existing[field] !== newItem[field]) {
+    if ((existing as Record<string, unknown>)[field] !== (newItem as Record<string, unknown>)[field]) {
       return true;
     }
   }
 
   // Also check rawData for backdrop image tags and image blur hashes
-  const existingRaw = existing.rawData || {};
-  const newRaw = newItem.rawData || {};
+  const existingRaw = (existing.rawData || {}) as Record<string, unknown>;
+  const newRaw = (newItem.rawData || {}) as Record<string, unknown>;
 
   if (
     JSON.stringify(existingRaw.BackdropImageTags) !==

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Container } from "@/components/Container";
 import { getServer } from "@/lib/db/server";
-import { getMe } from "@/lib/db/users";
+import { getMe, isUserAdmin } from "@/lib/db/users";
 import { getWatchlistWithItemsLite } from "@/lib/db/watchlists";
 import { WatchlistHeader } from "./WatchlistHeader";
 import { WatchlistItems } from "./WatchlistItems";
@@ -42,10 +42,15 @@ export default async function WatchlistDetailPage({
   }
 
   const isOwner = watchlist.userId === me.id;
+  const isAdmin = await isUserAdmin();
 
   return (
     <Container>
-      <WatchlistHeader watchlist={watchlist} isOwner={isOwner} />
+      <WatchlistHeader
+        watchlist={watchlist}
+        isOwner={isOwner}
+        isAdmin={isAdmin}
+      />
       <WatchlistItems
         watchlist={watchlist}
         isOwner={isOwner}

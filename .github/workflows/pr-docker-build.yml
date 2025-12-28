@@ -46,6 +46,27 @@ jobs:
       - name: Run tests
         run: bun test
 
+  typecheck:
+    name: Typecheck (tsc --noEmit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck nextjs-app
+        run: bun run typecheck:nextjs
+
+      - name: Typecheck job-server
+        run: bun run typecheck:job-server
+
   build-and-push:
     runs-on: ubuntu-latest
     strategy:
@@ -105,7 +126,7 @@ jobs:
 
   summary:
     runs-on: ubuntu-latest
-    needs: [lint, test, build-and-push]
+    needs: [lint, test, typecheck, build-and-push]
     if: always()
     steps:
       - name: PR Build Summary

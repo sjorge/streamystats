@@ -2,8 +2,7 @@ import { jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { basePath } from "@/lib/utils";
-import { getServer } from "./lib/db/server";
-import { getServers } from "./lib/server";
+import { getServer, getServers } from "./lib/db/server";
 
 /**
  * Middleware with Signed Session Authentication

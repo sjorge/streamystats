@@ -3,6 +3,8 @@ import type { Job } from "pg-boss";
 import {
   syncServerDataJob,
   addServerJob,
+  backfillJellyfinIdsJob,
+  BACKFILL_JOB_NAMES,
   generateItemEmbeddingsJob,
   geolocateActivitiesJob,
   calculateFingerprintsJob,
@@ -109,6 +111,7 @@ async function createQueues(boss: PgBoss) {
     GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
     GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
     SECURITY_SYNC_JOB_NAME,
+    BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS,
   ];
 
   for (const name of queueNames) {
@@ -199,6 +202,13 @@ async function registerJobHandlers(boss: PgBoss) {
     SECURITY_SYNC_JOB_NAME,
     { batchSize: 1 },
     wrapHandler(securityFullSyncJob)
+  );
+
+  // Register backfill jobs
+  await boss.work(
+    BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS,
+    { batchSize: 1 },
+    wrapHandler(backfillJellyfinIdsJob)
   );
 
   console.log("All job handlers registered successfully");

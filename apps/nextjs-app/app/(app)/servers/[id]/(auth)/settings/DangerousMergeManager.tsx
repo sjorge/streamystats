@@ -34,13 +34,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 import { fetch } from "@/lib/utils";
 
 const ITEMS_PER_PAGE = 25;
 
 interface DangerousMergeManagerProps {
-  server: Server;
+  server: ServerPublic;
 }
 
 interface DangerousMatch {

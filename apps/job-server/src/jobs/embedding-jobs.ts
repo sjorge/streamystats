@@ -29,9 +29,102 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RATE_LIMIT_DELAY = 500;
 const ITEMS_PER_BATCH = 100; // Items to fetch from DB at a time
 const API_BATCH_SIZE = 20; // Items to send to embedding API at once
+const MAX_CONSECUTIVE_BATCH_FAILURES = 5;
 
 // Track if index has been ensured this session (per dimension)
 const indexEnsuredForDimension = new Set<number>();
+
+function sanitizeErrorMessage(message: string): string {
+  // postgres-js style errors can include the full parameter list. For embeddings that’s a 1536-length
+  // vector which is noisy and can bloat logs.
+  if (message.includes("Failed query:") && message.includes("params:")) {
+    const beforeParams = message.split("params:")[0]?.trimEnd() ?? message;
+    return `${beforeParams}\nparams: [redacted]`;
+  }
+
+  // Safety net: cap extremely long messages to avoid log spam.
+  const MAX_LEN = 2000;
+  if (message.length > MAX_LEN) {
+    return `${message.slice(0, MAX_LEN)}…[truncated]`;
+  }
+
+  return message;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!error) return "Unknown error";
+  if (error instanceof Error) return sanitizeErrorMessage(error.message);
+  try {
+    return sanitizeErrorMessage(JSON.stringify(error));
+  } catch {
+    return sanitizeErrorMessage(String(error));
+  }
+}
+
+function isUnsupportedDimensionsParamError(error: unknown): boolean {
+  const msg = getErrorMessage(error).toLowerCase();
+  return (
+    (msg.includes("dimension") || msg.includes("dimensions")) &&
+    (msg.includes("unknown") ||
+      msg.includes("unsupported") ||
+      msg.includes("unrecognized") ||
+      msg.includes("invalid") ||
+      msg.includes("unexpected"))
+  );
+}
+
+function getHttpStatus(error: unknown): number | null {
+  const anyErr = error as { status?: unknown; response?: { status?: unknown } };
+  if (typeof anyErr?.status === "number") return anyErr.status;
+  if (typeof anyErr?.response?.status === "number") return anyErr.response.status;
+  return null;
+}
+
+function getRequestId(error: unknown): string | null {
+  const anyErr = error as {
+    request_id?: unknown;
+    headers?: Record<string, unknown>;
+    response?: { headers?: Record<string, unknown> };
+  };
+
+  if (typeof anyErr?.request_id === "string") return anyErr.request_id;
+
+  const headers = anyErr?.headers ?? anyErr?.response?.headers ?? null;
+  if (!headers) return null;
+
+  const raw =
+    headers["x-request-id"] ??
+    headers["X-Request-Id"] ??
+    headers["request-id"] ??
+    headers["Request-Id"];
+  return typeof raw === "string" ? raw : null;
+}
+
+function getOpenAIErrorInfo(error: unknown): {
+  status: number | null;
+  type: string | null;
+  code: string | null;
+  message: string;
+  requestId: string | null;
+} {
+  const anyErr = error as {
+    error?: { type?: unknown; code?: unknown; message?: unknown };
+  };
+  return {
+    status: getHttpStatus(error),
+    type: typeof anyErr?.error?.type === "string" ? anyErr.error.type : null,
+    code: typeof anyErr?.error?.code === "string" ? anyErr.error.code : null,
+    message:
+      typeof anyErr?.error?.message === "string"
+        ? anyErr.error.message
+        : getErrorMessage(error),
+    requestId: getRequestId(error),
+  };
+}
+
+function toPgVectorLiteral(value: number[]): string {
+  return `[${value.join(",")}]`;
+}
 
 /**
  * Check if stop has been requested for a server.
@@ -214,6 +307,7 @@ async function processOpenAIBatch(
   let processed = 0;
   let skipped = 0;
   let errors = 0;
+  let firstDbWriteError: string | null = null;
 
   const batchData: { item: Item; text: string }[] = [];
   const toSkip: Item[] = [];
@@ -241,11 +335,25 @@ async function processOpenAIBatch(
   }
 
   const texts = batchData.map((d) => d.text);
-  const response = await client.embeddings.create({
-    model: config.model,
-    input: texts,
-    ...(config.dimensions ? { dimensions: config.dimensions } : {}),
-  });
+  let response: Awaited<ReturnType<typeof client.embeddings.create>>;
+  try {
+    response = await client.embeddings.create({
+      model: config.model,
+      input: texts,
+      ...(config.dimensions ? { dimensions: config.dimensions } : {}),
+    });
+  } catch (error) {
+    // Some OpenAI-compatible providers (and some models) reject the optional `dimensions` param.
+    // Retry once without it so the job can still proceed when embeddings are supported.
+    if (config.dimensions && isUnsupportedDimensionsParamError(error)) {
+      response = await client.embeddings.create({
+        model: config.model,
+        input: texts,
+      });
+    } else {
+      throw error;
+    }
+  }
 
   if (!response.data || response.data.length !== batchData.length) {
     throw new Error(
@@ -269,14 +377,24 @@ async function processOpenAIBatch(
     }
 
     try {
+      const vectorLiteral = toPgVectorLiteral(embedding);
       await db
         .update(items)
-        .set({ embedding, processed: true })
+        .set({ embedding: sql`${vectorLiteral}::vector`, processed: true })
         .where(eq(items.id, item.id));
       processed++;
-    } catch {
+    } catch (err) {
+      if (!firstDbWriteError) {
+        firstDbWriteError = getErrorMessage(err);
+      }
       errors++;
     }
+  }
+
+  // If we got embeddings back but couldn't persist any of them, continuing will just rack up "errors"
+  // and never make forward progress. Fail fast with the underlying DB error.
+  if (processed === 0 && firstDbWriteError) {
+    throw new Error(`Failed to persist embeddings to DB: ${firstDbWriteError}`);
   }
 
   return { processed, skipped, errors };
@@ -323,7 +441,7 @@ async function processOllamaItem(
 
   await db
     .update(items)
-    .set({ embedding, processed: true })
+    .set({ embedding: sql`${toPgVectorLiteral(embedding)}::vector`, processed: true })
     .where(eq(items.id, item.id));
   return { processed: 1, skipped: 0, errors: 0 };
 }
@@ -344,6 +462,8 @@ export async function generateItemEmbeddingsJob(
   let totalErrors = 0;
   let lastHeartbeat = Date.now();
   let stopped = false;
+  let consecutiveBatchFailures = 0;
+  let lastBatchError: string | null = null;
 
   const serverMeta = await db
     .select({ name: servers.name })
@@ -371,6 +491,7 @@ export async function generateItemEmbeddingsJob(
           processed: totalProcessed,
           skipped: totalSkipped,
           errors: totalErrors,
+          lastError: lastBatchError,
           lastHeartbeat: new Date().toISOString(),
         },
         Date.now() - startTime
@@ -387,7 +508,7 @@ export async function generateItemEmbeddingsJob(
     }
 
     console.info(
-      `[embeddings] server=${serverName} serverId=${serverId} action=start provider=${provider} model=${config.model}`
+      `[embeddings] server=${serverName} serverId=${serverId} action=start provider=${provider} model=${config.model} dimensions=${config.dimensions} baseUrl=${config.baseUrl}`
     );
 
     await logJobResult(
@@ -431,8 +552,15 @@ export async function generateItemEmbeddingsJob(
     // Create OpenAI client if needed
     let openaiClient: OpenAI | null = null;
     if (provider === "openai-compatible") {
+      const apiKey = config.apiKey?.trim();
+      console.info(
+        `[embeddings] server=${serverName} serverId=${serverId} action=authConfigured provider=${provider} apiKeyPresent=${Boolean(
+          apiKey && apiKey.length > 0
+        )}`
+      );
       openaiClient = new OpenAI({
-        apiKey: config.apiKey || "not-needed",
+        // Trim to avoid copy/paste whitespace/newline issues causing 401s.
+        apiKey: apiKey && apiKey.length > 0 ? apiKey : "not-needed",
         baseURL: config.baseUrl,
         timeout: TIMEOUT_CONFIG.DEFAULT,
         maxRetries: DEFAULT_MAX_RETRIES,
@@ -508,6 +636,8 @@ export async function generateItemEmbeddingsJob(
             totalProcessed += result.processed;
             totalSkipped += result.skipped;
             totalErrors += result.errors;
+            consecutiveBatchFailures = 0;
+            lastBatchError = null;
           } catch (batchError) {
             if (batchError instanceof Error) {
               if (batchError.message.includes("rate_limit")) {
@@ -518,17 +648,39 @@ export async function generateItemEmbeddingsJob(
               }
               if (
                 batchError.message.includes("invalid_api_key") ||
-                batchError.message.includes("401")
+                getHttpStatus(batchError) === 401
               ) {
-                throw new Error("Invalid API key.");
+                const info = getOpenAIErrorInfo(batchError);
+                throw new Error(
+                  `Embeddings provider returned 401 (unauthorized). ` +
+                    `baseUrl=${config.baseUrl} ` +
+                    `type=${info.type ?? "unknown"} code=${info.code ?? "unknown"} ` +
+                    `requestId=${info.requestId ?? "unknown"} ` +
+                    `message=${info.message}`
+                );
               }
               // Dimension mismatch should propagate
               if (batchError.message.includes("Dimension mismatch")) {
                 throw batchError;
               }
+              // Deterministic failures (DB schema/extension issues) should fail fast.
+              if (batchError.message.includes("Failed to persist embeddings to DB")) {
+                throw batchError;
+              }
             }
-            console.error(`Batch error:`, batchError);
+            consecutiveBatchFailures++;
+            lastBatchError = getErrorMessage(batchError);
+            console.error(
+              `[embeddings] server=${serverName} serverId=${serverId} action=batchError provider=${provider} model=${config.model} baseUrl=${config.baseUrl} consecutiveFailures=${consecutiveBatchFailures} error=${lastBatchError}`
+            );
             totalErrors += apiBatch.length;
+
+            // Avoid infinite loops when provider/config is invalid (e.g. wrong model/baseUrl).
+            if (consecutiveBatchFailures >= MAX_CONSECUTIVE_BATCH_FAILURES) {
+              throw new Error(
+                `Embeddings failed repeatedly (${consecutiveBatchFailures} consecutive batch failures). Last error: ${lastBatchError}`
+              );
+            }
           }
 
           await sleep(DEFAULT_RATE_LIMIT_DELAY);

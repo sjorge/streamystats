@@ -11,7 +11,7 @@
     "dev": "bun run dev:all",
     "build": "bun run build:all",
     "start": "bun run start:all",
-    "dev:job-server": "cd apps/job-server && bun run dev",
+    "dev:job-server": "cd apps/job-server && bun --env-file=../../.env run --watch src/index.ts",
     "dev:nextjs": "cd apps/nextjs-app && bun run dev",
     "dev:all": "bun run dev:job-server & bun run dev:nextjs",
     "start:job-server": "cd apps/job-server && bun run start",
@@ -28,6 +28,9 @@
     "lint:fix": "cd apps/nextjs-app && bun run lint:fix",
     "format": "cd apps/nextjs-app && bun run format",
     "format:fix": "cd apps/nextjs-app && bun run format:fix",
+    "typecheck": "bun run typecheck:nextjs && bun run typecheck:job-server",
+    "typecheck:nextjs": "cd apps/nextjs-app && bun run typecheck",
+    "typecheck:job-server": "cd apps/job-server && bun run typecheck",
     "install:bun": "bun install"
   },
   "keywords": [

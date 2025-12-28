@@ -19,6 +19,19 @@ const vector = (0, pg_core_1.customType)({
         return `[${value.join(",")}]`;
     },
 });
+// Custom tsvector type for full-text search
+// This column is populated by triggers in the database
+const tsvector = (0, pg_core_1.customType)({
+    dataType() {
+        return "tsvector";
+    },
+    fromDriver(value) {
+        return value;
+    },
+    toDriver(value) {
+        return value;
+    },
+});
 const drizzle_orm_1 = require("drizzle-orm");
 // =============================================================================
 // Tables
@@ -26,6 +39,7 @@ const drizzle_orm_1 = require("drizzle-orm");
 // Servers table - main server configurations
 exports.servers = (0, pg_core_1.pgTable)("servers", {
     id: (0, pg_core_1.serial)("id").primaryKey(),
+    jellyfinId: (0, pg_core_1.text)("jellyfin_id"), // Unique Jellyfin server ID from /System/Info
     name: (0, pg_core_1.text)("name").notNull(),
     url: (0, pg_core_1.text)("url").notNull(),
     apiKey: (0, pg_core_1.text)("api_key").notNull(),
@@ -168,7 +182,12 @@ exports.users = (0, pg_core_1.pgTable)("users", {
         .default("CreateAndJoinGroups"),
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-});
+    // Full-text search vector - populated by database trigger
+    searchVector: tsvector("search_vector"),
+}, (table) => [
+    (0, pg_core_1.index)("users_server_id_idx").on(table.serverId),
+    (0, pg_core_1.index)("users_search_vector_idx").using("gin", table.searchVector),
+]);
 // Activities table - user activities and server events
 exports.activities = (0, pg_core_1.pgTable)("activities", {
     id: (0, pg_core_1.text)("id").primaryKey(), // External activity ID from server
@@ -183,7 +202,12 @@ exports.activities = (0, pg_core_1.pgTable)("activities", {
     userId: (0, pg_core_1.text)("user_id").references(() => exports.users.id, { onDelete: "set null" }), // Optional, some activities aren't user-specific
     itemId: (0, pg_core_1.text)("item_id"), // Optional, media item ID from server
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-});
+    // Full-text search vector - populated by database trigger
+    searchVector: tsvector("search_vector"),
+}, (table) => [
+    (0, pg_core_1.index)("activities_server_id_idx").on(table.serverId),
+    (0, pg_core_1.index)("activities_search_vector_idx").using("gin", table.searchVector),
+]);
 // Job results table
 exports.jobResults = (0, pg_core_1.pgTable)("job_results", {
     id: (0, pg_core_1.serial)("id").primaryKey(),
@@ -279,6 +303,9 @@ exports.items = (0, pg_core_1.pgTable)("items", {
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
     // Soft delete
     deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
+    // Full-text search vector - populated by database trigger
+    // Contains: name, originalTitle, overview, seriesName, genres, people (actors/directors)
+    searchVector: tsvector("search_vector"),
 }, 
 // Note: Vector index must be created manually per dimension using:
 // CREATE INDEX items_embedding_idx ON items USING hnsw ((embedding::vector(N)) vector_cosine_ops)
@@ -286,6 +313,7 @@ exports.items = (0, pg_core_1.pgTable)("items", {
 (table) => [
     (0, pg_core_1.index)("items_server_type_idx").on(table.serverId, table.type),
     (0, pg_core_1.index)("items_series_id_idx").on(table.seriesId),
+    (0, pg_core_1.index)("items_search_vector_idx").using("gin", table.searchVector),
 ]);
 // Sessions table - user sessions and playback information
 exports.sessions = (0, pg_core_1.pgTable)("sessions", {
@@ -509,13 +537,18 @@ exports.watchlists = (0, pg_core_1.pgTable)("watchlists", {
     name: (0, pg_core_1.text)("name").notNull(),
     description: (0, pg_core_1.text)("description"),
     isPublic: (0, pg_core_1.boolean)("is_public").notNull().default(false),
+    isPromoted: (0, pg_core_1.boolean)("is_promoted").notNull().default(false), // Admin-only: visible on all users' home screens in external clients
     allowedItemType: (0, pg_core_1.text)("allowed_item_type"), // If set, only items of this type can be added (Movie, Series, Episode, etc.)
     defaultSortOrder: (0, pg_core_1.text)("default_sort_order").notNull().default("custom"), // custom, name, dateAdded, releaseDate
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+    // Full-text search vector - populated by database trigger
+    searchVector: tsvector("search_vector"),
 }, (table) => [
     (0, pg_core_1.index)("watchlists_server_user_idx").on(table.serverId, table.userId),
     (0, pg_core_1.index)("watchlists_server_public_idx").on(table.serverId, table.isPublic),
+    (0, pg_core_1.index)("watchlists_server_promoted_idx").on(table.serverId, table.isPromoted),
+    (0, pg_core_1.index)("watchlists_search_vector_idx").using("gin", table.searchVector),
 ]);
 // Watchlist items junction table - items within watchlists
 exports.watchlistItems = (0, pg_core_1.pgTable)("watchlist_items", {

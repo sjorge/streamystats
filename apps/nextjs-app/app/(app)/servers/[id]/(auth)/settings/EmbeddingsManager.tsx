@@ -44,7 +44,7 @@ import {
   stopEmbedding,
   toggleAutoEmbeddings,
 } from "@/lib/db/server";
-import type { Server } from "@/lib/types";
+import type { ServerPublic } from "@/lib/types";
 
 // Presets for common embedding providers
 const PROVIDER_PRESETS = {
@@ -117,7 +117,7 @@ const PROVIDER_PRESETS = {
 type PresetKey = keyof typeof PROVIDER_PRESETS;
 
 // Detect preset from server config
-function detectPreset(server: Server): PresetKey {
+function detectPreset(server: ServerPublic): PresetKey {
   const baseUrl = server.embeddingBaseUrl || "";
   for (const [key, preset] of Object.entries(PROVIDER_PRESETS)) {
     if (key !== "custom" && baseUrl === preset.baseUrl) {
@@ -127,7 +127,7 @@ function detectPreset(server: Server): PresetKey {
   return baseUrl ? "custom" : "openai";
 }
 
-export function EmbeddingsManager({ server }: { server: Server }) {
+export function EmbeddingsManager({ server }: { server: ServerPublic }) {
   // Preset selection
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>(
     detectPreset(server),
@@ -139,7 +139,7 @@ export function EmbeddingsManager({ server }: { server: Server }) {
   );
   // Don't pre-fill API key for security - just track if one exists
   const [apiKey, setApiKey] = useState("");
-  const hasExistingApiKey = Boolean(server.embeddingApiKey);
+  const hasExistingApiKey = server.hasEmbeddingApiKey;
   const [model, setModel] = useState(
     server.embeddingModel || PROVIDER_PRESETS.openai.defaultModel,
   );

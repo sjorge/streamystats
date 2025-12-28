@@ -2,7 +2,7 @@ import { db, items, users } from "@streamystats/database";
 import { eq } from "drizzle-orm";
 import { requireSession } from "@/lib/api-auth";
 import type { ActiveSession } from "@/lib/db/active-sessions";
-import { getServer } from "@/lib/db/server";
+import { getServerWithSecrets } from "@/lib/db/server";
 
 export async function GET(request: Request) {
   // Require valid session to view active sessions
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const server = await getServer({ serverId });
+  const server = await getServerWithSecrets({ serverId });
 
   if (!server) {
     return new Response(

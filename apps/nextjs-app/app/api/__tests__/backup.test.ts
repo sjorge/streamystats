@@ -51,7 +51,7 @@ describe("backup export/import routes", () => {
     }));
 
     bunMock.module("@/lib/db/server", () => ({
-      getServer: async () => ({
+      getServerWithSecrets: async () => ({
         id: 1,
         name: "My Server",
         url: "http://jellyfin.local",
@@ -162,7 +162,7 @@ describe("backup export/import routes", () => {
     }));
 
     bunMock.module("@/lib/db/server", () => ({
-      getServer: async () => ({
+      getServerWithSecrets: async () => ({
         id: 99,
         name: "Target Server",
         url: "http://jellyfin.local",

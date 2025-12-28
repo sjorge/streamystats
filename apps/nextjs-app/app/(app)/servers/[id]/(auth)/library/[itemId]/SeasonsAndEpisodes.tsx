@@ -1,6 +1,6 @@
 "use client";
 
-import type { Item, Server } from "@streamystats/database/schema";
+import type { Item } from "@streamystats/database/schema";
 import { Calendar, Clock, Play, Tv } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,15 +14,22 @@ import {
 } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SeasonEpisode } from "@/lib/db/items";
+import type { ServerPublic } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 
 interface SeasonsAndEpisodesProps {
   seasons: SeasonEpisode[];
   serverId: number;
-  server: Server;
+  server: ServerPublic;
 }
 
-function EpisodePoster({ episode, server }: { episode: Item; server: Server }) {
+function EpisodePoster({
+  episode,
+  server,
+}: {
+  episode: Item;
+  server: ServerPublic;
+}) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 

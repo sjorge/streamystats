@@ -1,7 +1,7 @@
 import { atomWithStorage } from "jotai/utils";
-import type { Server } from "../types";
+import type { ServerPublic } from "../types";
 
-export const serverAtom = atomWithStorage<Server | null>(
+export const serverAtom = atomWithStorage<ServerPublic | null>(
   "selectedServer",
   null,
 );
