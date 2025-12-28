@@ -5,6 +5,7 @@ import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
 import { GEOLOCATION_JOB_NAMES } from "./geolocation-jobs";
+import { BACKFILL_JOB_NAMES } from "./server-jobs";
 import { cleanupDeletedItems } from "../jellyfin/sync/deleted-items";
 import { cancelJobsByName } from "../routes/jobs/utils";
 
@@ -75,6 +76,7 @@ class SyncScheduler {
     }
 
     await this.performStartupCleanup();
+    await this.triggerJellyfinIdBackfill();
     
     const skipStartupFullSync = 
       Bun.env.SKIP_STARTUP_FULL_SYNC?.toLowerCase() === "true" ||
@@ -335,6 +337,32 @@ class SyncScheduler {
           )
         )
       );
+  }
+
+  /**
+   * Backfill Jellyfin server IDs for existing servers missing jellyfinId
+   * This is a one-time startup job that only runs if there are servers without IDs
+   */
+  private async triggerJellyfinIdBackfill(): Promise<void> {
+    try {
+      // Check if any servers are missing jellyfinId
+      const serversWithoutId = await db
+        .select({ id: servers.id })
+        .from(servers)
+        .where(isNull(servers.jellyfinId))
+        .limit(1);
+
+      if (serversWithoutId.length === 0) {
+        console.log("[scheduler] trigger=jellyfin-id-backfill status=skipped reason=all-servers-have-ids");
+        return;
+      }
+
+      console.log("[scheduler] trigger=jellyfin-id-backfill");
+      const boss = await getJobQueue();
+      await boss.send(BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS, {});
+    } catch (error) {
+      console.error("[scheduler] trigger=jellyfin-id-backfill status=error", error);
+    }
   }
 
   /**
@@ -798,9 +826,7 @@ class SyncScheduler {
                 .where(eq(jobResults.id, staleJob.id));
 
               cleanedCount++;
-              console.log(
-                `[cleanup] type=stale-embedding serverId=${serverId}`
-              );
+              console.info(`[cleanup] type=stale-embedding serverId=${serverId}`);
             }
           }
         } catch (error) {
@@ -809,7 +835,7 @@ class SyncScheduler {
       }
 
       if (cleanedCount > 0) {
-        console.log(
+        console.info(
           `[cleanup] type=stale-embedding cleanedCount=${cleanedCount}`
         );
       }
