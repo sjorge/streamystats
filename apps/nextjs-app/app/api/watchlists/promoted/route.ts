@@ -11,7 +11,7 @@ import {
 import {
   getPromotedWatchlists,
   getWatchlistPreviewItems,
-  type WatchlistWithItemCount,
+  type WatchlistWithItemCountSanitized,
 } from "@/lib/db/watchlists";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -29,7 +29,7 @@ export type PromotedWatchlistIdsResponse = {
   total: number;
 };
 
-export type PromotedWatchlistFullItem = WatchlistWithItemCount & {
+export type PromotedWatchlistFullItem = WatchlistWithItemCountSanitized & {
   previewItems: Array<{
     id: string;
     name: string | null;
