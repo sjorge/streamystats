@@ -24,15 +24,16 @@ import { formatError } from "../utils/format-error";
 import { shouldLog } from "../utils/log-throttle";
 import { normalizeTimeoutMs } from "../utils/sleep";
 
-// Timeout for individual poll operations (30 seconds)
-const POLL_TIMEOUT_MS = 30_000;
-// Max time a poll can run before watchdog considers it stuck (60 seconds)
-const WATCHDOG_THRESHOLD_MS = 60_000;
+// Timeout for individual poll operations (3 minutes to allow for retries)
+const POLL_TIMEOUT_MS = 3 * 60_000;
+// Max time a poll can run before watchdog considers it stuck (5 minutes)
+const WATCHDOG_THRESHOLD_MS = 5 * 60_000;
 // How often to log heartbeats showing poller is alive (5 minutes)
 const HEARTBEAT_LOG_INTERVAL_MS = 5 * 60_000;
-// Default per-server request timeout (fail fast, let backoff handle longer outages)
-// Increased to reduce false "server down" during Jellyfin load spikes / cold starts.
-const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 15_000;
+// Default per-server request timeout (1 minute to handle slow Jellyfin responses)
+const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 60_000;
+// Default retries for Jellyfin requests
+const DEFAULT_SERVER_RETRIES = 3;
 // Default server poll concurrency
 const DEFAULT_SERVER_CONCURRENCY = 3;
 // DB statement timeout to prevent DB stalls from wedging session tracking
@@ -64,6 +65,7 @@ interface SessionPollerConfig {
   enabled?: boolean;
   pollTimeoutMs?: number;
   serverRequestTimeoutMs?: number;
+  serverRetries?: number;
   serverConcurrency?: number;
 }
 
@@ -119,6 +121,9 @@ class SessionPoller {
     const envServerTimeoutMs = Bun.env.SESSION_POLL_SERVER_TIMEOUT_MS
       ? Number.parseInt(Bun.env.SESSION_POLL_SERVER_TIMEOUT_MS, 10)
       : undefined;
+    const envServerRetries = Bun.env.SESSION_POLL_SERVER_RETRIES
+      ? Number.parseInt(Bun.env.SESSION_POLL_SERVER_RETRIES, 10)
+      : undefined;
     const envServerConcurrency = Bun.env.SESSION_POLL_SERVER_CONCURRENCY
       ? Number.parseInt(Bun.env.SESSION_POLL_SERVER_CONCURRENCY, 10)
       : undefined;
@@ -130,6 +135,10 @@ class SessionPoller {
         config.serverRequestTimeoutMs ??
         envServerTimeoutMs ??
         DEFAULT_SERVER_REQUEST_TIMEOUT_MS,
+      serverRetries:
+        config.serverRetries ??
+        envServerRetries ??
+        DEFAULT_SERVER_RETRIES,
       serverConcurrency:
         config.serverConcurrency ??
         envServerConcurrency ??
@@ -158,6 +167,7 @@ class SessionPoller {
       intervalMs: this.config.intervalMs,
       pollTimeoutMs: this.config.pollTimeoutMs,
       serverRequestTimeoutMs: this.config.serverRequestTimeoutMs,
+      serverRetries: this.config.serverRetries,
       serverConcurrency: this.config.serverConcurrency,
     });
 
@@ -448,7 +458,7 @@ class SessionPoller {
       const client = JellyfinClient.fromServer(server);
       const currentSessions = await client.getSessions({
         timeoutMs: serverTimeoutMs,
-        retries: 0,
+        retries: this.config.serverRetries,
         signal: controller.signal,
       });
       await this.processSessions(server, currentSessions);
@@ -689,6 +699,9 @@ class SessionPoller {
             );
             finalDuration += timeDiff;
           }
+
+          // Skip sessions with duration <= 1 second (consistent with handleEndedSessions)
+          if (finalDuration <= 1) continue;
 
           const percentComplete =
             session.runtimeTicks > 0
@@ -1328,10 +1341,21 @@ class SessionPoller {
         user: tracked.userName,
       });
     } catch (error) {
+      // Log comprehensive error with full session data for debugging
       console.error(
-        `[session] action=save-error serverId=${server.id} error=${formatError(
-          error
-        )}`
+        `[session] action=save-error serverId=${server.id} error=${formatError(error)}\n` +
+          `  Session data that failed to save:\n` +
+          `    sessionKey=${tracked.sessionKey}\n` +
+          `    sessionId=${tracked.sessionId ?? "null"}\n` +
+          `    user=${tracked.userName} (jellyfinId=${tracked.userJellyfinId})\n` +
+          `    item=${tracked.itemName} (itemId=${tracked.itemId})\n` +
+          `    series=${tracked.seriesName ?? "null"} (seriesId=${tracked.seriesId ?? "null"})\n` +
+          `    device=${tracked.deviceName} (deviceId=${tracked.deviceId})\n` +
+          `    client=${tracked.clientName} v${tracked.applicationVersion ?? "unknown"}\n` +
+          `    duration=${finalDuration}s percentComplete=${percentComplete.toFixed(1)}%\n` +
+          `    startTime=${tracked.startTime.toISOString()}\n` +
+          `    positionTicks=${tracked.positionTicks} runtimeTicks=${tracked.runtimeTicks}\n` +
+          `    playMethod=${tracked.playMethod ?? "unknown"} isPaused=${tracked.isPaused}`
       );
     }
   }
@@ -1394,6 +1418,7 @@ class SessionPoller {
       intervalMs: this.config.intervalMs,
       pollTimeoutMs: this.config.pollTimeoutMs,
       serverRequestTimeoutMs: this.config.serverRequestTimeoutMs,
+      serverRetries: this.config.serverRetries,
       serverConcurrency: this.config.serverConcurrency,
       isRunning: this.timerId !== null && !this.stopRequested,
       pollInProgress: this.pollInProgress,
