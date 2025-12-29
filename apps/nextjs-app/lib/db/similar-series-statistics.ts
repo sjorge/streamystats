@@ -206,6 +206,7 @@ async function getUserSpecificSeriesRecommendations(
   );
 
   // Get user's watch history for episodes, aggregated by series
+  // Only include series where user watched at least 2 episodes
   const userSeriesWatchHistory = await db
     .select({
       seriesId: sessions.seriesId,
@@ -227,6 +228,7 @@ async function getUserSpecificSeriesRecommendations(
       ),
     )
     .groupBy(sessions.seriesId)
+    .having(sql`COUNT(DISTINCT ${sessions.itemId}) >= 2`)
     .orderBy(sql`MAX(${sessions.endTime}) DESC`);
 
   debugLog(`📊 Found ${userSeriesWatchHistory.length} series in watch history`);

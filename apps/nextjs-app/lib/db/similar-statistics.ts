@@ -207,6 +207,7 @@ async function getUserSpecificRecommendations(
   ].filter((c): c is Exclude<typeof c, null> => c !== null);
 
   // Get user's watch history with total play duration and recent activity
+  // Only include movies where user watched >50%
   const userWatchHistory = await db
     .select({
       itemId: sessions.itemId,
@@ -215,6 +216,9 @@ async function getUserSpecificRecommendations(
         "totalPlayDuration",
       ),
       lastWatched: sql<Date>`MAX(${sessions.endTime})`.as("lastWatched"),
+      maxPercentComplete: sql<number>`MAX(${sessions.percentComplete})`.as(
+        "maxPercentComplete",
+      ),
     })
     .from(sessions)
     .innerJoin(items, eq(sessions.itemId, items.id))
@@ -222,12 +226,14 @@ async function getUserSpecificRecommendations(
       and(
         eq(sessions.serverId, serverId),
         eq(sessions.userId, userId),
+        eq(items.type, "Movie"),
         isNotNull(items.embedding),
         isNotNull(sessions.playDuration),
         ...sessionTimeConditions,
       ),
     )
     .groupBy(sessions.itemId, items.id)
+    .having(sql`MAX(${sessions.percentComplete}) > 50`)
     .orderBy(sql`MAX(${sessions.endTime}) DESC`);
 
   debugLog(`📊 Found ${userWatchHistory.length} items in watch history`);
@@ -281,6 +287,7 @@ async function getUserSpecificRecommendations(
   });
 
   // Get top watched items ordered by total play duration
+  // Only include movies where user watched >50%
   const topWatchedHistory = await db
     .select({
       itemId: sessions.itemId,
@@ -295,12 +302,14 @@ async function getUserSpecificRecommendations(
       and(
         eq(sessions.serverId, serverId),
         eq(sessions.userId, userId),
+        eq(items.type, "Movie"),
         isNotNull(items.embedding),
         isNotNull(sessions.playDuration),
         ...sessionTimeConditions,
       ),
     )
     .groupBy(sessions.itemId, items.id)
+    .having(sql`MAX(${sessions.percentComplete}) > 50`)
     .orderBy(desc(sql<number>`SUM(${sessions.playDuration})`))
     .limit(10);
 
