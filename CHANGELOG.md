@@ -1,5 +1,69 @@
 # Changelog
 
+## [2.15.0](https://github.com/fredrikburmester/streamystats/compare/v2.14.1...v2.15.0) (2025-12-29)
+
+
+### Features
+
+* add backfill endpoint for Jellyfin server IDs and update server data structure in job-server module ([61ae969](https://github.com/fredrikburmester/streamystats/commit/61ae9690d7c1d7dd7e76aee8c667c5a09331fe2f))
+* add jellyfinId to servers and isPromoted to watchlists ([892906f](https://github.com/fredrikburmester/streamystats/commit/892906fd410b1aae54010bcdf87fa4e46281f48e))
+* add new API endpoints for recommendations and watchlists, including server identification and query parameters ([7cbfbce](https://github.com/fredrikburmester/streamystats/commit/7cbfbce86e224f070d376799b1e1ca1bf6be2443))
+* add OCI source label to Docker images for Renovatebot support ([73dd6ef](https://github.com/fredrikburmester/streamystats/commit/73dd6ef2242ca32287eb75e29680448eff679cd5)), closes [#276](https://github.com/fredrikburmester/streamystats/issues/276)
+* add promoted watchlists and external API improvements ([a61ec2c](https://github.com/fredrikburmester/streamystats/commit/a61ec2cca8cb3de561d7f920793bb266db4024a0))
+* Add session poller resilience and monitoring ([2a2dcdc](https://github.com/fredrikburmester/streamystats/commit/2a2dcdcfec1b073f8215d52605b7eddf0b2f96ef))
+* add typechecking scripts and CI workflow ([c49cb69](https://github.com/fredrikburmester/streamystats/commit/c49cb696f8b4162489dac8cc752518d1a384cda4))
+* add vaul dependency and implement Drawer component for improved UI in ChatDialog ([74c3c9c](https://github.com/fredrikburmester/streamystats/commit/74c3c9c754aa5d5a659aa6114ba59e98e975a3ed))
+* almost done watching heatmap for user page (and me page) ([227998b](https://github.com/fredrikburmester/streamystats/commit/227998bb9ba5db2052b0e242438e8f60e7c9dd19))
+* bun test job in pr builds ([9013145](https://github.com/fredrikburmester/streamystats/commit/9013145c4fbc32d14270b5d35c05680c43adc529))
+* enhance ActivityLogTable with user and activity type filters ([c60786a](https://github.com/fredrikburmester/streamystats/commit/c60786a35678e2f31efa8e9bd9ab0bdb84a44882))
+* enhance error handling and logging in embedding jobs ([b63894f](https://github.com/fredrikburmester/streamystats/commit/b63894fe622dff94943c4e7c75c11907a03608ae))
+* export new backfill job and constants from server-jobs module ([d38c43d](https://github.com/fredrikburmester/streamystats/commit/d38c43d050ea49c57101b97e451a83b49b1c16a6))
+* global search ([31a4f21](https://github.com/fredrikburmester/streamystats/commit/31a4f21063bdd9eae90c1d58f17d6e78f35fcbe4))
+* global search ([d06c631](https://github.com/fredrikburmester/streamystats/commit/d06c631f71a226e977e27a0082b4569d1a4140a3))
+* implement backfill job for Jellyfin IDs and enhance server data handling in job-server module ([36feea9](https://github.com/fredrikburmester/streamystats/commit/36feea95f73acd1d18294fb4cc77aa05ea584f62))
+* implement Jellyfin ID backfill trigger in SyncScheduler for servers without IDs ([f6a8638](https://github.com/fredrikburmester/streamystats/commit/f6a863855fa6e8c50791639e7facc8d59df1100c))
+* implement WatchlistsGrid component for displaying and managing user watchlists ([dccd851](https://github.com/fredrikburmester/streamystats/commit/dccd85138feb8d11b0542c213543fe26158a9269))
+* infer sessions based on items marked as played ([4f67f28](https://github.com/fredrikburmester/streamystats/commit/4f67f28cf76f30e61a102c1e7d0ed6ebdfa9fdde))
+* infer sessions based on items marked as played ([fbb5f9e](https://github.com/fredrikburmester/streamystats/commit/fbb5f9ef6ff6c70ddb363695a054ef116ab7dd8f))
+* **recommendations:** add series recommendations support ([32c660a](https://github.com/fredrikburmester/streamystats/commit/32c660a2e948694b05851af35132571f65bf124a))
+* register backfill job for Jellyfin IDs in job queue ([3d6a787](https://github.com/fredrikburmester/streamystats/commit/3d6a7876953ca44ea5b6e6758df9540f766f8e55))
+* show people sync in settings ([9327a5c](https://github.com/fredrikburmester/streamystats/commit/9327a5ce454df94d44cd98abbc12e4952adfb2ba))
+* show people sync progress in settings ([c762e04](https://github.com/fredrikburmester/streamystats/commit/c762e041b80bcaf0280902277ded2166f781d570))
+* watchlists ([7df353d](https://github.com/fredrikburmester/streamystats/commit/7df353de7b97166f507177a4adbdae8c6d8e10fc))
+* **watchlists:** add MediaBrowser auth support and sanitize searchVector from responses ([a0962df](https://github.com/fredrikburmester/streamystats/commit/a0962df7ffff220dcfca4089c4e46cf2ea0809cf))
+
+
+### Bug Fixes
+
+* actors breadcrumbs ([55cb29e](https://github.com/fredrikburmester/streamystats/commit/55cb29eb3f79aa60974e2647731989e97fca19d3))
+* add authentication to people-sync-progress endpoint ([14650da](https://github.com/fredrikburmester/streamystats/commit/14650daecffbba78b565463d71661509309d8bc9))
+* connection issues ([12a0ba6](https://github.com/fredrikburmester/streamystats/commit/12a0ba6a3edd04e78f507d2ee6d03219b4de53a2))
+* date filter ([57e9df3](https://github.com/fredrikburmester/streamystats/commit/57e9df338eb472fc40729768bfee210b2d2fcf10))
+* design ([1359c02](https://github.com/fredrikburmester/streamystats/commit/1359c02239ff858cd61a76c27a773a04c8aada88))
+* don't require API key for openai api compatible models ([2a94328](https://github.com/fredrikburmester/streamystats/commit/2a943284fd58bda9d0d567137bb33e6d5925d247))
+* don't show recommended sections if no embeddings ([4e96669](https://github.com/fredrikburmester/streamystats/commit/4e966691e4c1775583904afd3b12bced15d18163))
+* ensure error handling only sends error messages when they are instances of Error ([5542eb6](https://github.com/fredrikburmester/streamystats/commit/5542eb664f4c398f79370db612ec94a396b1cdd6))
+* error ([e638b2c](https://github.com/fredrikburmester/streamystats/commit/e638b2cf6c9b522509b0f10ec3e2e49e2332cfeb))
+* failing test ([6978476](https://github.com/fredrikburmester/streamystats/commit/6978476531de0b02260c01ac01fdb9a7c1277e64))
+* improve loading ([bfe544a](https://github.com/fredrikburmester/streamystats/commit/bfe544ab52d8676b91692758bb99304d78afca60))
+* improve session poller reliability with retries and better error logging ([0912f63](https://github.com/fredrikburmester/streamystats/commit/0912f638adfba5e20a403908707e9491fd172774))
+* improve type safety for image field comparisons in hasImageFieldsChanged function ([255b313](https://github.com/fredrikburmester/streamystats/commit/255b313a597018abd398d14601fa1d54314ca99a))
+* improved api key saving ([51638a2](https://github.com/fredrikburmester/streamystats/commit/51638a24c316db43dee3fb53811f472f2df6fc36))
+* instructions ([c31652a](https://github.com/fredrikburmester/streamystats/commit/c31652a0a3de35a239610e4df73f428137069519))
+* less agressive activities sync ([0746292](https://github.com/fredrikburmester/streamystats/commit/0746292edfae8fde52456f4555d5b2a2b65c081d))
+* less data pulled from jellyfin ([533113f](https://github.com/fredrikburmester/streamystats/commit/533113f08737b13f5e662a663b258536a20a0d71))
+* lint ([af6856e](https://github.com/fredrikburmester/streamystats/commit/af6856e6f68fa6d4bf80cc36596ad76627ba635d))
+* logs ([61bc665](https://github.com/fredrikburmester/streamystats/commit/61bc665f456b6b6b7c86c50a2bd31b8dfbecfab5))
+* move params await inside Suspense to avoid blocking route ([0ef9cef](https://github.com/fredrikburmester/streamystats/commit/0ef9cefa7de54918ef5a8c8f98628a5a925c387d))
+* only include items actually watched ([37b89d7](https://github.com/fredrikburmester/streamystats/commit/37b89d7ea22a2aad1149df1aa1c3ab212b49d011))
+* prevent duplicate sessions and detect item/position changes in session poller ([fe26095](https://github.com/fredrikburmester/streamystats/commit/fe260952d6a417375cb0ab9c345f69f8e184002d))
+* reduce sync frequency and fix repeated item updates ([eb7b9bb](https://github.com/fredrikburmester/streamystats/commit/eb7b9bb268e12fa11437e5a13b8440b2434f8650))
+* scope people sync queries to server ID ([e7fabc4](https://github.com/fredrikburmester/streamystats/commit/e7fabc42072bb1ab2b60a73fb4a8f8f08fb1dc6d))
+* settings menu in sidebar collapsed mode ([12a85a2](https://github.com/fredrikburmester/streamystats/commit/12a85a2636fcbd3df64486e6084dae4640e8b14c))
+* stale job status improvement ([51eae7e](https://github.com/fredrikburmester/streamystats/commit/51eae7e27afb24599004fcadc1277644a447f3b1))
+* use chat for queries ([28c8556](https://github.com/fredrikburmester/streamystats/commit/28c855605507562975af4913f0beb9849b1056ee))
+* wrong db queries $1 ([200c1ed](https://github.com/fredrikburmester/streamystats/commit/200c1edfd917cb4049bf318f9ce55d813ea9c74f))
+
 ## [2.14.1](https://github.com/fredrikburmester/streamystats/compare/v2.14.0...v2.14.1) (2025-12-22)
 
 
