@@ -150,3 +150,9 @@ ISO 8601 UTC with microseconds: `2025-07-23T07:51:42.811836Z`
 
 ### Comments
 Comments must explain *why*, not act as structural headings. No `/* Overview */` style comments.
+
+### Commit Messages
+Use conventional commits format, single line only (no multiline commits). Examples:
+- `feat: add user dashboard`
+- `fix: resolve session timeout issue`
+- `chore: update dependencies`
