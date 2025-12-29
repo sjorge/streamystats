@@ -9,16 +9,15 @@ export default async function Page({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-
   return (
     <Suspense fallback={<LoginSkeleton />}>
-      <LoginContent id={id} />
+      <LoginContent params={params} />
     </Suspense>
   );
 }
 
-async function LoginContent({ id }: { id: string }) {
+async function LoginContent({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const server = await getServer({ serverId: id });
   const servers = await getServers();
 
