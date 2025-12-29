@@ -512,6 +512,16 @@ class SessionPoller {
 
     const filteredSessions = this.filterValidSessions(currentSessions);
 
+    // Debug: log poll cycle info
+    if (filteredSessions.length > 0 || trackedSessions.size > 0) {
+      log("session-poller", {
+        action: "cycle",
+        serverId: server.id,
+        currentSessions: filteredSessions.length,
+        trackedSessions: trackedSessions.size,
+      });
+    }
+
     const changes = this.detectSessionChanges(
       filteredSessions,
       trackedSessions
@@ -1067,9 +1077,125 @@ class SessionPoller {
       const tracked = trackedSessions.get(sessionKey);
       if (!tracked) continue;
 
+      const item = session.NowPlayingItem;
+      const currentItemId = item?.Id || "";
+
+      // Detect if item changed or position reset significantly (new playback)
+      const itemChanged = currentItemId !== tracked.itemId;
       const playState = session.PlayState || {};
-      const currentPaused = playState.IsPaused || false;
       const currentPosition = playState.PositionTicks || 0;
+      // Position reset: was >60s into content, now back near start
+      const positionReset =
+        tracked.positionTicks > 600_000_000 && // was >60s in (ticks)
+        currentPosition < 100_000_000 && // now <10s in
+        tracked.playDuration > 30; // had accumulated >30s of watch time
+
+      if (itemChanged || positionReset) {
+        // End the current session and save it
+        let finalDuration = tracked.playDuration;
+        if (!tracked.isPaused) {
+          const timeDiff = Math.floor(
+            (now.getTime() - tracked.lastUpdateTime.getTime()) / 1000
+          );
+          finalDuration += timeDiff;
+        }
+
+        if (finalDuration > 1) {
+          const percentComplete =
+            tracked.runtimeTicks > 0
+              ? (tracked.positionTicks / tracked.runtimeTicks) * 100
+              : 0.0;
+          const completed = percentComplete > 90.0;
+
+          log("session", {
+            action: "ended",
+            reason: itemChanged ? "item-changed" : "position-reset",
+            serverId: server.id,
+            user: tracked.userName,
+            content: tracked.itemName,
+            durationSec: finalDuration,
+            progressPct: Math.round(percentComplete * 10) / 10,
+            completed,
+          });
+
+          await this.savePlaybackRecord(
+            server,
+            tracked,
+            finalDuration,
+            percentComplete,
+            completed
+          );
+        }
+
+        // Start tracking as a new session
+        const transcodingInfo = session.TranscodingInfo;
+        const isPaused = playState.IsPaused || false;
+        const lastActivity = this.parseJellyfinDate(session.LastActivityDate);
+
+        const newTracked: TrackedSession = {
+          sessionKey,
+          userJellyfinId: session.UserId || "",
+          userName: session.UserName || "",
+          clientName: session.Client,
+          deviceId: session.DeviceId,
+          deviceName: session.DeviceName,
+          itemId: currentItemId,
+          itemName: item?.Name || "",
+          seriesId: item?.SeriesId,
+          seriesName: item?.SeriesName,
+          seasonId: item?.SeasonId,
+          runtimeTicks: item?.RunTimeTicks || 0,
+          positionTicks: currentPosition,
+          isPaused,
+          startTime: now,
+          lastUpdateTime: now,
+          lastActivityDate: lastActivity,
+          lastPlaybackCheckIn: this.parseJellyfinDate(
+            session.LastPlaybackCheckIn
+          ),
+          playDuration: 0,
+          sessionId: session.Id,
+          applicationVersion: session.ApplicationVersion,
+          isActive: session.IsActive,
+          remoteEndPoint: session.RemoteEndPoint,
+          isMuted: playState.IsMuted,
+          volumeLevel: playState.VolumeLevel,
+          audioStreamIndex: playState.AudioStreamIndex,
+          subtitleStreamIndex: playState.SubtitleStreamIndex,
+          mediaSourceId: playState.MediaSourceId,
+          repeatMode: playState.RepeatMode,
+          playbackOrder: playState.PlaybackOrder,
+          playMethod: playState.PlayMethod,
+          transcodingAudioCodec: transcodingInfo?.AudioCodec,
+          transcodingVideoCodec: transcodingInfo?.VideoCodec,
+          transcodingContainer: transcodingInfo?.Container,
+          transcodingIsVideoDirect: transcodingInfo?.IsVideoDirect,
+          transcodingIsAudioDirect: transcodingInfo?.IsAudioDirect,
+          transcodingBitrate: transcodingInfo?.Bitrate,
+          transcodingCompletionPercentage: transcodingInfo?.CompletionPercentage,
+          transcodingWidth: transcodingInfo?.Width,
+          transcodingHeight: transcodingInfo?.Height,
+          transcodingAudioChannels: transcodingInfo?.AudioChannels,
+          transcodingHardwareAccelerationType:
+            transcodingInfo?.HardwareAccelerationType,
+          transcodeReasons: transcodingInfo?.TranscodeReasons,
+        };
+
+        log("session", {
+          action: "new",
+          reason: itemChanged ? "item-changed" : "position-reset",
+          serverId: server.id,
+          user: newTracked.userName,
+          content: newTracked.itemName,
+          paused: isPaused,
+          durationSec: 0,
+        });
+
+        trackedSessions.set(sessionKey, newTracked);
+        continue;
+      }
+
+      const currentPaused = playState.IsPaused || false;
       const lastActivity = this.parseJellyfinDate(session.LastActivityDate);
       const lastPaused = this.parseJellyfinDate(session.LastPausedDate);
 
@@ -1271,8 +1397,10 @@ class SessionPoller {
           .where(eq(users.id, tracked.userJellyfinId))
           .limit(1);
 
+        // Include startTime in all IDs to ensure each playback session is unique
+        // Jellyfin session IDs can be reused across different playback sessions
         const stableId = tracked.sessionId
-          ? `sid:${server.id}:${tracked.sessionId}`
+          ? `sid:${server.id}:${tracked.sessionId}:${tracked.startTime.toISOString()}`
           : `trk:${server.id}:${tracked.sessionKey}:${tracked.startTime.toISOString()}`;
 
         const playbackRecord: NewSession = {
@@ -1333,12 +1461,29 @@ class SessionPoller {
           },
         };
 
-        await tx.insert(sessions).values(playbackRecord).onConflictDoNothing();
-      });
-      log("session", {
-        action: "saved",
-        serverId: server.id,
-        user: tracked.userName,
+        const result = await tx
+          .insert(sessions)
+          .values(playbackRecord)
+          .onConflictDoNothing()
+          .returning({ id: sessions.id });
+
+        if (result.length === 0) {
+          log("session", {
+            action: "skipped",
+            reason: "duplicate",
+            serverId: server.id,
+            user: tracked.userName,
+            sessionId: stableId,
+            itemId: tracked.itemId,
+          });
+        } else {
+          log("session", {
+            action: "saved",
+            serverId: server.id,
+            user: tracked.userName,
+            sessionId: stableId,
+          });
+        }
       });
     } catch (error) {
       // Log comprehensive error with full session data for debugging
