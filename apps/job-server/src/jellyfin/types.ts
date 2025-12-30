@@ -92,6 +92,9 @@ export interface TrackedSession {
   applicationVersion?: string;
   isActive?: boolean;
 
+  // Pause state debouncing (to avoid flickering logs)
+  lastLoggedPauseState?: boolean;
+
   // TranscodingInfo fields
   transcodingAudioCodec?: string;
   transcodingVideoCodec?: string;

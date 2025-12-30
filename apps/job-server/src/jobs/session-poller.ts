@@ -1352,6 +1352,22 @@ class SessionPoller {
         currentPosition
       );
 
+      // Log pause/resume only when state changes from what we last logged
+      // This prevents flickering logs when Jellyfin reports inconsistent states
+      const lastLoggedState = tracked.lastLoggedPauseState ?? !currentPaused;
+      const shouldLogPauseChange = currentPaused !== lastLoggedState;
+
+      if (shouldLogPauseChange) {
+        log("session", {
+          action: currentPaused ? "paused" : "resumed",
+          serverId: server.id,
+          user: tracked.userName,
+          content: tracked.itemName,
+          durationSec: updatedDuration,
+          position: this.formatTicksAsTime(currentPosition),
+        });
+      }
+
       const transcodingInfo = session.TranscodingInfo;
 
       // Update the tracked session
@@ -1362,6 +1378,10 @@ class SessionPoller {
         lastActivityDate: lastActivity,
         lastUpdateTime: now,
         playDuration: updatedDuration,
+        // Only update lastLoggedPauseState when we actually logged
+        lastLoggedPauseState: shouldLogPauseChange
+          ? currentPaused
+          : tracked.lastLoggedPauseState,
         applicationVersion:
           session.ApplicationVersion || tracked.applicationVersion,
         isActive: session.IsActive ?? tracked.isActive,
