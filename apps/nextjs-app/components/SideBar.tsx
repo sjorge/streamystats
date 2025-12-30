@@ -79,6 +79,11 @@ const dashboard_items = [
     url: "/dashboard/clients",
     icon: Monitor,
   },
+  {
+    title: "People",
+    url: "/dashboard/people",
+    icon: Users,
+  },
 ];
 
 const admin_items = [
