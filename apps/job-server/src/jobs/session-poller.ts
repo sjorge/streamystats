@@ -1352,19 +1352,6 @@ class SessionPoller {
         currentPosition
       );
 
-      const pauseStateChanged = currentPaused !== tracked.isPaused;
-
-      if (pauseStateChanged) {
-        log("session", {
-          action: currentPaused ? "paused" : "resumed",
-          serverId: server.id,
-          user: tracked.userName,
-          content: tracked.itemName,
-          durationSec: updatedDuration,
-          position: this.formatTicksAsTime(currentPosition),
-        });
-      }
-
       const transcodingInfo = session.TranscodingInfo;
 
       // Update the tracked session
