@@ -3,7 +3,10 @@ import { Suspense } from "react";
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getRecentlyAddedItems } from "@/lib/db/recently-added";
+import {
+  getRecentlyAddedItems,
+  getRecentlyAddedSeriesWithEpisodes,
+} from "@/lib/db/recently-added";
 import { getSeasonalRecommendations } from "@/lib/db/seasonal-recommendations";
 import { getServer } from "@/lib/db/server";
 import { getSimilarSeries } from "@/lib/db/similar-series-statistics";
@@ -14,6 +17,7 @@ import type { ServerPublic } from "@/lib/types";
 import { ActiveSessions } from "./ActiveSessions";
 import { MostWatchedItems } from "./MostWatchedItems";
 import { RecentlyAdded } from "./RecentlyAdded";
+import { RecentlyAddedSeries } from "./RecentlyAddedSeries";
 import { SeasonalRecommendations } from "./SeasonalRecommendations";
 import { SimilarSeriesStatistics } from "./SimilarSeriesStatistics";
 import { SimilarMovieStatistics } from "./SimilarStatistics";
@@ -96,7 +100,8 @@ async function GeneralStats({
     similarSeriesData,
     data,
     seasonalData,
-    recentlyAddedData,
+    recentlyAddedMovies,
+    recentlyAddedSeries,
   ] = await Promise.all([
     getSimilarStatistics(server.id),
     getSimilarSeries(server.id),
@@ -105,7 +110,8 @@ async function GeneralStats({
       userId: isAdmin ? undefined : me?.id,
     }),
     getSeasonalRecommendations(server.id),
-    getRecentlyAddedItems(server.id),
+    getRecentlyAddedItems(server.id, "Movie"),
+    getRecentlyAddedSeriesWithEpisodes(server.id),
   ]);
 
   return (
@@ -114,8 +120,15 @@ async function GeneralStats({
       {seasonalData && (
         <SeasonalRecommendations data={seasonalData} server={server} />
       )}
-      {recentlyAddedData.length > 0 && (
-        <RecentlyAdded items={recentlyAddedData} server={server} />
+      {recentlyAddedMovies.length > 0 && (
+        <RecentlyAdded
+          items={recentlyAddedMovies}
+          server={server}
+          itemType="Movie"
+        />
+      )}
+      {recentlyAddedSeries.length > 0 && (
+        <RecentlyAddedSeries items={recentlyAddedSeries} server={server} />
       )}
       {similarData.length > 0 && (
         <SimilarMovieStatistics data={similarData} server={server} />

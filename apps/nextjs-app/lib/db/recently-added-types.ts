@@ -20,3 +20,22 @@ export interface RecentlyAddedItem {
   imageBlurHashes: ImageBlurHashes | null;
   dateCreated: Date | null;
 }
+
+export interface RecentlyAddedEpisode extends RecentlyAddedItem {
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  seriesName: string | null;
+}
+
+export interface RecentlyAddedSeriesGroup {
+  // The series item (for poster, name, etc.)
+  series: RecentlyAddedItem;
+  // Recent episodes added
+  recentEpisodes: RecentlyAddedEpisode[];
+  // Total count of episodes added recently
+  newEpisodeCount: number;
+  // Whether this is a brand new series (all episodes are new)
+  isNewSeries: boolean;
+  // Most recent episode added (for single episode display)
+  latestEpisode: RecentlyAddedEpisode | null;
+}

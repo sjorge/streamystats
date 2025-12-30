@@ -5,7 +5,6 @@ import {
   Clock,
   ExternalLink,
   Film,
-  ListPlus,
   Loader2,
   MoreHorizontal,
   Plus,
@@ -39,8 +38,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { getRecentlyAddedItems } from "@/lib/db/recently-added";
-import type { RecentlyAddedItem } from "@/lib/db/recently-added-types";
+import { getRecentlyAddedSeriesWithEpisodes } from "@/lib/db/recently-added";
+import type { RecentlyAddedSeriesGroup } from "@/lib/db/recently-added-types";
 import type { ServerPublic } from "@/lib/types";
 
 interface WatchlistInfo {
@@ -50,47 +49,19 @@ interface WatchlistInfo {
   allowedItemType: string | null;
 }
 
-interface RecentlyAddedProps {
-  items: RecentlyAddedItem[];
+interface RecentlyAddedSeriesProps {
+  items: RecentlyAddedSeriesGroup[];
   server: ServerPublic;
-  itemType: "Movie" | "Series";
 }
 
-const themeConfig = {
-  Movie: {
-    gradient: "from-amber-500/10 via-orange-500/5 to-amber-500/10",
-    radial: "from-amber-500/20",
-    iconBg: "text-amber-500",
-    headerBadge: "bg-amber-500/20 text-amber-400",
-    itemBadge: "bg-amber-600/90 text-white",
-    icon: Film,
-    title: "Recently Added Movies",
-    description: "Latest movies added to your library",
-  },
-  Series: {
-    gradient: "from-purple-500/10 via-fuchsia-500/5 to-purple-500/10",
-    radial: "from-purple-500/20",
-    iconBg: "text-purple-500",
-    headerBadge: "bg-purple-500/20 text-purple-400",
-    itemBadge: "bg-purple-600/90 text-white",
-    icon: Tv,
-    title: "Recently Added Series",
-    description: "Latest series added to your library",
-  },
-};
-
-export function RecentlyAdded({
+export function RecentlyAddedSeries({
   items: initialItems,
   server,
-  itemType,
-}: RecentlyAddedProps) {
+}: RecentlyAddedSeriesProps) {
   const [items, setItems] = useState(initialItems);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
-
-  const theme = themeConfig[itemType];
-  const Icon = theme.icon;
 
   // Watchlist state
   const [watchlists, setWatchlists] = useState<WatchlistInfo[]>([]);
@@ -103,23 +74,12 @@ export function RecentlyAdded({
   );
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createForItemId, setCreateForItemId] = useState<string | null>(null);
-  const [createForItemType, setCreateForItemType] = useState<string | null>(
-    null,
-  );
+  const [createForItemIds, setCreateForItemIds] = useState<string[]>([]);
+  const [createDialogType, setCreateDialogType] = useState<
+    "series" | "episodes"
+  >("series");
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [creating, setCreating] = useState(false);
-
-  const formatRuntime = (ticks: number | null) => {
-    if (!ticks) return null;
-    const minutes = Math.floor(ticks / 600000000);
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${remainingMinutes > 0 ? `${remainingMinutes}m` : ""}`;
-    }
-    return `${minutes}m`;
-  };
 
   const fetchWatchlists = async () => {
     if (watchlists.length > 0) return;
@@ -135,24 +95,33 @@ export function RecentlyAdded({
     }
   };
 
-  const fetchItemWatchlists = async (itemId: string) => {
-    if (itemWatchlists[itemId]) return;
+  const fetchItemWatchlists = async (itemIds: string[]) => {
+    const idsToFetch = itemIds.filter((id) => !itemWatchlists[id]);
+    if (idsToFetch.length === 0) return;
+
     try {
-      const containingLists: number[] = [];
+      const newWatchlistData: Record<string, number[]> = {};
+      for (const itemId of idsToFetch) {
+        newWatchlistData[itemId] = [];
+      }
+
       for (const wl of watchlists) {
         const itemRes = await fetch(`/api/watchlists/${wl.id}/items`);
         if (itemRes.ok) {
           const { data: wlData } = await itemRes.json();
-          if (
-            wlData.items.some(
-              (i: { item: { id: string } }) => i.item.id === itemId,
-            )
-          ) {
-            containingLists.push(wl.id);
+          for (const itemId of idsToFetch) {
+            if (
+              wlData.items.some(
+                (i: { item: { id: string } }) => i.item.id === itemId,
+              )
+            ) {
+              newWatchlistData[itemId].push(wl.id);
+            }
           }
         }
       }
-      setItemWatchlists((prev) => ({ ...prev, [itemId]: containingLists }));
+
+      setItemWatchlists((prev) => ({ ...prev, ...newWatchlistData }));
     } catch (error) {
       console.error("Error fetching item watchlists:", error);
     }
@@ -199,8 +168,51 @@ export function RecentlyAdded({
     }
   };
 
+  const handleAddEpisodesToWatchlist = async (
+    episodeIds: string[],
+    watchlistId: number,
+  ) => {
+    setAddingToWatchlist(`episodes-${watchlistId}`);
+
+    try {
+      let addedCount = 0;
+      for (const episodeId of episodeIds) {
+        const inWatchlists = itemWatchlists[episodeId] || [];
+        if (!inWatchlists.includes(watchlistId)) {
+          const res = await fetch(`/api/watchlists/${watchlistId}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId: episodeId }),
+          });
+          if (res.ok) {
+            setItemWatchlists((prev) => ({
+              ...prev,
+              [episodeId]: [...(prev[episodeId] || []), watchlistId],
+            }));
+            addedCount++;
+          }
+        }
+      }
+      if (addedCount > 0) {
+        toast.success(
+          `Added ${addedCount} episode${addedCount > 1 ? "s" : ""} to watchlist`,
+        );
+      } else {
+        toast.info("Episodes already in watchlist");
+      }
+    } catch (error) {
+      console.error("Error adding episodes to watchlist:", error);
+      toast.error("Failed to add episodes to watchlist");
+    } finally {
+      setAddingToWatchlist(null);
+    }
+  };
+
   const handleCreateAndAdd = async () => {
-    if (!newWatchlistName.trim() || !createForItemId) return;
+    if (!newWatchlistName.trim()) return;
+    if (createDialogType === "series" && !createForItemId) return;
+    if (createDialogType === "episodes" && createForItemIds.length === 0)
+      return;
 
     setCreating(true);
     try {
@@ -214,26 +226,45 @@ export function RecentlyAdded({
 
       if (res.ok) {
         const { data: newWatchlist } = await res.json();
-
-        await fetch(`/api/watchlists/${newWatchlist.id}/items`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: createForItemId }),
-        });
-
         setWatchlists((prev) => [...prev, newWatchlist]);
-        setItemWatchlists((prev) => ({
-          ...prev,
-          [createForItemId]: [
-            ...(prev[createForItemId] || []),
-            newWatchlist.id,
-          ],
-        }));
-        toast.success("Created watchlist and added item");
+
+        if (createDialogType === "series" && createForItemId) {
+          await fetch(`/api/watchlists/${newWatchlist.id}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId: createForItemId }),
+          });
+
+          setItemWatchlists((prev) => ({
+            ...prev,
+            [createForItemId]: [
+              ...(prev[createForItemId] || []),
+              newWatchlist.id,
+            ],
+          }));
+          toast.success("Created watchlist and added series");
+        } else if (createDialogType === "episodes") {
+          for (const episodeId of createForItemIds) {
+            await fetch(`/api/watchlists/${newWatchlist.id}/items`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ itemId: episodeId }),
+            });
+
+            setItemWatchlists((prev) => ({
+              ...prev,
+              [episodeId]: [...(prev[episodeId] || []), newWatchlist.id],
+            }));
+          }
+          toast.success(
+            `Created watchlist and added ${createForItemIds.length} episode${createForItemIds.length > 1 ? "s" : ""}`,
+          );
+        }
+
         setShowCreateDialog(false);
         setNewWatchlistName("");
         setCreateForItemId(null);
-        setCreateForItemType(null);
+        setCreateForItemIds([]);
       }
     } catch (error) {
       console.error("Error creating watchlist:", error);
@@ -248,10 +279,52 @@ export function RecentlyAdded({
     window.open(jellyfinUrl, "_blank");
   };
 
-  const getCompatibleWatchlists = (itemTypeFilter: string) => {
+  const getCompatibleWatchlists = (itemType: string) => {
     return watchlists.filter(
-      (wl) => !wl.allowedItemType || wl.allowedItemType === itemTypeFilter,
+      (wl) => !wl.allowedItemType || wl.allowedItemType === itemType,
     );
+  };
+
+  const getBadgeText = (group: RecentlyAddedSeriesGroup): string => {
+    if (group.isNewSeries) {
+      return "New Series";
+    }
+    if (group.newEpisodeCount === 1 && group.latestEpisode) {
+      const ep = group.latestEpisode;
+      if (ep.seasonNumber !== null && ep.episodeNumber !== null) {
+        return `S${ep.seasonNumber}E${ep.episodeNumber}`;
+      }
+      return "New Episode";
+    }
+    return `${group.newEpisodeCount} New Episodes`;
+  };
+
+  const getSubtitle = (group: RecentlyAddedSeriesGroup): string | null => {
+    if (group.isNewSeries) {
+      return `${group.newEpisodeCount} episode${group.newEpisodeCount !== 1 ? "s" : ""}`;
+    }
+    if (group.newEpisodeCount === 1 && group.latestEpisode) {
+      return group.latestEpisode.name;
+    }
+    return null;
+  };
+
+  const getItemLink = (group: RecentlyAddedSeriesGroup): string => {
+    if (
+      group.newEpisodeCount === 1 &&
+      group.latestEpisode &&
+      !group.isNewSeries
+    ) {
+      return `/servers/${server.id}/library/${group.latestEpisode.id}`;
+    }
+    return `/servers/${server.id}/library/${group.series.id}`;
+  };
+
+  const getEpisodeLabel = (group: RecentlyAddedSeriesGroup): string => {
+    if (group.newEpisodeCount === 1) {
+      return "Add Episode to Watchlist";
+    }
+    return `Add ${group.newEpisodeCount} Episodes to Watchlist`;
   };
 
   useEffect(() => {
@@ -267,7 +340,7 @@ export function RecentlyAdded({
         const [entry] = entries;
         if (entry?.isIntersecting && !isLoading && hasMore) {
           setIsLoading(true);
-          getRecentlyAddedItems(server.id, itemType, 20, items.length)
+          getRecentlyAddedSeriesWithEpisodes(server.id, 7, 20, items.length)
             .then((result) => {
               if (!result || result.length === 0) {
                 setHasMore(false);
@@ -295,7 +368,7 @@ export function RecentlyAdded({
     return () => {
       observer.disconnect();
     };
-  }, [server.id, itemType, items.length, isLoading, hasMore]);
+  }, [server.id, items.length, isLoading, hasMore]);
 
   if (!items || items.length === 0) {
     return null;
@@ -304,57 +377,54 @@ export function RecentlyAdded({
   return (
     <>
       <div>
-        <div
-          className={`rounded-lg border bg-gradient-to-r ${theme.gradient} relative overflow-hidden`}
-        >
-          <div
-            className={`absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] ${theme.radial} via-transparent to-transparent opacity-50`}
-          />
+        <div className="rounded-lg border bg-gradient-to-r from-purple-500/10 via-fuchsia-500/5 to-purple-500/10 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent opacity-50" />
           <div className="relative z-10">
             <div className="p-4 pb-3">
               <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                <div
-                  className={`p-1.5 rounded-lg bg-background/50 ${theme.iconBg}`}
-                >
-                  <Icon className="h-4 w-4" />
+                <div className="p-1.5 rounded-lg bg-background/50 text-purple-500">
+                  <Tv className="h-4 w-4" />
                 </div>
-                <span>{theme.title}</span>
+                <span>Recently Added Series</span>
                 <Badge
                   variant="outline"
-                  className={`ml-2 text-[10px] ${theme.headerBadge} border-0`}
+                  className="ml-2 text-[10px] bg-purple-500/20 text-purple-400 border-0"
                 >
                   New
                 </Badge>
               </h2>
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                 <Sparkles className="h-3 w-3" />
-                {theme.description}
+                Latest series and episodes added to your library
               </p>
             </div>
 
             <div className="">
               <ScrollArea dir="ltr" className="w-full py-1">
                 <div className="flex gap-4 flex-nowrap px-4 w-max">
-                  {items.map((item) => {
-                    const inWatchlists = itemWatchlists[item.id] || [];
-                    const compatibleWatchlists = getCompatibleWatchlists(
-                      item.type,
-                    );
+                  {items.map((group) => {
+                    const seriesId = group.series.id;
+                    const episodeIds = group.recentEpisodes.map((ep) => ep.id);
+                    const seriesInWatchlists = itemWatchlists[seriesId] || [];
+                    const seriesWatchlists = getCompatibleWatchlists("Series");
+                    const episodeWatchlists =
+                      getCompatibleWatchlists("Episode");
+                    const badgeText = getBadgeText(group);
+                    const subtitle = getSubtitle(group);
+                    const itemLink = getItemLink(group);
 
                     return (
                       <div
-                        key={item.id}
+                        key={group.series.id}
                         className="flex-shrink-0 group relative"
                       >
                         <div className="relative w-[152px] sm:w-[184px] py-2">
                           <div className="flex flex-col overflow-hidden border border-border bg-card rounded-lg hover:border-primary/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] hover:z-10 relative">
-                            <Link
-                              href={`/servers/${server.id}/library/${item.id}`}
-                            >
+                            <Link href={itemLink}>
                               <div className="relative">
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-10" />
                                 <Poster
-                                  item={item}
+                                  item={group.series}
                                   server={server}
                                   width={184}
                                   height={240}
@@ -363,10 +433,16 @@ export function RecentlyAdded({
                                 />
                                 <div className="absolute top-2 left-2 z-20">
                                   <Badge
-                                    className={`${theme.itemBadge} backdrop-blur-md border-0 shadow-lg text-xs font-medium px-1.5 py-0.5`}
+                                    className={`backdrop-blur-md border-0 shadow-lg text-xs font-medium px-1.5 py-0.5 ${
+                                      group.isNewSeries
+                                        ? "bg-green-600/90 text-white"
+                                        : group.newEpisodeCount === 1
+                                          ? "bg-purple-600/90 text-white"
+                                          : "bg-blue-600/90 text-white"
+                                    }`}
                                   >
                                     <Clock className="h-2.5 w-2.5 mr-1" />
-                                    New
+                                    {badgeText}
                                   </Badge>
                                 </div>
                               </div>
@@ -377,36 +453,43 @@ export function RecentlyAdded({
                                 if (open) {
                                   fetchWatchlists();
                                   if (watchlists.length > 0) {
-                                    fetchItemWatchlists(item.id);
+                                    fetchItemWatchlists([
+                                      seriesId,
+                                      ...episodeIds,
+                                    ]);
                                   }
                                 }
                               }}
                             >
-                              <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuContent align="end" className="w-64">
+                                {/* Add Series to Watchlist */}
                                 <DropdownMenuSub>
                                   <DropdownMenuSubTrigger>
-                                    <ListPlus className="h-4 w-4 mr-2" />
-                                    Add to Watchlist
+                                    <Tv className="h-4 w-4 mr-2" />
+                                    Add Series to Watchlist
                                   </DropdownMenuSubTrigger>
                                   <DropdownMenuSubContent className="w-48">
                                     {watchlistsLoading ? (
                                       <div className="flex items-center justify-center py-2">
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                       </div>
-                                    ) : compatibleWatchlists.length === 0 ? (
+                                    ) : seriesWatchlists.length === 0 ? (
                                       <div className="px-2 py-2 text-sm text-muted-foreground text-center">
                                         No compatible watchlists
                                       </div>
                                     ) : (
-                                      compatibleWatchlists.map((wl) => (
+                                      seriesWatchlists.map((wl) => (
                                         <DropdownMenuItem
                                           key={wl.id}
                                           onClick={() =>
-                                            handleAddToWatchlist(item.id, wl.id)
+                                            handleAddToWatchlist(
+                                              seriesId,
+                                              wl.id,
+                                            )
                                           }
                                           disabled={
                                             addingToWatchlist ===
-                                            `${item.id}-${wl.id}`
+                                            `${seriesId}-${wl.id}`
                                           }
                                           className="flex items-center justify-between"
                                         >
@@ -414,9 +497,11 @@ export function RecentlyAdded({
                                             {wl.name}
                                           </span>
                                           {addingToWatchlist ===
-                                          `${item.id}-${wl.id}` ? (
+                                          `${seriesId}-${wl.id}` ? (
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                          ) : inWatchlists.includes(wl.id) ? (
+                                          ) : seriesInWatchlists.includes(
+                                              wl.id,
+                                            ) ? (
                                             <Check className="h-4 w-4 text-primary" />
                                           ) : null}
                                         </DropdownMenuItem>
@@ -425,8 +510,8 @@ export function RecentlyAdded({
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       onClick={() => {
-                                        setCreateForItemId(item.id);
-                                        setCreateForItemType(item.type);
+                                        setCreateForItemId(seriesId);
+                                        setCreateDialogType("series");
                                         setShowCreateDialog(true);
                                       }}
                                     >
@@ -435,8 +520,66 @@ export function RecentlyAdded({
                                     </DropdownMenuItem>
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
+
+                                {/* Add Episode(s) to Watchlist */}
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>
+                                    <Film className="h-4 w-4 mr-2" />
+                                    {getEpisodeLabel(group)}
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent className="w-48">
+                                    {watchlistsLoading ? (
+                                      <div className="flex items-center justify-center py-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      </div>
+                                    ) : episodeWatchlists.length === 0 ? (
+                                      <div className="px-2 py-2 text-sm text-muted-foreground text-center">
+                                        No compatible watchlists
+                                      </div>
+                                    ) : (
+                                      episodeWatchlists.map((wl) => (
+                                        <DropdownMenuItem
+                                          key={wl.id}
+                                          onClick={() =>
+                                            handleAddEpisodesToWatchlist(
+                                              episodeIds,
+                                              wl.id,
+                                            )
+                                          }
+                                          disabled={
+                                            addingToWatchlist ===
+                                            `episodes-${wl.id}`
+                                          }
+                                          className="flex items-center justify-between"
+                                        >
+                                          <span className="truncate">
+                                            {wl.name}
+                                          </span>
+                                          {addingToWatchlist ===
+                                          `episodes-${wl.id}` ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : null}
+                                        </DropdownMenuItem>
+                                      ))
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setCreateForItemIds(episodeIds);
+                                        setCreateDialogType("episodes");
+                                        setShowCreateDialog(true);
+                                      }}
+                                    >
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      Create new watchlist
+                                    </DropdownMenuItem>
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+
+                                <DropdownMenuSeparator />
+
                                 <DropdownMenuItem
-                                  onClick={() => openInJellyfin(item.id)}
+                                  onClick={() => openInJellyfin(seriesId)}
                                 >
                                   <ExternalLink className="h-4 w-4 mr-2" />
                                   Open in Jellyfin
@@ -455,24 +598,22 @@ export function RecentlyAdded({
                             </DropdownMenu>
 
                             <Link
-                              href={`/servers/${server.id}/library/${item.id}`}
-                              className="p-3 space-y-2 bg-gradient-to-b from-card to-card/95"
+                              href={itemLink}
+                              className="p-3 space-y-1 bg-gradient-to-b from-card to-card/95"
                             >
-                              <div>
-                                <h3 className="text-foreground text-sm font-bold truncate">
-                                  {item.name}
-                                </h3>
-                                <p className="text-muted-foreground text-xs mt-0.5 flex items-center gap-1.5">
-                                  {item.productionYear}
-                                  {item.runtimeTicks &&
-                                    formatRuntime(item.runtimeTicks) && (
-                                      <>
-                                        <span>•</span>
-                                        {formatRuntime(item.runtimeTicks)}
-                                      </>
-                                    )}
+                              <h3 className="text-foreground text-sm font-bold truncate">
+                                {group.series.name}
+                              </h3>
+                              {subtitle && (
+                                <p className="text-muted-foreground text-xs truncate">
+                                  {subtitle}
                                 </p>
-                              </div>
+                              )}
+                              {!subtitle && group.series.productionYear && (
+                                <p className="text-muted-foreground text-xs">
+                                  {group.series.productionYear}
+                                </p>
+                              )}
                             </Link>
                           </div>
                         </div>
@@ -493,7 +634,9 @@ export function RecentlyAdded({
           <DialogHeader>
             <DialogTitle>Create Watchlist</DialogTitle>
             <DialogDescription>
-              Create a new watchlist and add this item to it
+              {createDialogType === "series"
+                ? "Create a new watchlist and add this series to it"
+                : `Create a new watchlist and add ${createForItemIds.length} episode${createForItemIds.length > 1 ? "s" : ""} to it`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
