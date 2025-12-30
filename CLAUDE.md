@@ -156,3 +156,6 @@ Use conventional commits format, single line only (no multiline commits). Exampl
 - `feat: add user dashboard`
 - `fix: resolve session timeout issue`
 - `chore: update dependencies`
+
+### PRs 
+Keep PR body short, use convnetional commits and don't add any attributions to the PR body, branch name, or commit messages.
