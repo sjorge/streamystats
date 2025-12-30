@@ -158,4 +158,4 @@ Use conventional commits format, single line only (no multiline commits). Exampl
 - `chore: update dependencies`
 
 ### PRs 
-Keep PR body short, use convnetional commits and don't add any attributions to the PR body, branch name, or commit messages.
+Keep PR body short, use convnetional commits and don't add any attributions to the PR body, branch name, or commit messages. Don't include a test plan in PR body.
