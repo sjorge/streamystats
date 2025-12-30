@@ -6,6 +6,8 @@ import {
   servers,
   sessions,
   users,
+  serverJobConfigurations,
+  JOB_DEFAULTS,
   type NewActivity,
   type NewActiveSession,
   type NewActivityLogCursor,
@@ -75,6 +77,20 @@ interface SessionChanges {
   endedSessions: Array<{ key: string; session: TrackedSession }>;
 }
 
+// Default polling interval from JOB_DEFAULTS (in seconds, converted to ms)
+const DEFAULT_POLL_INTERVAL_MS =
+  (JOB_DEFAULTS["session-polling"].type === "interval"
+    ? JOB_DEFAULTS["session-polling"].defaultInterval
+    : 5) * 1000;
+
+// Minimum tick interval - how often we check if any server needs polling
+const MIN_TICK_INTERVAL_MS = 1000; // 1 second
+
+interface ServerPollingConfig {
+  intervalMs: number;
+  enabled: boolean;
+}
+
 class SessionPoller {
   private trackedSessions: Map<string, Map<string, TrackedSession>> = new Map();
   private timerId: NodeJS.Timeout | null = null;
@@ -98,6 +114,11 @@ class SessionPoller {
     number,
     { cursorDate: Date | null; cursorId: string | null }
   > = new Map();
+
+  // Per-server polling configuration
+  private serverPollingConfigs: Map<number, ServerPollingConfig> = new Map();
+  // Track when each server was last polled
+  private serverLastPolled: Map<number, number> = new Map();
 
   private abortInFlight(_reason: string): void {
     for (const controller of this.inFlightServerControllers.values()) {
@@ -147,6 +168,122 @@ class SessionPoller {
   }
 
   /**
+   * Load per-server polling configurations from database
+   */
+  async loadServerPollingConfigs(): Promise<void> {
+    try {
+      const configs = await db
+        .select()
+        .from(serverJobConfigurations)
+        .where(eq(serverJobConfigurations.jobKey, "session-polling"));
+
+      this.serverPollingConfigs.clear();
+
+      for (const config of configs) {
+        const intervalMs = config.intervalSeconds
+          ? config.intervalSeconds * 1000
+          : DEFAULT_POLL_INTERVAL_MS;
+
+        this.serverPollingConfigs.set(config.serverId, {
+          intervalMs,
+          enabled: config.enabled,
+        });
+      }
+
+      if (configs.length > 0) {
+        log("session-poller", {
+          action: "loaded-configs",
+          count: configs.length,
+        });
+      }
+    } catch (error) {
+      console.error(
+        `[session-poller] action=load-configs-error error=${formatError(error)}`
+      );
+    }
+  }
+
+  /**
+   * Reload polling config for a specific server
+   */
+  async reloadServerConfig(serverId: number): Promise<void> {
+    try {
+      const configs = await db
+        .select()
+        .from(serverJobConfigurations)
+        .where(
+          and(
+            eq(serverJobConfigurations.serverId, serverId),
+            eq(serverJobConfigurations.jobKey, "session-polling")
+          )
+        );
+
+      if (configs.length > 0) {
+        const config = configs[0];
+        const intervalMs = config.intervalSeconds
+          ? config.intervalSeconds * 1000
+          : DEFAULT_POLL_INTERVAL_MS;
+
+        this.serverPollingConfigs.set(serverId, {
+          intervalMs,
+          enabled: config.enabled,
+        });
+
+        log("session-poller", {
+          action: "reloaded-config",
+          serverId,
+          intervalMs,
+          enabled: config.enabled,
+        });
+      } else {
+        // No custom config, remove from map (will use default)
+        this.serverPollingConfigs.delete(serverId);
+        log("session-poller", {
+          action: "reset-config",
+          serverId,
+          intervalMs: DEFAULT_POLL_INTERVAL_MS,
+        });
+      }
+    } catch (error) {
+      console.error(
+        `[session-poller] action=reload-config-error serverId=${serverId} error=${formatError(error)}`
+      );
+    }
+  }
+
+  /**
+   * Get effective polling interval for a server (in ms)
+   */
+  getServerIntervalMs(serverId: number): number {
+    const config = this.serverPollingConfigs.get(serverId);
+    return config?.intervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  }
+
+  /**
+   * Check if polling is enabled for a server
+   */
+  isServerPollingEnabled(serverId: number): boolean {
+    const config = this.serverPollingConfigs.get(serverId);
+    // If no custom config, polling is enabled by default
+    return config?.enabled ?? true;
+  }
+
+  /**
+   * Check if a server is due for polling based on its interval
+   */
+  private isServerDueForPolling(serverId: number): boolean {
+    if (!this.isServerPollingEnabled(serverId)) {
+      return false;
+    }
+
+    const lastPolled = this.serverLastPolled.get(serverId) ?? 0;
+    const intervalMs = this.getServerIntervalMs(serverId);
+    const now = Date.now();
+
+    return now - lastPolled >= intervalMs;
+  }
+
+  /**
    * Start the session poller
    */
   async start(): Promise<void> {
@@ -164,12 +301,16 @@ class SessionPoller {
 
     log("session-poller", {
       action: "start",
-      intervalMs: this.config.intervalMs,
+      defaultIntervalMs: DEFAULT_POLL_INTERVAL_MS,
+      tickIntervalMs: MIN_TICK_INTERVAL_MS,
       pollTimeoutMs: this.config.pollTimeoutMs,
       serverRequestTimeoutMs: this.config.serverRequestTimeoutMs,
       serverRetries: this.config.serverRetries,
       serverConcurrency: this.config.serverConcurrency,
     });
+
+    // Load per-server polling configurations
+    await this.loadServerPollingConfigs();
 
     // Load any previously persisted active sessions & activity cursors (survives restart)
     await this.loadPersistedState();
@@ -186,7 +327,8 @@ class SessionPoller {
   private scheduleNextCycle(): void {
     if (this.stopRequested) return;
 
-    const delayMs = normalizeTimeoutMs(this.config.intervalMs);
+    // Use minimum tick interval to check frequently which servers need polling
+    const delayMs = normalizeTimeoutMs(MIN_TICK_INTERVAL_MS);
     this.timerId = setTimeout(() => {
       void this
         .runPollCycle()
@@ -375,9 +517,19 @@ class SessionPoller {
       );
 
       const tasks: Array<Promise<void>> = [];
+
       for (const server of activeServers) {
+        // Check if server is due for polling based on its interval
+        if (!this.isServerDueForPolling(server.id)) continue;
+        // Check backoff (for failed servers)
         if (!this.shouldPollServer(server.id)) continue;
+
         tasks.push(limit(() => this.pollServer(server, signal)));
+      }
+
+      // If no servers need polling this cycle, that's normal
+      if (tasks.length === 0) {
+        return;
       }
 
       const results = await Promise.allSettled(tasks);
@@ -445,6 +597,9 @@ class SessionPoller {
    * Poll sessions for a specific server
    */
   private async pollServer(server: Server, signal: AbortSignal): Promise<void> {
+    // Record poll attempt time (even if it fails, we don't want to retry immediately)
+    this.serverLastPolled.set(server.id, Date.now());
+
     const hadBackoff = this.serverBackoff.has(server.id);
     const controller = new AbortController();
     const serverTimeoutMs = Math.max(1000, this.config.serverRequestTimeoutMs);
@@ -511,16 +666,6 @@ class SessionPoller {
     const trackedSessions = this.trackedSessions.get(serverKey) || new Map();
 
     const filteredSessions = this.filterValidSessions(currentSessions);
-
-    // Debug: log poll cycle info
-    if (filteredSessions.length > 0 || trackedSessions.size > 0) {
-      log("session-poller", {
-        action: "cycle",
-        serverId: server.id,
-        currentSessions: filteredSessions.length,
-        trackedSessions: trackedSessions.size,
-      });
-    }
 
     const changes = this.detectSessionChanges(
       filteredSessions,
@@ -1208,9 +1353,17 @@ class SessionPoller {
       );
 
       const pauseStateChanged = currentPaused !== tracked.isPaused;
-      const durationIncreased = updatedDuration > tracked.playDuration + 10;
+      // Log every 10 seconds of playback (when crossing 10s boundaries: 10, 20, 30, etc.)
+      const currentBoundary = Math.floor(updatedDuration / 10);
+      const previousBoundary = Math.floor(tracked.playDuration / 10);
+      // Only log if we've crossed into a NEW boundary (current > previous)
+      // This prevents double-logging when duration stays at the same boundary
+      const crossedTenSecondBoundary =
+        !currentPaused &&
+        updatedDuration > 0 &&
+        currentBoundary > previousBoundary;
 
-      if (pauseStateChanged || durationIncreased) {
+      if (pauseStateChanged || crossedTenSecondBoundary) {
         log("session", {
           action: "update",
           serverId: server.id,
@@ -1340,38 +1493,39 @@ class SessionPoller {
 
   /**
    * Calculate play duration based on session state
+   *
+   * Uses wall clock time for duration tracking to avoid issues with
+   * Jellyfin's lastActivityDate not updating frequently enough.
    */
   private calculateDuration(
     tracked: TrackedSession,
     currentPaused: boolean,
-    lastActivity?: Date,
-    lastPaused?: Date,
-    currentPosition?: number
+    _lastActivity?: Date,
+    _lastPaused?: Date,
+    _currentPosition?: number
   ): number {
     const wasPaused = tracked.isPaused;
+    const now = Date.now();
+    const elapsedSinceLastUpdate = Math.floor(
+      (now - tracked.lastUpdateTime.getTime()) / 1000
+    );
 
-    if (wasPaused === false && currentPaused === true && lastPaused) {
-      return (
-        tracked.playDuration +
-        Math.floor(
-          (lastPaused.getTime() - tracked.lastUpdateTime.getTime()) / 1000
-        )
-      );
+    // Was playing, now paused - add time since last update
+    if (wasPaused === false && currentPaused === true) {
+      return tracked.playDuration + Math.max(0, elapsedSinceLastUpdate);
     }
 
-    if (wasPaused === false && currentPaused === false && lastActivity) {
-      return (
-        tracked.playDuration +
-        Math.floor(
-          (lastActivity.getTime() - tracked.lastUpdateTime.getTime()) / 1000
-        )
-      );
+    // Was playing, still playing - add time since last update
+    if (wasPaused === false && currentPaused === false) {
+      return tracked.playDuration + Math.max(0, elapsedSinceLastUpdate);
     }
 
+    // Was paused, now playing - don't add time (just resumed)
     if (wasPaused === true && currentPaused === false) {
       return tracked.playDuration;
     }
 
+    // Was paused, still paused - no change
     return tracked.playDuration;
   }
 
@@ -1560,7 +1714,8 @@ class SessionPoller {
     const now = Date.now();
     return {
       enabled: this.config.enabled,
-      intervalMs: this.config.intervalMs,
+      defaultIntervalMs: DEFAULT_POLL_INTERVAL_MS,
+      tickIntervalMs: MIN_TICK_INTERVAL_MS,
       pollTimeoutMs: this.config.pollTimeoutMs,
       serverRequestTimeoutMs: this.config.serverRequestTimeoutMs,
       serverRetries: this.config.serverRetries,
@@ -1569,6 +1724,7 @@ class SessionPoller {
       pollInProgress: this.pollInProgress,
       trackedServers: this.trackedSessions.size,
       totalTrackedSessions: this.countTrackedSessions(),
+      serversWithCustomIntervals: this.serverPollingConfigs.size,
       // Health metrics
       totalPollCount: this.totalPollCount,
       totalSuccessCount: this.totalSuccessCount,
@@ -1593,7 +1749,20 @@ class SessionPoller {
   }
 }
 
-// Export singleton instance
-export const sessionPoller = new SessionPoller();
+// Use globalThis to ensure singleton survives hot module reloading
+const GLOBAL_KEY = "__streamystats_session_poller__";
+
+function getOrCreateSessionPoller(): SessionPoller {
+  const global = globalThis as unknown as Record<string, SessionPoller | undefined>;
+
+  if (!global[GLOBAL_KEY]) {
+    global[GLOBAL_KEY] = new SessionPoller();
+  }
+
+  return global[GLOBAL_KEY];
+}
+
+// Export singleton instance (survives HMR)
+export const sessionPoller = getOrCreateSessionPoller();
 
 export { SessionPoller, SessionPollerConfig };

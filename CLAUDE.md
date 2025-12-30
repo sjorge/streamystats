@@ -157,5 +157,25 @@ Use conventional commits format, single line only (no multiline commits). Exampl
 - `fix: resolve session timeout issue`
 - `chore: update dependencies`
 
-### PRs 
+### PRs
 Keep PR body short, use convnetional commits and don't add any attributions to the PR body, branch name, or commit messages. Don't include a test plan in PR body.
+
+## Debugging with tmux
+
+The dev servers can be run in a tmux session so Claude can read logs:
+
+```bash
+# Start both servers in tmux (job-server + Next.js)
+tmux new-session -d -s streamystats-dev -n dev
+tmux send-keys -t streamystats-dev:dev "bun run dev" Enter
+
+# Read logs (last 50 lines)
+tmux capture-pane -t streamystats-dev:dev -p -S -50
+
+# Read more history (last 200 lines)
+tmux capture-pane -t streamystats-dev:dev -p -S -200
+```
+
+To attach and watch live: `tmux attach -t streamystats-dev`
+
+This allows Claude to monitor server output, debug issues, and verify changes in real-time.

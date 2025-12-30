@@ -419,8 +419,6 @@ app.get("/server-status", async (c) => {
       },
       scheduler: {
         ...schedulerStatus,
-        healthCheck:
-          schedulerStatus.enabled && schedulerStatus.runningTasks.length > 0,
       },
       sessionPoller: {
         ...sessionPollerStatus,

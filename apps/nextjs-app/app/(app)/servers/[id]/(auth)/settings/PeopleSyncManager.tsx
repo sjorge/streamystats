@@ -162,7 +162,10 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
       <CardHeader>
         <CardTitle>People Sync</CardTitle>
         <CardDescription>
-          Syncing actors, directors, and other people from your media
+          Syncing actors, directors, and other people from your media items from
+          Jellyfin. This job is specifically separated from the normal item sync
+          due to the fact that including people in an item query is a very heavy
+          calculation on the Jellyfin server.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -211,9 +214,6 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
         </Table>
 
         <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Syncs every 15 minutes in the background.
-          </p>
           <Button
             onClick={handleTriggerSync}
             disabled={isTriggering}

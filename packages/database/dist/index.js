@@ -29,6 +29,8 @@ Object.defineProperty(exports, "getDatabaseUrl", { enumerable: true, get: functi
 Object.defineProperty(exports, "getDb", { enumerable: true, get: function () { return connection_1.getDb; } });
 // Export all schema tables and types
 __exportStar(require("./schema"), exports);
+// Export job defaults
+__exportStar(require("./job-defaults"), exports);
 // Export migration utilities
 var migrate_1 = require("./migrate");
 Object.defineProperty(exports, "migrate", { enumerable: true, get: function () { return migrate_1.migrate; } });

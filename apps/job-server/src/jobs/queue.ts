@@ -26,6 +26,10 @@ import {
   securityFullSyncJob,
   SECURITY_SYNC_JOB_NAME,
 } from "./security-sync-job";
+import {
+  schedulerMaintenanceWorker,
+  SCHEDULER_MAINTENANCE_JOB_NAME,
+} from "./scheduler-maintenance";
 
 let bossInstance: PgBoss | null = null;
 
@@ -115,6 +119,7 @@ async function createQueues(boss: PgBoss) {
     SECURITY_SYNC_JOB_NAME,
     BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS,
     INFER_WATCHTIME_JOB_NAME,
+    SCHEDULER_MAINTENANCE_JOB_NAME,
   ];
 
   for (const name of queueNames) {
@@ -219,6 +224,13 @@ async function registerJobHandlers(boss: PgBoss) {
     INFER_WATCHTIME_JOB_NAME,
     { batchSize: 1 },
     wrapHandler(inferWatchtimeJob)
+  );
+
+  // Register scheduler maintenance job (handles cleanup tasks)
+  await boss.work(
+    SCHEDULER_MAINTENANCE_JOB_NAME,
+    { batchSize: 1 },
+    wrapHandler(schedulerMaintenanceWorker)
   );
 
   console.log("All job handlers registered successfully");

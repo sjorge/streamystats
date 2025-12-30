@@ -23,7 +23,9 @@ export default async function JobsSettings(props: {
       <h1 className="text-3xl font-bold mb-8">Jobs</h1>
 
       <div className="space-y-8">
-        {isAdmin ? <ServerJobStatusCard serverId={server.id} /> : null}
+        {isAdmin ? (
+          <ServerJobStatusCard serverId={server.id} isAdmin={isAdmin} />
+        ) : null}
         <SyncManager serverId={server.id} serverName={server.name} />
         {isAdmin ? <PeopleSyncManager serverId={server.id} /> : null}
         {isAdmin ? <LibrarySyncManager serverId={server.id} /> : null}
