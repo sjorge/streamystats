@@ -1353,23 +1353,13 @@ class SessionPoller {
       );
 
       const pauseStateChanged = currentPaused !== tracked.isPaused;
-      // Log every 10 seconds of playback (when crossing 10s boundaries: 10, 20, 30, etc.)
-      const currentBoundary = Math.floor(updatedDuration / 10);
-      const previousBoundary = Math.floor(tracked.playDuration / 10);
-      // Only log if we've crossed into a NEW boundary (current > previous)
-      // This prevents double-logging when duration stays at the same boundary
-      const crossedTenSecondBoundary =
-        !currentPaused &&
-        updatedDuration > 0 &&
-        currentBoundary > previousBoundary;
 
-      if (pauseStateChanged || crossedTenSecondBoundary) {
+      if (pauseStateChanged) {
         log("session", {
-          action: "update",
+          action: currentPaused ? "paused" : "resumed",
           serverId: server.id,
           user: tracked.userName,
           content: tracked.itemName,
-          paused: currentPaused,
           durationSec: updatedDuration,
           position: this.formatTicksAsTime(currentPosition),
         });
