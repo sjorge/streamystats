@@ -404,6 +404,7 @@ export const items = pgTable(
     // Dimension is determined by the server's embeddingDimensions config
     embedding: vector("embedding"),
     processed: boolean("processed").default(false),
+    peopleSynced: boolean("people_synced").default(false),
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -296,6 +296,7 @@ exports.items = (0, pg_core_1.pgTable)("items", {
     // Dimension is determined by the server's embeddingDimensions config
     embedding: vector("embedding"),
     processed: (0, pg_core_1.boolean)("processed").default(false),
+    peopleSynced: (0, pg_core_1.boolean)("people_synced").default(false),
     // Timestamps
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
