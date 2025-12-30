@@ -60,7 +60,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     const total = Number(totalResult[0]?.count ?? 0);
 
-    // Count items that still need people sync (no item_people records for this server)
+    // Count items that still need people sync
     const remainingResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(items)
@@ -69,11 +69,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         and(
           eq(items.serverId, serverIdNum),
           inArray(libraries.type, [...LIBRARY_TYPES_WITH_PEOPLE]),
-          sql`NOT EXISTS (
-            SELECT 1 FROM item_people ip
-            WHERE ip.item_id = ${items.id}
-            AND ip.server_id = ${serverIdNum}
-          )`,
+          eq(items.peopleSynced, false),
         ),
       );
 

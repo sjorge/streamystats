@@ -64,8 +64,7 @@ export async function syncPeopleForServer(
   );
 
   while (Date.now() - startTime < maxRuntimeMs) {
-    // Find items that don't have any item_people records yet
-    // Using a subquery to check for missing people links
+    // Find items that haven't been processed for people sync yet
     const candidates = await db
       .select({ id: items.id })
       .from(items)
@@ -74,11 +73,7 @@ export async function syncPeopleForServer(
         and(
           eq(items.serverId, serverId),
           inArray(libraries.type, [...LIBRARY_TYPES_WITH_PEOPLE]),
-          sql`NOT EXISTS (
-            SELECT 1 FROM item_people ip
-            WHERE ip.item_id = ${items.id}
-            AND ip.server_id = ${serverId}
-          )`
+          eq(items.peopleSynced, false)
         )
       )
       .limit(DB_BATCH_LIMIT);
@@ -115,10 +110,10 @@ export async function syncPeopleForServer(
           insertedLinks += result.insertedLinks;
         }
 
-        // Mark items as processed for embeddings regeneration
+        // Mark items as processed for people sync and trigger embeddings regeneration
         await db
           .update(items)
-          .set({ processed: false, updatedAt: new Date() })
+          .set({ processed: false, peopleSynced: true, updatedAt: new Date() })
           .where(
             and(eq(items.serverId, serverId), inArray(items.id, chunk))
           );
@@ -168,11 +163,7 @@ export async function syncPeopleForServer(
       and(
         eq(items.serverId, serverId),
         inArray(libraries.type, [...LIBRARY_TYPES_WITH_PEOPLE]),
-        sql`NOT EXISTS (
-          SELECT 1 FROM item_people ip
-          WHERE ip.item_id = ${items.id}
-          AND ip.server_id = ${serverId}
-        )`
+        eq(items.peopleSynced, false)
       )
     );
 
