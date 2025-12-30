@@ -3,6 +3,10 @@ import { Suspense } from "react";
 import { Container } from "@/components/Container";
 import { PageTitle } from "@/components/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  getRecentlyAddedItems,
+  getRecentlyAddedSeriesWithEpisodes,
+} from "@/lib/db/recently-added";
 import { getSeasonalRecommendations } from "@/lib/db/seasonal-recommendations";
 import { getServer } from "@/lib/db/server";
 import { getSimilarSeries } from "@/lib/db/similar-series-statistics";
@@ -12,6 +16,8 @@ import { getMe, isUserAdmin } from "@/lib/db/users";
 import type { ServerPublic } from "@/lib/types";
 import { ActiveSessions } from "./ActiveSessions";
 import { MostWatchedItems } from "./MostWatchedItems";
+import { RecentlyAdded } from "./RecentlyAdded";
+import { RecentlyAddedSeries } from "./RecentlyAddedSeries";
 import { SeasonalRecommendations } from "./SeasonalRecommendations";
 import { SimilarSeriesStatistics } from "./SimilarSeriesStatistics";
 import { SimilarMovieStatistics } from "./SimilarStatistics";
@@ -89,22 +95,40 @@ async function GeneralStats({
 }) {
   const [me, isAdmin] = await Promise.all([getMe(), isUserAdmin()]);
 
-  const [similarData, similarSeriesData, data, seasonalData] =
-    await Promise.all([
-      getSimilarStatistics(server.id),
-      getSimilarSeries(server.id),
-      getMostWatchedItems({
-        serverId: server.id,
-        userId: isAdmin ? undefined : me?.id,
-      }),
-      getSeasonalRecommendations(server.id),
-    ]);
+  const [
+    similarData,
+    similarSeriesData,
+    data,
+    seasonalData,
+    recentlyAddedMovies,
+    recentlyAddedSeries,
+  ] = await Promise.all([
+    getSimilarStatistics(server.id),
+    getSimilarSeries(server.id),
+    getMostWatchedItems({
+      serverId: server.id,
+      userId: isAdmin ? undefined : me?.id,
+    }),
+    getSeasonalRecommendations(server.id),
+    getRecentlyAddedItems(server.id, "Movie"),
+    getRecentlyAddedSeriesWithEpisodes(server.id),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
       {/* <ServerSetupMonitor serverId={server.id} serverName={server.name} /> */}
       {seasonalData && (
         <SeasonalRecommendations data={seasonalData} server={server} />
+      )}
+      {recentlyAddedMovies.length > 0 && (
+        <RecentlyAdded
+          items={recentlyAddedMovies}
+          server={server}
+          itemType="Movie"
+        />
+      )}
+      {recentlyAddedSeries.length > 0 && (
+        <RecentlyAddedSeries items={recentlyAddedSeries} server={server} />
       )}
       {similarData.length > 0 && (
         <SimilarMovieStatistics data={similarData} server={server} />
