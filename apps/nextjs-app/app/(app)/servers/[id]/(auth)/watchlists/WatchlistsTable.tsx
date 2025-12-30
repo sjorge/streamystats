@@ -10,18 +10,59 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Globe, Lock, Megaphone } from "lucide-react";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ExternalLink,
+  Globe,
+  Lock,
+  Megaphone,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import JellyfinAvatar from "@/components/JellyfinAvatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -30,9 +71,244 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { usePersistantState } from "@/hooks/usePersistantState";
 import type { WatchlistWithItemCount } from "@/lib/db/watchlists";
 import { formatLocalDate } from "@/lib/timezone";
+
+interface WatchlistRowActionsProps {
+  watchlist: WatchlistWithItemCount;
+  serverId: number;
+  isOwner: boolean;
+}
+
+function WatchlistRowActions({
+  watchlist,
+  serverId,
+  isOwner,
+}: WatchlistRowActionsProps) {
+  const router = useRouter();
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [showEditDialog, setShowEditDialog] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+
+  const [name, setName] = React.useState(watchlist.name);
+  const [description, setDescription] = React.useState(
+    watchlist.description ?? "",
+  );
+  const [isPublic, setIsPublic] = React.useState(watchlist.isPublic);
+  const [allowedItemType, setAllowedItemType] = React.useState(
+    watchlist.allowedItemType ?? "",
+  );
+  const [defaultSortOrder, setDefaultSortOrder] = React.useState(
+    watchlist.defaultSortOrder,
+  );
+
+  React.useEffect(() => {
+    if (showEditDialog) {
+      setName(watchlist.name);
+      setDescription(watchlist.description ?? "");
+      setIsPublic(watchlist.isPublic);
+      setAllowedItemType(watchlist.allowedItemType ?? "");
+      setDefaultSortOrder(watchlist.defaultSortOrder);
+    }
+  }, [showEditDialog, watchlist]);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/watchlists/${watchlist.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.refresh();
+      }
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/watchlists/${watchlist.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+          isPublic,
+          allowedItemType: allowedItemType || null,
+          defaultSortOrder,
+        }),
+      });
+
+      if (res.ok) {
+        setShowEditDialog(false);
+        router.refresh();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/servers/${serverId}/watchlists/${watchlist.id}`}>
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open
+            </Link>
+          </DropdownMenuItem>
+          {isOwner && (
+            <>
+              <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Remove
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Watchlist</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{watchlist.name}"? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <form onSubmit={handleEdit}>
+            <DialogHeader>
+              <DialogTitle>Edit Watchlist</DialogTitle>
+              <DialogDescription>
+                Update your watchlist settings
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Name</Label>
+                <Input
+                  id="edit-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="My Watchlist"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="A collection of..."
+                  rows={2}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-itemType">Item Type Lock</Label>
+                <Select
+                  value={allowedItemType || "_none"}
+                  onValueChange={(v) =>
+                    setAllowedItemType(v === "_none" ? "" : v)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Allow all types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Allow all types</SelectItem>
+                    <SelectItem value="Movie">Movies only</SelectItem>
+                    <SelectItem value="Series">Series only</SelectItem>
+                    <SelectItem value="Episode">Episodes only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-sortOrder">Default Sort Order</Label>
+                <Select
+                  value={defaultSortOrder}
+                  onValueChange={setDefaultSortOrder}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">Custom Order</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="dateAdded">Date Added</SelectItem>
+                    <SelectItem value="releaseDate">Release Date</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-public" className="cursor-pointer">
+                  Make Public
+                </Label>
+                <Switch
+                  id="edit-public"
+                  checked={isPublic}
+                  onCheckedChange={setIsPublic}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowEditDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading || !name.trim()}>
+                {loading ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 interface WatchlistsTableProps {
   watchlists: WatchlistWithItemCount[];
@@ -203,6 +479,24 @@ export function WatchlistsTable({
 
         return <div>{formatLocalDate(date, "d MMM yyyy, HH:mm")}</div>;
       },
+    },
+    {
+      id: "actions",
+      header: () => <div className="text-right">Actions</div>,
+      cell: ({ row }) => {
+        const watchlist = row.original;
+        const isOwner = watchlist.userId === currentUserId;
+        return (
+          <div className="flex justify-end">
+            <WatchlistRowActions
+              watchlist={watchlist}
+              serverId={serverId}
+              isOwner={isOwner}
+            />
+          </div>
+        );
+      },
+      enableHiding: false,
     },
   ];
 
