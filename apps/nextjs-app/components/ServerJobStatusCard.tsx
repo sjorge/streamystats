@@ -3,7 +3,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { type JobEvent, useJobEvents } from "@/hooks/useJobEvents";
 import {
   JOB_NAME_TO_KEY,
@@ -13,20 +27,38 @@ import {
 } from "@/lib/types/job-status";
 import { fetch } from "@/lib/utils";
 
+function getStateBadgeVariant(
+  state: ServerJobState,
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (state) {
+    case "running":
+      return "default";
+    case "queued":
+      return "secondary";
+    case "scheduled":
+      return "outline";
+    case "failed":
+      return "destructive";
+    case "cancelled":
+    case "stopped":
+      return "outline";
+  }
+}
+
 function getStateBadgeClass(state: ServerJobState): string {
   switch (state) {
     case "running":
-      return "text-white bg-blue-600 border-blue-700";
+      return "bg-blue-600 hover:bg-blue-600";
     case "queued":
-      return "text-white bg-amber-500 border-amber-600";
+      return "bg-amber-500 hover:bg-amber-500 text-white";
     case "scheduled":
-      return "text-white bg-slate-500 border-slate-600";
+      return "bg-slate-500 hover:bg-slate-500 text-white";
     case "failed":
-      return "text-white bg-red-600 border-red-700";
+      return "";
     case "cancelled":
-      return "text-white bg-slate-400 border-slate-500";
+      return "bg-slate-400 hover:bg-slate-400";
     case "stopped":
-      return "text-zinc-300 bg-zinc-700 border-zinc-600";
+      return "bg-zinc-700 hover:bg-zinc-700 text-zinc-300";
   }
 }
 
@@ -87,24 +119,35 @@ function updateJobFromEvent(
   });
 }
 
+function formatTime(dateString: string): string {
+  return new Date(dateString).toLocaleTimeString();
+}
+
+function JobsCardHeader() {
+  return (
+    <CardHeader>
+      <CardTitle>All Jobs</CardTitle>
+      <CardDescription>Below are all jobs that can run on the server and their status. Jobs can run in parallell and does not affect one another.</CardDescription>
+    </CardHeader>
+  );
+}
+
 export function ServerJobStatusCard({ serverId }: { serverId: number }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["serverJobStatus", serverId],
     queryFn: () => fetchServerJobStatus(serverId),
-    staleTime: Number.POSITIVE_INFINITY, // Don't refetch - SSE handles updates
+    staleTime: Number.POSITIVE_INFINITY,
     retry: 2,
   });
 
   const [jobs, setJobs] = useState<ServerJobStatusItem[]>([]);
 
-  // Sync initial data to local state
   useEffect(() => {
     if (data?.jobs) {
       setJobs(data.jobs);
     }
   }, [data?.jobs]);
 
-  // Handle SSE events for real-time updates
   const handleJobEvent = useCallback(
     (event: JobEvent) => {
       if (event.serverId !== serverId) return;
@@ -120,9 +163,7 @@ export function ServerJobStatusCard({ serverId }: { serverId: number }) {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Jobs</CardTitle>
-        </CardHeader>
+        <JobsCardHeader />
         <CardContent className="text-sm text-muted-foreground">
           Loading…
         </CardContent>
@@ -133,9 +174,7 @@ export function ServerJobStatusCard({ serverId }: { serverId: number }) {
   if (error || !data?.success) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Jobs</CardTitle>
-        </CardHeader>
+        <JobsCardHeader />
         <CardContent className="text-sm text-muted-foreground">
           Not available.
         </CardContent>
@@ -145,41 +184,44 @@ export function ServerJobStatusCard({ serverId }: { serverId: number }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Jobs</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {jobs.map((job) => (
-          <div
-            key={job.key}
-            className="flex items-start justify-between gap-3 border rounded-md p-3"
-          >
-            <div className="min-w-0">
-              <div className="text-sm font-medium">{job.label}</div>
-              {job.state === "running" && job.activeSince ? (
-                <div className="text-xs text-muted-foreground mt-1">
-                  running since {new Date(job.activeSince).toLocaleTimeString()}
-                </div>
-              ) : null}
-              {job.state === "scheduled" && job.scheduledFor ? (
-                <div className="text-xs text-muted-foreground mt-1">
-                  scheduled for{" "}
-                  {new Date(job.scheduledFor).toLocaleTimeString()}
-                </div>
-              ) : null}
-              {job.state === "failed" && job.lastError ? (
-                <div className="text-xs text-red-600 mt-1 break-words">
-                  {job.lastError}
-                </div>
-              ) : null}
-            </div>
-            <div className="flex-shrink-0">
-              <Badge className={getStateBadgeClass(job.state)}>
-                {job.state}
-              </Badge>
-            </div>
-          </div>
-        ))}
+      <JobsCardHeader />
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Job</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden sm:table-cell">Details</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {jobs.map((job) => (
+              <TableRow key={job.key}>
+                <TableCell className="font-medium">{job.label}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={getStateBadgeVariant(job.state)}
+                    className={getStateBadgeClass(job.state)}
+                  >
+                    {job.state}
+                  </Badge>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+                  {job.state === "running" && job.activeSince && (
+                    <span>Running since {formatTime(job.activeSince)}</span>
+                  )}
+                  {job.state === "scheduled" && job.scheduledFor && (
+                    <span>Scheduled for {formatTime(job.scheduledFor)}</span>
+                  )}
+                  {job.state === "failed" && job.lastError && (
+                    <span className="text-destructive">{job.lastError}</span>
+                  )}
+                  {job.state === "stopped" && <span>Idle</span>}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );

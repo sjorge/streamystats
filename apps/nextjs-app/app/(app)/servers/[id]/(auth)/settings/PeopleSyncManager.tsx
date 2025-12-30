@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  AlertTriangle,
-  CheckCircle,
-  Loader2,
-  RefreshCw,
-  Users,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,6 +12,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { fetch } from "@/lib/utils";
 
 interface PeopleSyncManagerProps {
@@ -89,7 +91,6 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
         timestamp: new Date(),
       });
 
-      // Refresh progress after a short delay
       setTimeout(() => {
         fetchProgress();
       }, 2000);
@@ -108,7 +109,6 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
   useEffect(() => {
     fetchProgress();
 
-    // Poll every 30 seconds if sync is not complete
     const interval = setInterval(() => {
       if (!data?.isComplete) {
         fetchProgress();
@@ -122,10 +122,7 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            People Sync Progress
-          </CardTitle>
+          <CardTitle>People Sync</CardTitle>
           <CardDescription>
             Syncing actors, directors, and other people from your media
           </CardDescription>
@@ -144,10 +141,7 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            People Sync Progress
-          </CardTitle>
+          <CardTitle>People Sync</CardTitle>
           <CardDescription>
             Syncing actors, directors, and other people from your media
           </CardDescription>
@@ -166,63 +160,68 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5" />
-          People Sync Progress
-        </CardTitle>
+        <CardTitle>People Sync</CardTitle>
         <CardDescription>
           Syncing actors, directors, and other people from your media
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {data.isComplete ? (
-                <span className="flex items-center gap-1.5 text-green-600 dark:text-green-500">
-                  <CheckCircle className="h-4 w-4" />
-                  Sync complete
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Syncing in background...
-                </span>
-              )}
-            </span>
-            <span className="font-medium">{data.progress}%</span>
-          </div>
-          <Progress value={data.progress} className="h-2" />
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Total</TableHead>
+              <TableHead>Synced</TableHead>
+              <TableHead>Remaining</TableHead>
+              <TableHead>Progress</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">
+                {data.total.toLocaleString()}
+              </TableCell>
+              <TableCell className="font-medium text-green-600 dark:text-green-500">
+                {data.synced.toLocaleString()}
+              </TableCell>
+              <TableCell className="font-medium text-amber-600 dark:text-amber-500">
+                {data.remaining.toLocaleString()}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Progress value={data.progress} className="w-16 h-2" />
+                  <span className="font-medium">{data.progress}%</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                {data.isComplete ? (
+                  <span className="inline-flex items-center gap-1.5 text-green-600 dark:text-green-500">
+                    <CheckCircle className="h-4 w-4" />
+                    Complete
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Syncing
+                  </span>
+                )}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
 
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="space-y-1">
-            <p className="text-2xl font-bold">{data.total.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">Total Items</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-2xl font-bold text-green-600 dark:text-green-500">
-              {data.synced.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">Synced</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-2xl font-bold text-amber-600 dark:text-amber-500">
-              {data.remaining.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">Remaining</p>
-          </div>
-        </div>
-
-        <div className="pt-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Syncs every 15 minutes in the background.
+          </p>
           <Button
             onClick={handleTriggerSync}
             disabled={isTriggering}
             variant="outline"
-            className="flex items-center gap-2"
+            size="sm"
           >
             <RefreshCw
-              className={`h-4 w-4 ${isTriggering ? "animate-spin" : ""}`}
+              className={`h-4 w-4 mr-2 ${isTriggering ? "animate-spin" : ""}`}
             />
             {isTriggering ? "Triggering..." : "Sync Now"}
           </Button>
@@ -235,24 +234,8 @@ export function PeopleSyncManager({ serverId }: PeopleSyncManagerProps) {
             ) : (
               <AlertTriangle className="h-4 w-4" />
             )}
-            <AlertDescription className="space-y-1">
-              <div>{triggerResult.message}</div>
-              <div className="text-xs opacity-75">
-                {triggerResult.timestamp.toLocaleString()}
-              </div>
-            </AlertDescription>
+            <AlertDescription>{triggerResult.message}</AlertDescription>
           </Alert>
-        )}
-
-        {!data.isComplete && (
-          <div className="bg-muted/50 border rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">
-              People data is continuously synced from Jellyfin and updated every
-              15 minutes. This process runs in the background and might affect
-              performance due to People being a heavy database operation on the
-              Jellyfin side.
-            </p>
-          </div>
         )}
       </CardContent>
     </Card>

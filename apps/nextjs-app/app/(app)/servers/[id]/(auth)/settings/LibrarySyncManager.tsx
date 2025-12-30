@@ -1,14 +1,9 @@
 "use client";
 
-import {
-  AlertTriangle,
-  CheckCircle,
-  Library,
-  Loader,
-  RefreshCw,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { fetch } from "@/lib/utils";
 
 interface LibrarySyncManagerProps {
@@ -130,10 +133,7 @@ export function LibrarySyncManager({ serverId }: LibrarySyncManagerProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Library className="h-5 w-5" />
-            Library Sync
-          </CardTitle>
+          <CardTitle>Library Sync</CardTitle>
           <CardDescription>
             Sync individual libraries from your Jellyfin server
           </CardDescription>
@@ -150,10 +150,7 @@ export function LibrarySyncManager({ serverId }: LibrarySyncManagerProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Library className="h-5 w-5" />
-          Library Sync
-        </CardTitle>
+        <CardTitle>Library Sync</CardTitle>
         <CardDescription>
           Sync individual libraries from your Jellyfin server
         </CardDescription>
@@ -168,72 +165,81 @@ export function LibrarySyncManager({ serverId }: LibrarySyncManagerProps) {
             </AlertDescription>
           </Alert>
         ) : (
-          <div className="space-y-3">
-            {libraries.map((library) => {
-              const isSyncing = syncingLibraries.has(library.id);
-              const result = syncResults.get(library.id);
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Library</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="hidden sm:table-cell">Status</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {libraries.map((library) => {
+                const isSyncing = syncingLibraries.has(library.id);
+                const result = syncResults.get(library.id);
 
-              return (
-                <div
-                  key={library.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">{library.name}</p>
-                      <span className="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded">
-                        {library.type}
-                      </span>
-                    </div>
-                    {result && (
-                      <Alert
-                        variant={result.success ? "default" : "destructive"}
-                        className="mt-2"
+                return (
+                  <TableRow key={library.id}>
+                    <TableCell className="font-medium">
+                      {library.name}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{library.type}</Badge>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {result && (
+                        <div className="flex items-center gap-2">
+                          {result.success ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                          )}
+                          <span
+                            className={
+                              result.success
+                                ? "text-muted-foreground"
+                                : "text-destructive"
+                            }
+                          >
+                            {result.success ? "Triggered" : result.message}
+                          </span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        onClick={() =>
+                          handleSyncLibrary(library.id, library.name)
+                        }
+                        disabled={isSyncing}
+                        variant="outline"
+                        size="sm"
                       >
-                        {result.success ? (
-                          <CheckCircle className="h-4 w-4" />
+                        {isSyncing ? (
+                          <>
+                            <Loader className="h-4 w-4 animate-spin mr-2" />
+                            Syncing
+                          </>
                         ) : (
-                          <AlertTriangle className="h-4 w-4" />
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Sync
+                          </>
                         )}
-                        <AlertDescription className="text-xs">
-                          <div>{result.message}</div>
-                          <div className="opacity-75 mt-1">
-                            {result.timestamp.toLocaleString()}
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                  <Button
-                    onClick={() => handleSyncLibrary(library.id, library.name)}
-                    disabled={isSyncing}
-                    variant="outline"
-                    size="sm"
-                    className="ml-4 flex items-center gap-2 shrink-0"
-                  >
-                    {isSyncing ? (
-                      <>
-                        <Loader className="h-4 w-4 animate-spin" />
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="h-4 w-4" />
-                        Sync Now
-                      </>
-                    )}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
 
         <div className="bg-muted/50 border rounded-lg p-3">
           <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Library syncs will update all items in the
-            selected library. The sync will run in the background and you can
-            monitor progress from the dashboard.
+            Library syncs will update all items in the selected library. The
+            sync runs in the background.
           </p>
         </div>
       </CardContent>

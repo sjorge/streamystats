@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Container } from "@/components/Container";
-import { ServerJobStatusCard } from "@/components/ServerJobStatusCard";
 import { getInferredSessionCount } from "@/lib/db/infer-watchtime";
 import { getServer } from "@/lib/db/server";
 import { getUsers, isUserAdmin } from "@/lib/db/users";
@@ -9,10 +8,7 @@ import { DangerousMergeManager } from "../DangerousMergeManager";
 import { DangerousSeriesMergeManager } from "../DangerousSeriesMergeManager";
 import { DeleteServer } from "../DeleteServer";
 import { InferWatchtimeAdminManager } from "../InferWatchtimeAdminManager";
-import { LibrarySyncManager } from "../LibrarySyncManager";
 import { MergeItemsManager } from "../MergeItemsManager";
-import { PeopleSyncManager } from "../PeopleSyncManager";
-import { SyncManager } from "../SyncManager";
 import { UpdateConnection } from "../UpdateConnection";
 import { VersionSection } from "../VersionSection";
 
@@ -37,11 +33,7 @@ export default async function GeneralSettings(props: {
 
       <div className="space-y-8">
         <VersionSection />
-        {isAdmin ? <ServerJobStatusCard serverId={server.id} /> : null}
         <UpdateConnection serverId={server.id} />
-        <SyncManager serverId={server.id} serverName={server.name} />
-        {isAdmin ? <PeopleSyncManager serverId={server.id} /> : null}
-        {isAdmin ? <LibrarySyncManager serverId={server.id} /> : null}
         {isAdmin ? (
           <InferWatchtimeAdminManager
             serverId={server.id}
