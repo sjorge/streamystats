@@ -61,6 +61,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Build database package
+        run: bun run build:database
+
       - name: Typecheck nextjs-app
         run: bun run typecheck:nextjs
 
