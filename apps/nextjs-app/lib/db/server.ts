@@ -183,9 +183,12 @@ export const saveEmbeddingConfig = async ({
   try {
     // Build update object - only include apiKey if explicitly provided
     // This prevents accidentally wiping existing keys when other fields are updated
+    // Normalize base URL by removing trailing slashes
+    const normalizedBaseUrl = config.baseUrl?.replace(/\/+$/, "");
+
     const updateData: Partial<typeof servers.$inferInsert> = {
       embeddingProvider: config.provider,
-      embeddingBaseUrl: config.baseUrl,
+      embeddingBaseUrl: normalizedBaseUrl,
       embeddingModel: config.model,
       embeddingDimensions: config.dimensions || 1536,
     };
@@ -847,9 +850,12 @@ export const saveChatConfig = async ({
   try {
     // Build update object - only include apiKey if explicitly provided
     // This prevents accidentally wiping existing keys when other fields are updated
+    // Normalize base URL by removing trailing slashes
+    const normalizedBaseUrl = config.baseUrl?.replace(/\/+$/, "");
+
     const updateData: Partial<typeof servers.$inferInsert> = {
       chatProvider: config.provider,
-      chatBaseUrl: config.baseUrl,
+      chatBaseUrl: normalizedBaseUrl,
       chatModel: config.model,
     };
 
