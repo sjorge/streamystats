@@ -1,7 +1,6 @@
-import { PgBoss } from "pg-boss";
 import type { Job } from "pg-boss";
+import { PgBoss } from "pg-boss";
 import {
-  syncServerDataJob,
   addServerJob,
   backfillJellyfinIdsJob,
   BACKFILL_JOB_NAMES,
@@ -40,13 +39,9 @@ const DEFAULT_QUEUE_OPTIONS = {
   retentionSeconds: 60 * 60 * 24, // 24 hours
 };
 
-// Helper to wrap v9-style single-job handlers to v12 array-style handlers
-function wrapHandler<T, R>(handler: (job: Job<T>) => Promise<R>) {
-  return async (jobs: Job<T>[]): Promise<R> => {
-    // Process first job (batchSize defaults to 1)
-    const job = jobs[0];
-    return handler(job);
-  };
+// Helper to extract first job from batch and call handler with proper typing
+function firstJob<T, R>(handler: (job: Job<T>) => Promise<R>) {
+  return async (jobs: Job<T>[]): Promise<R> => handler(jobs[0]);
 }
 
 export async function getJobQueue(): Promise<PgBoss> {
@@ -102,7 +97,6 @@ export async function getJobQueue(): Promise<PgBoss> {
 async function createQueues(boss: PgBoss) {
   // Create all queues with default options
   const queueNames = [
-    "sync-server-data",
     "add-server",
     "generate-item-embeddings",
     JELLYFIN_JOB_NAMES.FULL_SYNC,
@@ -126,114 +120,44 @@ async function createQueues(boss: PgBoss) {
     await boss.createQueue(name, DEFAULT_QUEUE_OPTIONS);
   }
 
-  console.log(`Created ${queueNames.length} job queues`);
+  console.log(`[pg-boss] Created ${queueNames.length} job queues`);
 }
 
 async function registerJobHandlers(boss: PgBoss) {
   // Register media server job types
-  await boss.work(
-    "sync-server-data",
-    { batchSize: 1 },
-    wrapHandler(syncServerDataJob)
-  );
-  await boss.work("add-server", { batchSize: 1 }, wrapHandler(addServerJob));
+  await boss.work("add-server", { batchSize: 1 }, firstJob(addServerJob));
 
   // Register item embeddings job
-  await boss.work(
-    "generate-item-embeddings",
-    { batchSize: 1 },
-    wrapHandler(generateItemEmbeddingsJob)
-  );
+  await boss.work("generate-item-embeddings", { batchSize: 1 }, firstJob(generateItemEmbeddingsJob));
 
   // Register Jellyfin sync workers
-  await boss.work(
-    JELLYFIN_JOB_NAMES.FULL_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinFullSyncWorker)
-  );
-  await boss.work(
-    JELLYFIN_JOB_NAMES.USERS_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinUsersSyncWorker)
-  );
-  await boss.work(
-    JELLYFIN_JOB_NAMES.LIBRARIES_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinLibrariesSyncWorker)
-  );
-  await boss.work(
-    JELLYFIN_JOB_NAMES.ITEMS_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinItemsSyncWorker)
-  );
-  await boss.work(
-    JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinActivitiesSyncWorker)
-  );
-  await boss.work(
-    JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinRecentItemsSyncWorker)
-  );
-  await boss.work(
-    JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinRecentActivitiesSyncWorker)
-  );
-
-  await boss.work(
-    JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
-    { batchSize: 1 },
-    wrapHandler(jellyfinPeopleSyncWorker)
-  );
+  await boss.work(JELLYFIN_JOB_NAMES.FULL_SYNC, { batchSize: 1 }, firstJob(jellyfinFullSyncWorker));
+  await boss.work(JELLYFIN_JOB_NAMES.USERS_SYNC, { batchSize: 1 }, firstJob(jellyfinUsersSyncWorker));
+  await boss.work(JELLYFIN_JOB_NAMES.LIBRARIES_SYNC, { batchSize: 1 }, firstJob(jellyfinLibrariesSyncWorker));
+  await boss.work(JELLYFIN_JOB_NAMES.ITEMS_SYNC, { batchSize: 1 }, firstJob(jellyfinItemsSyncWorker));
+  await boss.work(JELLYFIN_JOB_NAMES.ACTIVITIES_SYNC, { batchSize: 1 }, firstJob(jellyfinActivitiesSyncWorker));
+  await boss.work(JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC, { batchSize: 1 }, firstJob(jellyfinRecentItemsSyncWorker));
+  await boss.work(JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC, { batchSize: 1 }, firstJob(jellyfinRecentActivitiesSyncWorker));
+  await boss.work(JELLYFIN_JOB_NAMES.PEOPLE_SYNC, { batchSize: 1 }, firstJob(jellyfinPeopleSyncWorker));
 
   // Register geolocation jobs
-  await boss.work(
-    GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES,
-    { batchSize: 1 },
-    wrapHandler(geolocateActivitiesJob)
-  );
-  await boss.work(
-    GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
-    { batchSize: 1 },
-    wrapHandler(calculateFingerprintsJob)
-  );
-  await boss.work(
-    GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS,
-    { batchSize: 1 },
-    wrapHandler(backfillActivityLocationsJob)
-  );
+  await boss.work(GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES, { batchSize: 1 }, firstJob(geolocateActivitiesJob));
+  await boss.work(GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS, { batchSize: 1 }, firstJob(calculateFingerprintsJob));
+  await boss.work(GEOLOCATION_JOB_NAMES.BACKFILL_LOCATIONS, { batchSize: 1 }, firstJob(backfillActivityLocationsJob));
 
   // Register security sync job
-  await boss.work(
-    SECURITY_SYNC_JOB_NAME,
-    { batchSize: 1 },
-    wrapHandler(securityFullSyncJob)
-  );
+  await boss.work(SECURITY_SYNC_JOB_NAME, { batchSize: 1 }, firstJob(securityFullSyncJob));
 
   // Register backfill jobs
-  await boss.work(
-    BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS,
-    { batchSize: 1 },
-    wrapHandler(backfillJellyfinIdsJob)
-  );
+  await boss.work(BACKFILL_JOB_NAMES.BACKFILL_JELLYFIN_IDS, { batchSize: 1 }, firstJob(backfillJellyfinIdsJob));
 
   // Register infer watchtime job
-  await boss.work(
-    INFER_WATCHTIME_JOB_NAME,
-    { batchSize: 1 },
-    wrapHandler(inferWatchtimeJob)
-  );
+  await boss.work(INFER_WATCHTIME_JOB_NAME, { batchSize: 1 }, firstJob(inferWatchtimeJob));
 
-  // Register scheduler maintenance job (handles cleanup tasks)
-  await boss.work(
-    SCHEDULER_MAINTENANCE_JOB_NAME,
-    { batchSize: 1 },
-    wrapHandler(schedulerMaintenanceWorker)
-  );
+  // Register scheduler maintenance job
+  await boss.work(SCHEDULER_MAINTENANCE_JOB_NAME, { batchSize: 1 }, firstJob(schedulerMaintenanceWorker));
 
-  console.log("All job handlers registered successfully");
+  console.log("[pg-boss] All job handlers registered successfully");
 }
 
 export async function closeJobQueue(): Promise<void> {
@@ -245,7 +169,6 @@ export async function closeJobQueue(): Promise<void> {
 
 // Job queue utilities
 export const JobTypes = {
-  SYNC_SERVER_DATA: "sync-server-data",
   ADD_SERVER: "add-server",
   GENERATE_ITEM_EMBEDDINGS: "generate-item-embeddings",
 } as const;

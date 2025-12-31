@@ -1,6 +1,5 @@
 // Export all job functions from their respective modules
 export {
-  syncServerDataJob,
   addServerJob,
   backfillJellyfinIdsJob,
   BACKFILL_JOB_NAMES,
@@ -14,13 +13,6 @@ export {
   backfillActivityLocationsJob,
   GEOLOCATION_JOB_NAMES,
 } from "./geolocation-jobs";
-
-export {
-  syncUsers,
-  syncLibraries,
-  syncActivities,
-  syncItems,
-} from "./sync-helpers";
 
 export { logJobResult } from "./job-logger";
 

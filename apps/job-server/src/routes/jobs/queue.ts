@@ -11,7 +11,6 @@ const app = new Hono();
 
 // All job types that can be associated with a server
 const ALL_SERVER_JOB_TYPES = [
-  JobTypes.SYNC_SERVER_DATA,
   JobTypes.GENERATE_ITEM_EMBEDDINGS,
   ...Object.values(JELLYFIN_JOB_NAMES),
   ...Object.values(GEOLOCATION_JOB_NAMES),
@@ -27,7 +26,6 @@ app.post("/cancel-by-type", async (c) => {
     }
 
     const validJobTypes = [
-      JobTypes.SYNC_SERVER_DATA,
       JobTypes.ADD_SERVER,
       JobTypes.GENERATE_ITEM_EMBEDDINGS,
       ...Object.values(JELLYFIN_JOB_NAMES),
@@ -185,7 +183,6 @@ app.get("/queue/stats", async (c) => {
     const boss = await getJobQueue();
 
     const stats = await Promise.all([
-      boss.getQueueStats(JobTypes.SYNC_SERVER_DATA),
       boss.getQueueStats(JobTypes.ADD_SERVER),
       boss.getQueueStats(JobTypes.GENERATE_ITEM_EMBEDDINGS),
     ]);
@@ -195,9 +192,8 @@ app.get("/queue/stats", async (c) => {
     return c.json({
       success: true,
       queueStats: {
-        syncServerData: queuedCounts[0],
-        addServer: queuedCounts[1],
-        generateItemEmbeddings: queuedCounts[2],
+        addServer: queuedCounts[0],
+        generateItemEmbeddings: queuedCounts[1],
         total: queuedCounts.reduce((sum, count) => sum + count, 0),
       },
     });

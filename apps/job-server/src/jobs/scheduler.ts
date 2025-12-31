@@ -1,22 +1,17 @@
 import {
   db,
   servers,
-  jobResults,
-  items,
   serverJobConfigurations,
-  JOB_DEFAULTS,
   getDefaultCron,
   isCronJob,
   type JobKey,
   type CronJobKey,
 } from "@streamystats/database";
-import type { EmbeddingJobResult } from "@streamystats/database/schema";
 import { eq, and, sql, ne, or, isNull, lt } from "drizzle-orm";
 import { getJobQueue } from "./queue";
 import { JELLYFIN_JOB_NAMES } from "../jellyfin/workers";
 import { GEOLOCATION_JOB_NAMES } from "./geolocation-jobs";
 import { BACKFILL_JOB_NAMES } from "./server-jobs";
-import { cleanupDeletedItems } from "../jellyfin/sync/deleted-items";
 import { cancelJobsByName } from "../routes/jobs/utils";
 import { SCHEDULER_MAINTENANCE_JOB_NAME } from "./scheduler-maintenance";
 
@@ -25,13 +20,20 @@ interface ServerJobConfig {
   enabled: boolean;
 }
 
+const SEND_OPTIONS = {
+  STANDARD: { expireInSeconds: 1800, retryLimit: 1, retryDelay: 60 },
+  MEDIUM: { expireInSeconds: 3600, retryLimit: 1, retryDelay: 60 },
+  LONG: { expireInSeconds: 7200, retryLimit: 1, retryDelay: 300 },
+  EXTENDED: { expireInSeconds: 14400, retryLimit: 1, retryDelay: 300 },
+} as const;
+
 /**
  * Maps scheduler job keys to pg-boss job names and their data builders
  */
 const SCHEDULER_JOB_CONFIG: Record<JobKey, {
   pgBossName: string;
   buildData: (serverId: number) => object;
-  sendOptions: { expireInSeconds: number; retryLimit: number; retryDelay: number };
+  sendOptions: typeof SEND_OPTIONS[keyof typeof SEND_OPTIONS];
 } | null> = {
   "activity-sync": {
     pgBossName: JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
@@ -39,7 +41,7 @@ const SCHEDULER_JOB_CONFIG: Record<JobKey, {
       serverId,
       options: { activityOptions: { pageSize: 100, maxPages: 1, intelligent: true } },
     }),
-    sendOptions: { expireInSeconds: 1800, retryLimit: 1, retryDelay: 60 },
+    sendOptions: SEND_OPTIONS.STANDARD,
   },
   "recent-items-sync": {
     pgBossName: JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC,
@@ -47,7 +49,7 @@ const SCHEDULER_JOB_CONFIG: Record<JobKey, {
       serverId,
       options: { itemOptions: { recentItemsLimit: 100 } },
     }),
-    sendOptions: { expireInSeconds: 1800, retryLimit: 1, retryDelay: 60 },
+    sendOptions: SEND_OPTIONS.STANDARD,
   },
   "user-sync": {
     pgBossName: JELLYFIN_JOB_NAMES.USERS_SYNC,
@@ -55,37 +57,37 @@ const SCHEDULER_JOB_CONFIG: Record<JobKey, {
       serverId,
       options: { userOptions: {} },
     }),
-    sendOptions: { expireInSeconds: 1800, retryLimit: 1, retryDelay: 60 },
+    sendOptions: SEND_OPTIONS.STANDARD,
   },
   "people-sync": {
     pgBossName: JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
     buildData: (serverId) => ({ serverId }),
-    sendOptions: { expireInSeconds: 7200, retryLimit: 1, retryDelay: 300 },
+    sendOptions: SEND_OPTIONS.LONG,
   },
   "embeddings-sync": {
     pgBossName: "generate-item-embeddings",
     buildData: (serverId) => ({ serverId, batchSize: 50 }),
-    sendOptions: { expireInSeconds: 3600, retryLimit: 1, retryDelay: 60 },
+    sendOptions: SEND_OPTIONS.MEDIUM,
   },
   "full-sync": {
     pgBossName: JELLYFIN_JOB_NAMES.FULL_SYNC,
     buildData: (serverId) => ({ serverId, options: {} }),
-    sendOptions: { expireInSeconds: 14400, retryLimit: 1, retryDelay: 300 },
+    sendOptions: SEND_OPTIONS.EXTENDED,
   },
   "geolocation-sync": {
     pgBossName: GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES,
     buildData: (serverId) => ({ serverId, batchSize: 100 }),
-    sendOptions: { expireInSeconds: 1800, retryLimit: 1, retryDelay: 60 },
+    sendOptions: SEND_OPTIONS.STANDARD,
   },
   "fingerprint-sync": {
     pgBossName: GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
     buildData: (serverId) => ({ serverId }),
-    sendOptions: { expireInSeconds: 3600, retryLimit: 1, retryDelay: 60 },
+    sendOptions: SEND_OPTIONS.MEDIUM,
   },
-  "deleted-items-cleanup": null, // Not a pg-boss job, runs directly
-  "job-cleanup": null, // Global job, not per-server
-  "old-job-cleanup": null, // Global job, not per-server
-  "session-polling": null, // Handled by session poller, not scheduler
+  "deleted-items-cleanup": null,
+  "job-cleanup": null,
+  "old-job-cleanup": null,
+  "session-polling": null,
 };
 
 class SyncScheduler {
@@ -487,339 +489,6 @@ class SyncScheduler {
   }
 
   /**
-   * Trigger activity sync for all active servers
-   */
-  private async triggerActivitySync(): Promise<void> {
-    try {
-      console.log("[scheduler] trigger=activity-sync");
-
-      // Get all servers that are not currently syncing (or stale syncing)
-      const activeServers = await this.getServersForPeriodicSync();
-
-      if (activeServers.length === 0) {
-        console.log("[scheduler] skipped=activity-sync reason=servers-busy");
-        return;
-      }
-
-      const boss = await getJobQueue();
-      let queuedCount = 0;
-
-      // Queue activity sync jobs for each server
-      for (const server of activeServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "activity-sync")) {
-          continue;
-        }
-
-        try {
-          await boss.send(
-            JELLYFIN_JOB_NAMES.RECENT_ACTIVITIES_SYNC,
-            {
-              serverId: server.id,
-              options: {
-                activityOptions: {
-                  pageSize: 100,
-                  maxPages: 1,
-                  intelligent: true,
-                },
-              },
-            },
-            {
-              expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
-              retryLimit: 1, // Retry once if it fails
-              retryDelay: 60, // Wait 60 seconds before retrying
-            }
-          );
-
-          queuedCount++;
-          console.log(
-            `[scheduler] queued=activity-sync server=${server.name} serverId=${server.id}`
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] queued=activity-sync server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-
-      console.log(
-        `[scheduler] completed=activity-sync serverCount=${queuedCount}`
-      );
-    } catch (error) {
-      console.error("[scheduler] trigger=activity-sync status=error", error);
-    }
-  }
-
-  /**
-   * Trigger recently added items sync for all active servers
-   */
-  private async triggerRecentItemsSync(): Promise<void> {
-    try {
-      console.log("[scheduler] trigger=recent-items-sync");
-
-      // Get all servers that are not currently syncing (or stale syncing)
-      const activeServers = await this.getServersForPeriodicSync();
-
-      if (activeServers.length === 0) {
-        console.log(
-          "[scheduler] skipped=recent-items-sync reason=servers-busy"
-        );
-        return;
-      }
-
-      const boss = await getJobQueue();
-      let queuedCount = 0;
-
-      // Queue recently added items sync jobs for each server
-      for (const server of activeServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "recent-items-sync")) {
-          continue;
-        }
-
-        try {
-          await boss.send(
-            JELLYFIN_JOB_NAMES.RECENT_ITEMS_SYNC,
-            {
-              serverId: server.id,
-              options: {
-                itemOptions: {
-                  recentItemsLimit: 100, // Default limit
-                },
-              },
-            },
-            {
-              expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
-              retryLimit: 1, // Retry once if it fails
-              retryDelay: 60, // Wait 60 seconds before retrying
-            }
-          );
-
-          queuedCount++;
-          console.log(
-            `[scheduler] queued=recent-items-sync server=${server.name} serverId=${server.id}`
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] queued=recent-items-sync server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-
-      console.log(
-        `[scheduler] completed=recent-items-sync serverCount=${queuedCount}`
-      );
-    } catch (error) {
-      console.error(
-        "[scheduler] trigger=recent-items-sync status=error",
-        error
-      );
-    }
-  }
-
-  /**
-   * Trigger user sync for all active servers
-   */
-  private async triggerUserSync(): Promise<void> {
-    try {
-      console.log("[scheduler] trigger=user-sync");
-
-      // Get all servers that are not currently syncing (or stale syncing)
-      const activeServers = await this.getServersForPeriodicSync();
-
-      if (activeServers.length === 0) {
-        console.log("[scheduler] skipped=user-sync reason=servers-busy");
-        return;
-      }
-
-      const boss = await getJobQueue();
-      let queuedCount = 0;
-
-      // Queue user sync jobs for each server
-      for (const server of activeServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "user-sync")) {
-          continue;
-        }
-
-        try {
-          await boss.send(
-            JELLYFIN_JOB_NAMES.USERS_SYNC,
-            {
-              serverId: server.id,
-              options: {
-                userOptions: {
-                  // User sync specific options can be added here
-                },
-              },
-            },
-            {
-              expireInSeconds: 1800, // Job expires after 30 minutes (1800 seconds)
-              retryLimit: 1, // Retry once if it fails
-              retryDelay: 60, // Wait 60 seconds before retrying
-            }
-          );
-
-          queuedCount++;
-          console.log(
-            `[scheduler] queued=user-sync server=${server.name} serverId=${server.id}`
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] queued=user-sync server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-
-      console.log(
-        `[scheduler] completed=user-sync serverCount=${queuedCount}`
-      );
-    } catch (error) {
-      console.error("[scheduler] trigger=user-sync status=error", error);
-    }
-  }
-
-  /**
-   * Trigger people sync for all active servers (background backfill).
-   * Uses a per-server singletonKey so it can be scheduled frequently without enqueuing duplicates.
-   */
-  private async triggerPeopleSync(): Promise<void> {
-    try {
-      const activeServers = await this.getServersForPeriodicSync();
-
-      if (activeServers.length === 0) {
-        return;
-      }
-
-      const boss = await getJobQueue();
-
-      for (const server of activeServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "people-sync")) {
-          continue;
-        }
-
-        try {
-          await boss.send(
-            JELLYFIN_JOB_NAMES.PEOPLE_SYNC,
-            { serverId: server.id },
-            {
-              singletonKey: `jellyfin-people-sync-${server.id}`,
-              expireInSeconds: 3600,
-              retryLimit: 1,
-              retryDelay: 60,
-            }
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] queued=people-sync server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-    } catch (error) {
-      console.error("[scheduler] trigger=people-sync status=error", error);
-    }
-  }
-
-  /**
-   * Trigger embeddings generation for all eligible servers.
-   * Only runs for servers with autoGenerateEmbeddings enabled and valid embedding config.
-   * Skips if there is already a queued/active embeddings job for that server.
-   */
-  private async triggerEmbeddingsSync(): Promise<void> {
-    try {
-      const activeServers = await this.getServersForPeriodicSync();
-
-      const eligibleServers = activeServers.filter(
-        (server) => server.autoGenerateEmbeddings
-      );
-
-      if (eligibleServers.length === 0) {
-        return;
-      }
-
-      const boss = await getJobQueue();
-
-      for (const server of eligibleServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "embeddings-sync")) {
-          continue;
-        }
-
-        try {
-          if (!server.embeddingProvider) {
-            continue;
-          }
-
-          if (!server.embeddingBaseUrl || !server.embeddingModel) {
-            continue;
-          }
-
-          const remainingCount = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(items)
-            .where(
-              and(
-                eq(items.serverId, server.id),
-                eq(items.processed, false),
-                sql`${items.type} IN ('Movie', 'Series')`
-              )
-            );
-
-          const remaining = Number(remainingCount[0]?.count ?? 0);
-          if (remaining <= 0) {
-            continue;
-          }
-
-          // pg-boss v12: use API to check for active jobs
-          let hasActiveJob = false;
-          try {
-            const stats = await boss.getQueueStats("generate-item-embeddings");
-            hasActiveJob = stats.activeCount > 0 || stats.queuedCount > 0;
-          } catch {
-            // If queue doesn't exist yet, no active jobs
-            hasActiveJob = false;
-          }
-
-          if (hasActiveJob) {
-            continue;
-          }
-
-          await boss.send(
-            "generate-item-embeddings",
-            {
-              serverId: server.id,
-              provider: server.embeddingProvider,
-              config: {
-                baseUrl: server.embeddingBaseUrl,
-                apiKey: server.embeddingApiKey ?? undefined,
-                model: server.embeddingModel,
-                dimensions: server.embeddingDimensions || 1536,
-              },
-            },
-            {
-              expireInSeconds: 3600,
-              retryLimit: 1,
-              retryDelay: 60,
-            }
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] queued=embeddings-sync server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-    } catch (error) {
-      console.error("[scheduler] trigger=embeddings-sync status=error", error);
-    }
-  }
-
-  /**
    * Trigger full sync for all active servers
    */
   private async triggerFullSync(): Promise<void> {
@@ -888,192 +557,6 @@ class SyncScheduler {
       );
     } catch (error) {
       console.error("[scheduler] trigger=full-sync status=error", error);
-    }
-  }
-
-  /**
-   * Reset servers stuck in "syncing" status for more than 30 minutes
-   */
-  private async resetStaleSyncStatus(): Promise<void> {
-    try {
-      const result = await db
-        .update(servers)
-        .set({
-          syncStatus: "failed",
-          syncError:
-            "Sync timed out - status was stuck in syncing for more than 30 minutes",
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(servers.syncStatus, "syncing"),
-            or(
-              isNull(servers.lastSyncStarted),
-              lt(servers.lastSyncStarted, sql`NOW() - INTERVAL '30 minutes'`)
-            )
-          )
-        )
-        .returning({ id: servers.id, name: servers.name });
-
-      if (result.length > 0) {
-        console.log(
-          `[scheduler] phase=reset-stale resetCount=${
-            result.length
-          } servers=${result.map((s) => s.name).join(",")}`
-        );
-      }
-    } catch (error) {
-      console.error("[scheduler] phase=reset-stale status=error", error);
-    }
-  }
-
-  /**
-   * Trigger cleanup of stale embedding jobs
-   */
-  private async triggerJobCleanup(): Promise<void> {
-    try {
-      // First, reset any servers stuck in "syncing" status
-      await this.resetStaleSyncStatus();
-
-      // Find all processing embedding jobs older than 10 minutes
-      const staleJobs = await db
-        .select()
-        .from(jobResults)
-        .where(
-          and(
-            eq(jobResults.jobName, "generate-item-embeddings"),
-            eq(jobResults.status, "processing"),
-            sql`${jobResults.createdAt} < NOW() - INTERVAL '10 minutes'`
-          )
-        );
-
-      let cleanedCount = 0;
-
-      for (const staleJob of staleJobs) {
-        try {
-          const result = staleJob.result as EmbeddingJobResult | null;
-          const serverId = result?.serverId;
-
-          if (serverId) {
-            // Check if there's been recent heartbeat activity
-            const lastHeartbeat = result?.lastHeartbeat
-              ? new Date(result.lastHeartbeat).getTime()
-              : new Date(staleJob.createdAt).getTime();
-            const heartbeatAge = Date.now() - lastHeartbeat;
-
-            // Only cleanup if no recent heartbeat (older than 2 minutes)
-            if (heartbeatAge > 2 * 60 * 1000) {
-              const processingTime = Math.min(
-                Date.now() - new Date(staleJob.createdAt).getTime(),
-                3600000
-              );
-
-              await db
-                .update(jobResults)
-                .set({
-                  status: "failed",
-                  error:
-                    "Job exceeded maximum processing time without heartbeat",
-                  processingTime,
-                  result: {
-                    ...result,
-                    error: "Job cleanup - exceeded maximum processing time",
-                    cleanedAt: new Date().toISOString(),
-                    staleDuration: heartbeatAge,
-                  },
-                })
-                .where(eq(jobResults.id, staleJob.id));
-
-              cleanedCount++;
-              console.info(`[cleanup] type=stale-embedding serverId=${serverId}`);
-            }
-          }
-        } catch (error) {
-          console.error("Error cleaning up stale job:", staleJob.jobId, error);
-        }
-      }
-
-      if (cleanedCount > 0) {
-        console.info(
-          `[cleanup] type=stale-embedding cleanedCount=${cleanedCount}`
-        );
-      }
-    } catch (error) {
-      console.error("[scheduler] trigger=job-cleanup status=error", error);
-    }
-  }
-
-  /**
-   * Trigger cleanup of old job results (older than 10 days)
-   */
-  private async triggerOldJobCleanup(): Promise<void> {
-    try {
-      console.log("[scheduler] trigger=old-job-cleanup");
-
-      const result = await db
-        .delete(jobResults)
-        .where(sql`${jobResults.createdAt} < NOW() - INTERVAL '10 days'`)
-        .returning({ id: jobResults.id });
-
-      const deletedCount = result.length;
-
-      console.log(
-        `[scheduler] completed=old-job-cleanup deletedCount=${deletedCount}`
-      );
-    } catch (error) {
-      console.error("[scheduler] trigger=old-job-cleanup status=error", error);
-    }
-  }
-
-  /**
-   * Trigger deleted items cleanup for all servers.
-   * Detects items removed from Jellyfin and soft-deletes them in the database.
-   * Migrates watch history if items were re-added with new IDs.
-   */
-  private async triggerDeletedItemsCleanup(): Promise<void> {
-    try {
-      console.log("[scheduler] trigger=deleted-items-cleanup");
-
-      const activeServers = await this.getServersForPeriodicSync();
-
-      if (activeServers.length === 0) {
-        console.log(
-          "[scheduler] skipped=deleted-items-cleanup reason=servers-busy"
-        );
-        return;
-      }
-
-      let processedCount = 0;
-
-      for (const server of activeServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "deleted-items-cleanup")) {
-          continue;
-        }
-
-        try {
-          const result = await cleanupDeletedItems(server);
-
-          processedCount++;
-          console.log(
-            `[scheduler] completed=deleted-items-cleanup server=${server.name} status=${result.status} deleted=${result.metrics.itemsSoftDeleted} migrated=${result.metrics.itemsMigrated} durationMs=${result.metrics.duration}`
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] completed=deleted-items-cleanup server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-
-      console.log(
-        `[scheduler] completed=deleted-items-cleanup serverCount=${processedCount}`
-      );
-    } catch (error) {
-      console.error(
-        "[scheduler] trigger=deleted-items-cleanup status=error",
-        error
-      );
     }
   }
 
@@ -1280,92 +763,6 @@ class SyncScheduler {
         error
       );
       throw error;
-    }
-  }
-
-  /**
-   * Trigger geolocation sync for all active servers.
-   * Geolocates activities that don't have location data yet.
-   */
-  private async triggerGeolocationSync(): Promise<void> {
-    try {
-      const activeServers = await this.getServersForPeriodicSync();
-
-      if (activeServers.length === 0) {
-        return;
-      }
-
-      const boss = await getJobQueue();
-
-      for (const server of activeServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "geolocation-sync")) {
-          continue;
-        }
-
-        try {
-          await boss.send(
-            GEOLOCATION_JOB_NAMES.GEOLOCATE_ACTIVITIES,
-            { serverId: server.id, batchSize: 100 },
-            {
-              singletonKey: `geolocate-activities-${server.id}`,
-              expireInSeconds: 1800,
-              retryLimit: 1,
-              retryDelay: 60,
-            }
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] queued=geolocation-sync server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-    } catch (error) {
-      console.error("[scheduler] trigger=geolocation-sync status=error", error);
-    }
-  }
-
-  /**
-   * Trigger fingerprint calculation for all active servers.
-   * Recalculates user behavioral fingerprints based on session data.
-   */
-  private async triggerFingerprintSync(): Promise<void> {
-    try {
-      const activeServers = await this.getServersForPeriodicSync();
-
-      if (activeServers.length === 0) {
-        return;
-      }
-
-      const boss = await getJobQueue();
-
-      for (const server of activeServers) {
-        // Check if job should run for this server (enabled + cron matches)
-        if (!this.isJobEnabledForServer(server.id, "fingerprint-sync")) {
-          continue;
-        }
-
-        try {
-          await boss.send(
-            GEOLOCATION_JOB_NAMES.CALCULATE_FINGERPRINTS,
-            { serverId: server.id },
-            {
-              singletonKey: `calculate-fingerprints-${server.id}`,
-              expireInSeconds: 3600,
-              retryLimit: 1,
-              retryDelay: 120,
-            }
-          );
-        } catch (error) {
-          console.error(
-            `[scheduler] queued=fingerprint-sync server=${server.name} status=error`,
-            error
-          );
-        }
-      }
-    } catch (error) {
-      console.error("[scheduler] trigger=fingerprint-sync status=error", error);
     }
   }
 

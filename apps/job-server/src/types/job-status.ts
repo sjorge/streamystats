@@ -3,11 +3,6 @@ import type { Job } from "pg-boss";
 export type JobStatus = "processing" | "completed" | "failed";
 
 // Job data types for type-safe job handlers
-export interface SyncServerDataJobData {
-  serverId: number;
-  endpoint: string;
-}
-
 export interface AddServerJobData {
   serverUrl: string;
   apiKey: string;
@@ -97,10 +92,8 @@ export interface ServerStatusResponse {
   timestamp: string;
   uptime: number;
   queueStats: {
-    syncServerData: number;
     addServer: number;
     generateItemEmbeddings: number;
-    sequentialServerSync: number;
     jellyfinFullSync: number;
     jellyfinUsersSync: number;
     jellyfinLibrariesSync: number;

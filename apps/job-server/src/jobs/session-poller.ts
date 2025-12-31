@@ -25,6 +25,7 @@ import pLimit from "p-limit";
 import { formatError } from "../utils/format-error";
 import { shouldLog } from "../utils/log-throttle";
 import { normalizeTimeoutMs } from "../utils/sleep";
+import { structuredLog as log } from "../utils/structured-log";
 
 // Timeout for individual poll operations (3 minutes to allow for retries)
 const POLL_TIMEOUT_MS = 3 * 60_000;
@@ -47,19 +48,6 @@ function setLocalStatementTimeoutSql(ms: number) {
   const safeMs = Math.max(0, Math.floor(ms));
   // Postgres does not accept bind params here (SET ... = $1), so we must inline.
   return sql.raw(`SET LOCAL statement_timeout = ${safeMs}`);
-}
-
-function log(
-  prefix: string,
-  data: Record<string, string | number | boolean | null | undefined>
-): void {
-  const parts = [`[${prefix}]`];
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined && value !== null) {
-      parts.push(`${key}=${value}`);
-    }
-  }
-  process.stdout.write(`${parts.join(" ")}\n`);
 }
 
 interface SessionPollerConfig {

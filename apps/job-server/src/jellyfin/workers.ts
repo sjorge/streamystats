@@ -190,109 +190,26 @@ export async function jellyfinSyncWorker(job: {
 }
 
 /**
- * Full sync job worker - performs complete sync of all data
+ * Factory to create sync workers for different sync types
  */
-export async function jellyfinFullSyncWorker(job: {
-  data: JellyfinServerSyncJobData;
-}): Promise<any> {
-  return jellyfinSyncWorker({
-    data: {
-      serverId: job.data.serverId,
-      syncType: "full",
-      options: job.data.options,
-    },
-  });
+function createSyncWorker(syncType: JellyfinSyncJobData["syncType"]) {
+  return (job: { data: JellyfinServerSyncJobData }) =>
+    jellyfinSyncWorker({
+      data: {
+        serverId: job.data.serverId,
+        syncType,
+        options: job.data.options,
+      },
+    });
 }
 
-/**
- * Users sync job worker
- */
-export async function jellyfinUsersSyncWorker(job: {
-  data: JellyfinServerSyncJobData;
-}): Promise<any> {
-  return jellyfinSyncWorker({
-    data: {
-      serverId: job.data.serverId,
-      syncType: "users",
-      options: job.data.options,
-    },
-  });
-}
-
-/**
- * Libraries sync job worker
- */
-export async function jellyfinLibrariesSyncWorker(job: {
-  data: JellyfinServerSyncJobData;
-}): Promise<any> {
-  return jellyfinSyncWorker({
-    data: {
-      serverId: job.data.serverId,
-      syncType: "libraries",
-      options: job.data.options,
-    },
-  });
-}
-
-/**
- * Items sync job worker
- */
-export async function jellyfinItemsSyncWorker(job: {
-  data: JellyfinServerSyncJobData;
-}): Promise<any> {
-  return jellyfinSyncWorker({
-    data: {
-      serverId: job.data.serverId,
-      syncType: "items",
-      options: job.data.options,
-    },
-  });
-}
-
-/**
- * Activities sync job worker
- */
-export async function jellyfinActivitiesSyncWorker(job: {
-  data: JellyfinServerSyncJobData;
-}): Promise<any> {
-  return jellyfinSyncWorker({
-    data: {
-      serverId: job.data.serverId,
-      syncType: "activities",
-      options: job.data.options,
-    },
-  });
-}
-
-/**
- * Recent items sync job worker
- */
-export async function jellyfinRecentItemsSyncWorker(job: {
-  data: JellyfinServerSyncJobData;
-}): Promise<any> {
-  return jellyfinSyncWorker({
-    data: {
-      serverId: job.data.serverId,
-      syncType: "recent_items",
-      options: job.data.options,
-    },
-  });
-}
-
-/**
- * Recent activities sync job worker
- */
-export async function jellyfinRecentActivitiesSyncWorker(job: {
-  data: JellyfinServerSyncJobData;
-}): Promise<any> {
-  return jellyfinSyncWorker({
-    data: {
-      serverId: job.data.serverId,
-      syncType: "recent_activities",
-      options: job.data.options,
-    },
-  });
-}
+export const jellyfinFullSyncWorker = createSyncWorker("full");
+export const jellyfinUsersSyncWorker = createSyncWorker("users");
+export const jellyfinLibrariesSyncWorker = createSyncWorker("libraries");
+export const jellyfinItemsSyncWorker = createSyncWorker("items");
+export const jellyfinActivitiesSyncWorker = createSyncWorker("activities");
+export const jellyfinRecentItemsSyncWorker = createSyncWorker("recent_items");
+export const jellyfinRecentActivitiesSyncWorker = createSyncWorker("recent_activities");
 
 /**
  * People sync job worker - syncs people data to the people and item_people tables

@@ -13,6 +13,7 @@ import {
 import { activityScheduler } from "../../jobs/scheduler";
 import { sessionPoller } from "../../jobs/session-poller";
 import { eq, and } from "drizzle-orm";
+import { getServerById } from "./utils";
 
 const app = new Hono();
 
@@ -34,23 +35,16 @@ app.post("/scheduler/trigger", async (c) => {
       return c.json({ error: "Server ID is required" }, 400);
     }
 
-    const server = await db
-      .select({ id: servers.id, name: servers.name })
-      .from(servers)
-      .where(eq(servers.id, Number.parseInt(serverId)))
-      .limit(1);
-
-    if (!server.length) {
+    const server = await getServerById(serverId);
+    if (!server) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerServerActivitySync(
-      Number.parseInt(serverId)
-    );
+    await activityScheduler.triggerServerActivitySync(server.id);
 
     return c.json({
       success: true,
-      message: `Activity sync triggered for server: ${server[0].name}`,
+      message: `Activity sync triggered for server: ${server.name}`,
     });
   } catch (error) {
     console.error("Error triggering activity sync:", error);
@@ -66,21 +60,16 @@ app.post("/scheduler/trigger-user-sync", async (c) => {
       return c.json({ error: "Server ID is required" }, 400);
     }
 
-    const server = await db
-      .select({ id: servers.id, name: servers.name })
-      .from(servers)
-      .where(eq(servers.id, Number.parseInt(serverId)))
-      .limit(1);
-
-    if (!server.length) {
+    const server = await getServerById(serverId);
+    if (!server) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerServerUserSync(Number.parseInt(serverId));
+    await activityScheduler.triggerServerUserSync(server.id);
 
     return c.json({
       success: true,
-      message: `User sync triggered for server: ${server[0].name}`,
+      message: `User sync triggered for server: ${server.name}`,
     });
   } catch (error) {
     console.error("Error triggering user sync:", error);
@@ -96,21 +85,16 @@ app.post("/scheduler/trigger-full-sync", async (c) => {
       return c.json({ error: "Server ID is required" }, 400);
     }
 
-    const server = await db
-      .select({ id: servers.id, name: servers.name })
-      .from(servers)
-      .where(eq(servers.id, Number.parseInt(serverId)))
-      .limit(1);
-
-    if (!server.length) {
+    const server = await getServerById(serverId);
+    if (!server) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerServerFullSync(Number.parseInt(serverId));
+    await activityScheduler.triggerServerFullSync(server.id);
 
     return c.json({
       success: true,
-      message: `Full sync triggered for server: ${server[0].name}`,
+      message: `Full sync triggered for server: ${server.name}`,
     });
   } catch (error) {
     console.error("Error triggering full sync:", error);
@@ -126,21 +110,16 @@ app.post("/scheduler/trigger-people-sync", async (c) => {
       return c.json({ error: "Server ID is required" }, 400);
     }
 
-    const server = await db
-      .select({ id: servers.id, name: servers.name })
-      .from(servers)
-      .where(eq(servers.id, Number.parseInt(serverId)))
-      .limit(1);
-
-    if (!server.length) {
+    const server = await getServerById(serverId);
+    if (!server) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerServerPeopleSync(Number.parseInt(serverId));
+    await activityScheduler.triggerServerPeopleSync(server.id);
 
     return c.json({
       success: true,
-      message: `People sync triggered for server: ${server[0].name}`,
+      message: `People sync triggered for server: ${server.name}`,
     });
   } catch (error) {
     console.error("Error triggering people sync:", error);
@@ -160,24 +139,16 @@ app.post("/scheduler/trigger-library-sync", async (c) => {
       return c.json({ error: "Library ID is required" }, 400);
     }
 
-    const server = await db
-      .select({ id: servers.id, name: servers.name })
-      .from(servers)
-      .where(eq(servers.id, Number.parseInt(serverId)))
-      .limit(1);
-
-    if (!server.length) {
+    const server = await getServerById(serverId);
+    if (!server) {
       return c.json({ error: "Server not found" }, 404);
     }
 
-    await activityScheduler.triggerLibraryItemsSync(
-      Number.parseInt(serverId),
-      libraryId
-    );
+    await activityScheduler.triggerLibraryItemsSync(server.id, libraryId);
 
     return c.json({
       success: true,
-      message: `Library sync triggered for server: ${server[0].name}`,
+      message: `Library sync triggered for server: ${server.name}`,
     });
   } catch (error) {
     console.error("Error triggering library sync:", error);
