@@ -10,6 +10,7 @@ import {
   Play,
   PlaySquare,
   Tv,
+  User,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PerLibraryStatistics } from "@/lib/db/library-statistics";
@@ -19,37 +20,60 @@ interface Props {
   data: PerLibraryStatistics[];
 }
 
-const getLibraryIcon = (type: string) => {
+const getLibraryConfig = (type: string) => {
   switch (type) {
     case "movies":
-      return Film;
+      return {
+        icon: Film,
+        color: "text-amber-500",
+        bgColor: "bg-amber-500/10",
+        borderColor: "border-amber-500/20",
+      };
     case "tvshows":
-      return Tv;
+      return {
+        icon: Tv,
+        color: "text-blue-500",
+        bgColor: "bg-blue-500/10",
+        borderColor: "border-blue-500/20",
+      };
     case "music":
-      return Music;
+      return {
+        icon: Music,
+        color: "text-purple-500",
+        bgColor: "bg-purple-500/10",
+        borderColor: "border-purple-500/20",
+      };
     default:
-      return Folder;
+      return {
+        icon: Folder,
+        color: "text-emerald-500",
+        bgColor: "bg-emerald-500/10",
+        borderColor: "border-emerald-500/20",
+      };
   }
 };
 
 const LibraryStatCard: React.FC<{ stats: PerLibraryStatistics }> = ({
   stats,
 }) => {
-  const Icon = getLibraryIcon(stats.libraryType);
+  const config = getLibraryConfig(stats.libraryType);
+  const Icon = config.icon;
   const isTvLibrary = stats.libraryType === "tvshows";
   const isMovieLibrary = stats.libraryType === "movies";
 
   return (
-    <Card className="flex flex-col">
+    <Card className={`flex flex-col border-l-4 ${config.borderColor}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base font-semibold">
           {stats.libraryName}
         </CardTitle>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground capitalize">
+        <div
+          className={`flex items-center gap-2 px-2 py-1 rounded-full ${config.bgColor}`}
+        >
+          <Icon className={`h-4 w-4 ${config.color}`} />
+          <span className={`text-xs font-medium capitalize ${config.color}`}>
             {stats.libraryType}
           </span>
-          <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-3">
@@ -59,25 +83,29 @@ const LibraryStatCard: React.FC<{ stats: PerLibraryStatistics }> = ({
             label="Total Time"
             value={formatDuration(ticksToSeconds(stats.totalRuntimeTicks))}
             icon={Clock}
+            iconColor="text-sky-500"
           />
           <StatItem
             label="Total Files"
             value={formatNumber(stats.totalFiles)}
             icon={Folder}
+            iconColor="text-orange-500"
           />
         </div>
 
-        {/* Row 2: Library Size */}
+        {/* Row 2: Library Size + Total Plays */}
         <div className="grid grid-cols-2 gap-4">
           <StatItem
             label="Library Size"
             value={formatBytes(stats.totalSizeBytes)}
             icon={HardDrive}
+            iconColor="text-slate-500"
           />
           <StatItem
             label="Total Plays"
             value={formatNumber(stats.totalPlays)}
             icon={Play}
+            iconColor="text-green-500"
           />
         </div>
 
@@ -87,6 +115,7 @@ const LibraryStatCard: React.FC<{ stats: PerLibraryStatistics }> = ({
             label="Total Playback"
             value={formatDuration(stats.totalPlaybackSeconds)}
             icon={PlaySquare}
+            iconColor="text-violet-500"
           />
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Last Activity</p>
@@ -100,12 +129,18 @@ const LibraryStatCard: React.FC<{ stats: PerLibraryStatistics }> = ({
           </div>
         </div>
 
-        {/* Row 4: Last Played */}
-        <div className="space-y-1">
+        {/* Row 4: Last Played with user info */}
+        <div className={`p-2 rounded-lg ${config.bgColor} space-y-1`}>
           <p className="text-xs text-muted-foreground">Last Played</p>
           <p className="text-sm font-medium truncate">
             {stats.lastPlayedItemName || "Nothing yet"}
           </p>
+          {stats.lastPlayedByUserName && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <User className="h-3 w-3" />
+              <span>by {stats.lastPlayedByUserName}</span>
+            </div>
+          )}
         </div>
 
         {/* Row 5: Type-specific counts */}
@@ -113,26 +148,37 @@ const LibraryStatCard: React.FC<{ stats: PerLibraryStatistics }> = ({
           {isTvLibrary ? (
             <div className="flex justify-between text-sm">
               <span>
-                <span className="font-medium">{stats.seriesCount}</span>{" "}
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {stats.seriesCount}
+                </span>{" "}
                 <span className="text-muted-foreground">Series</span>
               </span>
               <span>
-                <span className="font-medium">{stats.seasonsCount}</span>{" "}
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {stats.seasonsCount}
+                </span>{" "}
                 <span className="text-muted-foreground">Seasons</span>
               </span>
               <span>
-                <span className="font-medium">{stats.episodesCount}</span>{" "}
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {stats.episodesCount}
+                </span>{" "}
                 <span className="text-muted-foreground">Episodes</span>
               </span>
             </div>
           ) : isMovieLibrary ? (
             <div className="text-sm">
-              <span className="font-medium">{stats.moviesCount}</span>{" "}
+              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                {stats.moviesCount}
+              </span>{" "}
               <span className="text-muted-foreground">Movies</span>
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">
-              {stats.totalFiles} items
+            <div className="text-sm">
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                {stats.totalFiles}
+              </span>{" "}
+              <span className="text-muted-foreground">items</span>
             </div>
           )}
         </div>
@@ -145,10 +191,11 @@ const StatItem: React.FC<{
   label: string;
   value: string;
   icon: React.ElementType;
-}> = ({ label, value, icon: Icon }) => (
+  iconColor?: string;
+}> = ({ label, value, icon: Icon, iconColor = "text-muted-foreground" }) => (
   <div className="space-y-1">
     <div className="flex items-center gap-1">
-      <Icon className="h-3 w-3 text-muted-foreground" />
+      <Icon className={`h-3 w-3 ${iconColor}`} />
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
     <p className="text-sm font-medium truncate">{value}</p>

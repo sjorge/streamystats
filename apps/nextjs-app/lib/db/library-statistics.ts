@@ -441,6 +441,7 @@ export const getPerLibraryStatistics = async ({
       libraryId: items.libraryId,
       itemId: sessions.itemId,
       itemName: sessions.itemName,
+      userName: sessions.userName,
       startTime: sessions.startTime,
     })
     .from(sessions)
@@ -485,13 +486,14 @@ export const getPerLibraryStatistics = async ({
 
   const lastPlayedMap = new Map<
     string,
-    { itemId: string | null; itemName: string | null }
+    { itemId: string | null; itemName: string | null; userName: string | null }
   >();
   for (const item of lastPlayedItems) {
     if (!item.libraryId) continue;
     lastPlayedMap.set(item.libraryId, {
       itemId: item.itemId,
       itemName: item.itemName,
+      userName: item.userName,
     });
   }
 
@@ -507,6 +509,7 @@ export const getPerLibraryStatistics = async ({
     const lastPlayed = lastPlayedMap.get(library.id) || {
       itemId: null,
       itemName: null,
+      userName: null,
     };
 
     const counts = itemData.counts;
@@ -531,6 +534,7 @@ export const getPerLibraryStatistics = async ({
 
       lastPlayedItemId: lastPlayed.itemId,
       lastPlayedItemName: lastPlayed.itemName,
+      lastPlayedByUserName: lastPlayed.userName,
       lastActivityTime: sessionData.lastActivity,
     };
   });
