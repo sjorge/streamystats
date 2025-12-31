@@ -371,6 +371,7 @@ async function processItem(
       etag: items.etag,
       deletedAt: items.deletedAt,
       providerIds: items.providerIds,
+      mediaSourcesSynced: items.mediaSourcesSynced,
     })
     .from(items)
     .where(eq(items.id, jellyfinItem.Id))
@@ -379,6 +380,8 @@ async function processItem(
   const isNewItem = existingItem.length === 0;
   const wasDeleted = !isNewItem && existingItem[0].deletedAt !== null;
   const hasChanged = !isNewItem && existingItem[0].etag !== jellyfinItem.Etag;
+  const needsMediaSourcesSync =
+    !isNewItem && existingItem[0].mediaSourcesSynced === false;
 
   // Check if ProviderIds are missing in existing item but present in new item
   const needsProviderIdsUpdate =
@@ -406,6 +409,20 @@ async function processItem(
         jellyfinItem.ProviderIds
       )}`
     );
+  }
+
+  // If item only needs media sources sync (no other changes), just sync media sources
+  if (
+    !isNewItem &&
+    !hasChanged &&
+    !wasDeleted &&
+    !needsProviderIdsUpdate &&
+    needsMediaSourcesSync
+  ) {
+    const serverId = await getServerIdFromLibrary(libraryId);
+    await syncMediaSources(jellyfinItem, serverId);
+    metrics.incrementItemsProcessed();
+    return;
   }
 
   if (!isNewItem && !hasChanged && !wasDeleted && !needsProviderIdsUpdate) {
