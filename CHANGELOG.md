@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.16.0](https://github.com/fredrikburmester/streamystats/compare/v2.15.0...v2.16.0) (2025-12-31)
+
+
+### Features
+
+* add pause/resume logging with debouncing to prevent flickering ([ddcb786](https://github.com/fredrikburmester/streamystats/commit/ddcb7864f89b7fcd68aba61a742468c25ea1db96))
+* add per-server configurable job schedules ([744ab27](https://github.com/fredrikburmester/streamystats/commit/744ab275f564f94527b2437529eb88d663fef0e6))
+* colors ([3e3ad21](https://github.com/fredrikburmester/streamystats/commit/3e3ad2150c5f2d47faea49ecbbd893f0403a890b))
+* dropdown actions in watchlist table ([7678d69](https://github.com/fredrikburmester/streamystats/commit/7678d697af112bd5373d5e052250564422703147))
+* library stats ([ee7accb](https://github.com/fredrikburmester/streamystats/commit/ee7accb7f420b6b57490f39cb534f1b7244c0fa3))
+* people statistics ([de1c2a1](https://github.com/fredrikburmester/streamystats/commit/de1c2a1e34c75d3cbf7b302b46ec6bbd4ce3c6b7))
+* people stats ([ece9d38](https://github.com/fredrikburmester/streamystats/commit/ece9d3858767a33f4eca66a0245aa6e65ed07ec9))
+* recently added ([7910655](https://github.com/fredrikburmester/streamystats/commit/7910655e6d59e01fd01e085954c05aa67e9249c3))
+* recently added ([aff71d2](https://github.com/fredrikburmester/streamystats/commit/aff71d26d2afd0e64c677490e765efb2004a90bc))
+* recently added items on dashboard ([f826228](https://github.com/fredrikburmester/streamystats/commit/f826228eca30f01539884323a09417ffe2da3e32))
+
+
+### Bug Fixes
+
+* build issue ([1f46881](https://github.com/fredrikburmester/streamystats/commit/1f468815a6eea1ba1819078db5a019730094bf06))
+* fetch MediaSources from Jellyfin and sync for existing items ([a194e16](https://github.com/fredrikburmester/streamystats/commit/a194e169dedb78ad61d2b5379629df96d949c1d4))
+* hydration issue ([9f1643e](https://github.com/fredrikburmester/streamystats/commit/9f1643ef18e16912e3ee8ca427636ba1e7c0f7be))
+* mark items as synced manually instead of relying on people existing ([2892bb2](https://github.com/fredrikburmester/streamystats/commit/2892bb2c76147d05b06f4c4f78ed8330cf50c74e))
+* restore pause/resume session logging ([ba03d9e](https://github.com/fredrikburmester/streamystats/commit/ba03d9e2ec63ea9f773bcb5fbce7c3572a27ea09))
+* strip trailing slashes from AI base URLs ([95cf000](https://github.com/fredrikburmester/streamystats/commit/95cf000488ef95677d89fd5da7026d86cee6574c)), closes [#324](https://github.com/fredrikburmester/streamystats/issues/324)
+
 ## [2.15.0](https://github.com/fredrikburmester/streamystats/compare/v2.14.1...v2.15.0) (2025-12-29)
 
 
