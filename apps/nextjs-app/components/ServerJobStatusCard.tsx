@@ -456,11 +456,6 @@ export function ServerJobStatusCard({
                 const sessionPollingDefaults = JOB_DEFAULTS["session-polling"];
                 const isDisabled =
                   sessionPollingConfig && !sessionPollingConfig.enabled;
-                const intervalSeconds =
-                  sessionPollingConfig?.intervalSeconds ??
-                  (sessionPollingDefaults.type === "interval"
-                    ? sessionPollingDefaults.defaultInterval
-                    : 5);
 
                 return (
                   <TableRow className={isDisabled ? "opacity-50" : ""}>
@@ -476,8 +471,9 @@ export function ServerJobStatusCard({
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
-                        {intervalSeconds}s
+                        5s
                       </code>
+                      <span className="text-xs text-muted-foreground ml-1">(fixed)</span>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -510,7 +506,7 @@ export function ServerJobStatusCard({
                               }
                             >
                               <Settings className="mr-2 h-4 w-4" />
-                              Configure Interval
+                              Configure
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

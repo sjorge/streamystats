@@ -206,6 +206,9 @@ export function JobConfigModal(props: JobConfigModalProps) {
       ? !!cronError && !useDefault
       : !!intervalError && !useDefault;
 
+  // Session polling has a hardcoded 5s interval - only enable/disable is configurable
+  const isSessionPolling = jobKey === "session-polling";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -230,35 +233,48 @@ export function JobConfigModal(props: JobConfigModalProps) {
             />
           </div>
 
-          {/* Use default toggle */}
-          <div className="flex items-center justify-between">
+          {/* Session polling: show fixed interval notice */}
+          {isSessionPolling && (
             <div className="space-y-0.5">
-              <Label htmlFor="useDefault">Use Default</Label>
+              <Label>Polling Interval</Label>
               <p className="text-sm text-muted-foreground">
-                Default:{" "}
-                <code className="bg-muted px-1 rounded">{defaultValue}</code>
+                <code className="bg-muted px-1 rounded">5 seconds</code>{" "}
+                <span className="text-xs">(fixed)</span>
               </p>
             </div>
-            <Switch
-              id="useDefault"
-              checked={useDefault}
-              onCheckedChange={(checked) => {
-                setUseDefault(checked);
-                if (checked) {
-                  if (props.type === "cron") {
-                    setCronExpression(props.defaultCron);
-                    setCronError(null);
-                  } else {
-                    setIntervalSeconds(props.defaultInterval);
-                    setIntervalError(null);
-                  }
-                }
-              }}
-            />
-          </div>
+          )}
 
-          {/* Custom value input */}
-          {!useDefault && props.type === "cron" && (
+          {/* Use default toggle - hide for session-polling */}
+          {!isSessionPolling && (
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="useDefault">Use Default</Label>
+                <p className="text-sm text-muted-foreground">
+                  Default:{" "}
+                  <code className="bg-muted px-1 rounded">{defaultValue}</code>
+                </p>
+              </div>
+              <Switch
+                id="useDefault"
+                checked={useDefault}
+                onCheckedChange={(checked) => {
+                  setUseDefault(checked);
+                  if (checked) {
+                    if (props.type === "cron") {
+                      setCronExpression(props.defaultCron);
+                      setCronError(null);
+                    } else {
+                      setIntervalSeconds(props.defaultInterval);
+                      setIntervalError(null);
+                    }
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {/* Custom value input - hide for session-polling */}
+          {!isSessionPolling && !useDefault && props.type === "cron" && (
             <div className="space-y-2">
               <Label htmlFor="cronExpression">Cron Expression</Label>
               <Input
@@ -277,7 +293,7 @@ export function JobConfigModal(props: JobConfigModalProps) {
             </div>
           )}
 
-          {!useDefault && props.type === "interval" && (
+          {!isSessionPolling && !useDefault && props.type === "interval" && (
             <div className="space-y-2">
               <Label htmlFor="intervalSeconds">Interval (seconds)</Label>
               <Input
