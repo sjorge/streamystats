@@ -368,6 +368,17 @@ class SessionPoller {
       const updatedDuration = this.calculateDuration(tracked, currentPaused);
       const transcodingInfo = session.TranscodingInfo;
 
+      // Log pause/resume when state changes
+      if (currentPaused !== tracked.isPaused) {
+        log("session", {
+          action: currentPaused ? "paused" : "resumed",
+          serverId: server.id,
+          user: tracked.userName,
+          content: tracked.itemName,
+          durationSec: updatedDuration,
+        });
+      }
+
       const updatedRecord: TrackedSession = {
         ...tracked,
         positionTicks: currentPosition,
