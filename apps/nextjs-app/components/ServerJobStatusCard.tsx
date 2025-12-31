@@ -473,7 +473,9 @@ export function ServerJobStatusCard({
                       <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
                         5s
                       </code>
-                      <span className="text-xs text-muted-foreground ml-1">(fixed)</span>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        (fixed)
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Badge
