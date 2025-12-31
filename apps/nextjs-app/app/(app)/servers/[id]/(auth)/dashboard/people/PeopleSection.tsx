@@ -1,27 +1,28 @@
 "use client";
 
-import { Clock, Film, Play, TrendingUp } from "lucide-react";
+import { Clock, Film, Library, Play, TrendingUp } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import type { PersonStats } from "@/lib/db/people-stats";
+import type { PersonLibraryStats, PersonStats } from "@/lib/db/people-stats";
 import type { ServerPublic } from "@/lib/types";
 import { PersonCard } from "./PersonCard";
 
-export type IconType = "clock" | "play" | "film" | "trending";
+export type IconType = "clock" | "play" | "film" | "trending" | "library";
 
 const iconMap = {
   clock: Clock,
   play: Play,
   film: Film,
   trending: TrendingUp,
+  library: Library,
 } as const;
 
 interface Props {
   title: string;
   description: string;
   iconType: IconType;
-  people: PersonStats[];
+  people: (PersonStats | PersonLibraryStats)[];
   server: ServerPublic;
-  variant: "watchtime" | "playcount";
+  variant: "watchtime" | "playcount" | "library";
   emptyMessage: string;
 }
 

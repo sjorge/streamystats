@@ -1,5 +1,3 @@
-"use cache";
-
 import {
   db,
   itemPeople,
@@ -17,7 +15,7 @@ import {
   type SQL,
   sum,
 } from "drizzle-orm";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife } from "next/cache";
 import { getStatisticsExclusions } from "./exclusions";
 
 export interface PersonStats {
@@ -44,6 +42,141 @@ export interface DirectorActorCombination {
 
 export type MediaTypeFilter = "all" | "Movie" | "Series";
 
+export interface PersonLibraryStats {
+  id: string;
+  name: string;
+  primaryImageTag: string | null;
+  type: "Actor" | "Director";
+  itemCount: number;
+}
+
+/**
+ * Get top people (actors or directors) by library presence (number of items they appear in).
+ * This is independent of watch history - just counts items in the library.
+ */
+export async function getTopPeopleByLibraryPresence(
+  serverId: string | number,
+  personType: "Actor" | "Director",
+  mediaType: MediaTypeFilter,
+  limit = 20,
+): Promise<PersonLibraryStats[]> {
+  "use cache";
+  cacheLife("hours");
+
+  const serverIdNum = Number(serverId);
+
+  const { itemLibraryExclusion } = await getStatisticsExclusions(serverId);
+
+  const results: PersonLibraryStats[] = [];
+
+  // Query for Movies
+  if (mediaType === "all" || mediaType === "Movie") {
+    const movieConditions: SQL[] = [
+      eq(items.serverId, serverIdNum),
+      eq(items.type, "Movie"),
+      eq(itemPeople.type, personType),
+    ];
+
+    if (itemLibraryExclusion) {
+      movieConditions.push(itemLibraryExclusion);
+    }
+
+    const movieStats = await db
+      .select({
+        personId: people.id,
+        personName: people.name,
+        primaryImageTag: people.primaryImageTag,
+        itemCount: countDistinct(items.id).as("itemCount"),
+      })
+      .from(items)
+      .innerJoin(itemPeople, eq(items.id, itemPeople.itemId))
+      .innerJoin(
+        people,
+        and(
+          eq(itemPeople.personId, people.id),
+          eq(itemPeople.serverId, people.serverId),
+        ),
+      )
+      .where(and(...movieConditions))
+      .groupBy(people.id, people.name, people.primaryImageTag, people.serverId)
+      .orderBy(desc(countDistinct(items.id)))
+      .limit(limit);
+
+    for (const stat of movieStats) {
+      results.push({
+        id: stat.personId,
+        name: stat.personName,
+        primaryImageTag: stat.primaryImageTag,
+        type: personType,
+        itemCount: Number(stat.itemCount),
+      });
+    }
+  }
+
+  // Query for Series
+  if (mediaType === "all" || mediaType === "Series") {
+    const seriesConditions: SQL[] = [
+      eq(items.serverId, serverIdNum),
+      eq(items.type, "Series"),
+      eq(itemPeople.type, personType),
+    ];
+
+    if (itemLibraryExclusion) {
+      seriesConditions.push(itemLibraryExclusion);
+    }
+
+    const seriesStats = await db
+      .select({
+        personId: people.id,
+        personName: people.name,
+        primaryImageTag: people.primaryImageTag,
+        itemCount: countDistinct(items.id).as("itemCount"),
+      })
+      .from(items)
+      .innerJoin(itemPeople, eq(items.id, itemPeople.itemId))
+      .innerJoin(
+        people,
+        and(
+          eq(itemPeople.personId, people.id),
+          eq(itemPeople.serverId, people.serverId),
+        ),
+      )
+      .where(and(...seriesConditions))
+      .groupBy(people.id, people.name, people.primaryImageTag, people.serverId)
+      .orderBy(desc(countDistinct(items.id)))
+      .limit(limit);
+
+    for (const stat of seriesStats) {
+      if (mediaType === "all") {
+        const existing = results.find((r) => r.id === stat.personId);
+        if (existing) {
+          existing.itemCount += Number(stat.itemCount);
+        } else {
+          results.push({
+            id: stat.personId,
+            name: stat.personName,
+            primaryImageTag: stat.primaryImageTag,
+            type: personType,
+            itemCount: Number(stat.itemCount),
+          });
+        }
+      } else {
+        results.push({
+          id: stat.personId,
+          name: stat.personName,
+          primaryImageTag: stat.primaryImageTag,
+          type: personType,
+          itemCount: Number(stat.itemCount),
+        });
+      }
+    }
+  }
+
+  // Sort by item count and limit
+  results.sort((a, b) => b.itemCount - a.itemCount);
+  return results.slice(0, limit);
+}
+
 /**
  * Get top people (actors or directors) by total watch time.
  *
@@ -57,9 +190,8 @@ export async function getTopPeopleByWatchTime(
   limit = 20,
 ): Promise<PersonStats[]> {
   "use cache";
-  const serverIdNum = Number(serverId);
   cacheLife("hours");
-  cacheTag(`people-watchtime-${serverIdNum}-${personType}-${mediaType}`);
+  const serverIdNum = Number(serverId);
 
   const { userExclusion, itemLibraryExclusion } =
     await getStatisticsExclusions(serverId);
@@ -209,9 +341,9 @@ export async function getTopPeopleByPlayCount(
   limit = 20,
 ): Promise<PersonStats[]> {
   "use cache";
-  const serverIdNum = Number(serverId);
   cacheLife("hours");
-  cacheTag(`people-playcount-${serverIdNum}-${personType}-${mediaType}`);
+
+  const serverIdNum = Number(serverId);
 
   const { userExclusion, itemLibraryExclusion } =
     await getStatisticsExclusions(serverId);
@@ -359,9 +491,9 @@ export async function getTopDirectorActorCombinations(
   limit = 15,
 ): Promise<DirectorActorCombination[]> {
   "use cache";
-  const serverIdNum = Number(serverId);
   cacheLife("hours");
-  cacheTag(`people-combinations-${serverIdNum}-${mediaType}`);
+
+  const serverIdNum = Number(serverId);
 
   const { userExclusion, itemLibraryExclusion } =
     await getStatisticsExclusions(serverId);
