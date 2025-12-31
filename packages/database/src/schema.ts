@@ -314,6 +314,27 @@ export const jobResults = pgTable("job_results", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Server job configurations table - per-server cron job settings
+export const serverJobConfigurations = pgTable(
+  "server_job_configurations",
+  {
+    id: serial("id").primaryKey(),
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    jobKey: text("job_key").notNull(),
+    cronExpression: text("cron_expression"), // null = use default (for cron-based jobs)
+    intervalSeconds: integer("interval_seconds"), // null = use default (for interval-based jobs like session-polling)
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("server_job_config_unique").on(table.serverId, table.jobKey),
+    index("server_job_config_server_idx").on(table.serverId),
+  ]
+);
+
 // Items table - media items within servers
 export const items = pgTable(
   "items",
@@ -858,7 +879,18 @@ export const serversRelations = relations(servers, ({ many }) => ({
   watchlists: many(watchlists),
   people: many(people),
   itemPeople: many(itemPeople),
+  jobConfigurations: many(serverJobConfigurations),
 }));
+
+export const serverJobConfigurationsRelations = relations(
+  serverJobConfigurations,
+  ({ one }) => ({
+    server: one(servers, {
+      fields: [serverJobConfigurations.serverId],
+      references: [servers.id],
+    }),
+  })
+);
 
 export const librariesRelations = relations(libraries, ({ one, many }) => ({
   server: one(servers, {

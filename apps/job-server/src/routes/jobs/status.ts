@@ -17,6 +17,31 @@ import type {
 } from "../../types/job-status";
 import { toIsoUtcMicros } from "./utils";
 
+type PgBossJobState =
+  | "created"
+  | "retry"
+  | "active"
+  | "completed"
+  | "expired"
+  | "cancelled"
+  | "failed";
+
+interface ServerJobQueryRow {
+  name: string;
+  has_active: boolean;
+  has_queued: boolean;
+  latest_state: PgBossJobState;
+  latest_id: string;
+  latest_created_on: Date;
+  latest_completed_on: Date | null;
+  latest_output: unknown;
+  active_id: string | null;
+  active_started_on: Date | null;
+  queued_id: string | null;
+  queued_created_on: Date | null;
+  queued_start_after: Date | null;
+}
+
 const app = new Hono();
 
 app.get("/servers/:serverId/status", async (c) => {
@@ -170,28 +195,7 @@ app.get("/servers/:serverId/status", async (c) => {
         left join active using (name)
         left join queued using (name)
       `
-    )) as unknown as Array<{
-      name: string;
-      has_active: boolean;
-      has_queued: boolean;
-      latest_state:
-        | "created"
-        | "retry"
-        | "active"
-        | "completed"
-        | "expired"
-        | "cancelled"
-        | "failed";
-      latest_id: string;
-      latest_created_on: Date;
-      latest_completed_on: Date | null;
-      latest_output: unknown;
-      active_id: string | null;
-      active_started_on: Date | null;
-      queued_id: string | null;
-      queued_created_on: Date | null;
-      queued_start_after: Date | null;
-    }>;
+    )) as unknown as ServerJobQueryRow[];
 
     const byName = new Map(rows.map((r) => [r.name, r]));
 
@@ -291,7 +295,6 @@ app.get("/server-status", async (c) => {
     const boss = await getJobQueue();
 
     const queueStats = await Promise.all([
-      boss.getQueueStats(JobTypes.SYNC_SERVER_DATA),
       boss.getQueueStats(JobTypes.ADD_SERVER),
       boss.getQueueStats(JobTypes.GENERATE_ITEM_EMBEDDINGS),
     ]);
@@ -368,9 +371,8 @@ app.get("/server-status", async (c) => {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       queueStats: {
-        syncServerData: queueSizes[0],
-        addServer: queueSizes[1],
-        generateItemEmbeddings: queueSizes[2],
+        addServer: queueSizes[0],
+        generateItemEmbeddings: queueSizes[1],
         jellyfinFullSync: jellyfinQueueSizes[0],
         jellyfinUsersSync: jellyfinQueueSizes[1],
         jellyfinLibrariesSync: jellyfinQueueSizes[2],
@@ -419,8 +421,6 @@ app.get("/server-status", async (c) => {
       },
       scheduler: {
         ...schedulerStatus,
-        healthCheck:
-          schedulerStatus.enabled && schedulerStatus.runningTasks.length > 0,
       },
       sessionPoller: {
         ...sessionPollerStatus,

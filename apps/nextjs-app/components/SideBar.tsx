@@ -15,6 +15,7 @@ import {
   type LucideIcon,
   MessageSquare,
   Monitor,
+  RefreshCw,
   Settings,
   Shield,
   TrendingUp,
@@ -113,6 +114,11 @@ const settings_items = [
     title: "General",
     url: "/settings/general",
     icon: Settings,
+  },
+  {
+    title: "Jobs",
+    url: "/settings/jobs",
+    icon: RefreshCw,
   },
   {
     title: "Exclusions",

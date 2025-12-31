@@ -12,5 +12,8 @@ export {
 // Export all schema tables and types
 export * from "./schema";
 
+// Export job defaults
+export * from "./job-defaults";
+
 // Export migration utilities
 export { migrate } from "./migrate";

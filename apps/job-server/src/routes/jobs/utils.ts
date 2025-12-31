@@ -1,4 +1,25 @@
 import { getJobQueue } from "../../jobs/queue";
+import { db, servers } from "@streamystats/database";
+import { eq } from "drizzle-orm";
+
+export async function getServerById(
+  serverId: string | number
+): Promise<{ id: number; name: string } | null> {
+  const numericId =
+    typeof serverId === "string" ? Number.parseInt(serverId, 10) : serverId;
+
+  if (!Number.isFinite(numericId)) {
+    return null;
+  }
+
+  const result = await db
+    .select({ id: servers.id, name: servers.name })
+    .from(servers)
+    .where(eq(servers.id, numericId))
+    .limit(1);
+
+  return result[0] ?? null;
+}
 
 export function toIsoUtcMicros(date: Date): string {
   return date.toISOString().replace(/\.(\d{3})Z$/, ".$1000Z");

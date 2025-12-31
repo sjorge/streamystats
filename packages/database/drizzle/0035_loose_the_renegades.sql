@@ -1,0 +1,1 @@
+ALTER TABLE "server_job_configurations" ADD COLUMN "interval_seconds" integer;

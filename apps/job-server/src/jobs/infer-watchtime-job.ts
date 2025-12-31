@@ -2,6 +2,7 @@ import { db, servers, sessions, items, users, type NewSession } from "@streamyst
 import { eq, and, gte, lte } from "drizzle-orm";
 import { JellyfinClient } from "../jellyfin/client";
 import { logJobResult } from "./job-logger";
+import { structuredLog as log } from "../utils/structured-log";
 import type { PgBossJob } from "../types/job-status";
 
 export const INFER_WATCHTIME_JOB_NAME = "infer-watchtime-from-userdata";
@@ -20,19 +21,6 @@ export interface InferWatchtimeResult {
   skipped: number;
   created: number;
   errors: number;
-}
-
-function log(
-  prefix: string,
-  data: Record<string, string | number | boolean | null | undefined>
-): void {
-  const parts = [`[${prefix}]`];
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined && value !== null) {
-      parts.push(`${key}=${value}`);
-    }
-  }
-  console.log(parts.join(" "));
 }
 
 /**

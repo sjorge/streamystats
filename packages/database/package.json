@@ -48,6 +48,10 @@
     "./connection": {
       "types": "./dist/connection.d.ts",
       "default": "./dist/connection.js"
+    },
+    "./job-defaults": {
+      "types": "./dist/job-defaults.d.ts",
+      "default": "./dist/job-defaults.js"
     }
   }
 }

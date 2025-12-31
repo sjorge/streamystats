@@ -11,6 +11,16 @@ import {
 } from "@streamystats/database";
 import { eq, desc } from "drizzle-orm";
 
+interface JellyfinSystemInfo {
+  Id?: string;
+  ServerName?: string;
+  Version?: string;
+  ProductName?: string;
+  OperatingSystem?: string;
+  StartupWizardCompleted?: boolean;
+  LocalAddress?: string;
+}
+
 const app = new Hono();
 
 app.post("/add-server", async (c) => {
@@ -31,47 +41,6 @@ app.post("/add-server", async (c) => {
     });
   } catch (error) {
     console.error("Error queuing add server job:", error);
-    return c.json({ error: "Failed to queue job" }, 500);
-  }
-});
-
-app.post("/sync-server-data", async (c) => {
-  try {
-    const { serverId, endpoint } = await c.req.json();
-
-    if (!serverId || !endpoint) {
-      return c.json({ error: "Server ID and endpoint are required" }, 400);
-    }
-
-    const validEndpoints = [
-      "Users",
-      "Library/VirtualFolders",
-      "System/ActivityLog",
-    ];
-    if (!validEndpoints.includes(endpoint)) {
-      return c.json(
-        {
-          error: `Invalid endpoint. Must be one of: ${validEndpoints.join(
-            ", "
-          )}`,
-        },
-        400
-      );
-    }
-
-    const boss = await getJobQueue();
-    const jobId = await boss.send(JobTypes.SYNC_SERVER_DATA, {
-      serverId,
-      endpoint,
-    });
-
-    return c.json({
-      success: true,
-      jobId,
-      message: `Sync ${endpoint} job queued successfully`,
-    });
-  } catch (error) {
-    console.error("Error queuing sync server data job:", error);
     return c.json({ error: "Failed to queue job" }, 500);
   }
 });
@@ -256,14 +225,7 @@ app.post("/create-server", async (c) => {
         return c.json({ error: errorMessage }, 400);
       }
 
-      const serverInfo = (await testResponse.json()) as {
-        Id?: string;
-        ServerName?: string;
-        Version?: string;
-        ProductName?: string;
-        OperatingSystem?: string;
-        StartupWizardCompleted?: boolean;
-      };
+      const serverInfo = (await testResponse.json()) as JellyfinSystemInfo;
 
       const existingServer = await db
         .select({ id: servers.id, name: servers.name })

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.itemPeopleRelations = exports.peopleRelations = exports.watchlistItemsRelations = exports.watchlistsRelations = exports.hiddenRecommendationsRelations = exports.anomalyEventsRelations = exports.userFingerprintsRelations = exports.activityLocationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serversRelations = exports.watchlistItems = exports.watchlists = exports.itemPeople = exports.people = exports.anomalyEvents = exports.userFingerprints = exports.activityLocations = exports.hiddenRecommendations = exports.activityLogCursors = exports.activeSessions = exports.sessions = exports.items = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
+exports.itemPeopleRelations = exports.peopleRelations = exports.watchlistItemsRelations = exports.watchlistsRelations = exports.hiddenRecommendationsRelations = exports.anomalyEventsRelations = exports.userFingerprintsRelations = exports.activityLocationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serverJobConfigurationsRelations = exports.serversRelations = exports.watchlistItems = exports.watchlists = exports.itemPeople = exports.people = exports.anomalyEvents = exports.userFingerprints = exports.activityLocations = exports.hiddenRecommendations = exports.activityLogCursors = exports.activeSessions = exports.sessions = exports.items = exports.serverJobConfigurations = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 // Custom vector type that supports variable dimensions
 // This allows storing embeddings of any size without hardcoding dimensions
@@ -219,6 +219,22 @@ exports.jobResults = (0, pg_core_1.pgTable)("job_results", {
     processingTime: (0, pg_core_1.integer)("processing_time"), // in milliseconds (capped at 1 hour)
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
 });
+// Server job configurations table - per-server cron job settings
+exports.serverJobConfigurations = (0, pg_core_1.pgTable)("server_job_configurations", {
+    id: (0, pg_core_1.serial)("id").primaryKey(),
+    serverId: (0, pg_core_1.integer)("server_id")
+        .notNull()
+        .references(() => exports.servers.id, { onDelete: "cascade" }),
+    jobKey: (0, pg_core_1.text)("job_key").notNull(),
+    cronExpression: (0, pg_core_1.text)("cron_expression"), // null = use default (for cron-based jobs)
+    intervalSeconds: (0, pg_core_1.integer)("interval_seconds"), // null = use default (for interval-based jobs like session-polling)
+    enabled: (0, pg_core_1.boolean)("enabled").notNull().default(true),
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+}, (table) => [
+    (0, pg_core_1.unique)("server_job_config_unique").on(table.serverId, table.jobKey),
+    (0, pg_core_1.index)("server_job_config_server_idx").on(table.serverId),
+]);
 // Items table - media items within servers
 exports.items = (0, pg_core_1.pgTable)("items", {
     // Primary key and relationships
@@ -621,6 +637,13 @@ exports.serversRelations = (0, drizzle_orm_1.relations)(exports.servers, ({ many
     watchlists: many(exports.watchlists),
     people: many(exports.people),
     itemPeople: many(exports.itemPeople),
+    jobConfigurations: many(exports.serverJobConfigurations),
+}));
+exports.serverJobConfigurationsRelations = (0, drizzle_orm_1.relations)(exports.serverJobConfigurations, ({ one }) => ({
+    server: one(exports.servers, {
+        fields: [exports.serverJobConfigurations.serverId],
+        references: [exports.servers.id],
+    }),
 }));
 exports.librariesRelations = (0, drizzle_orm_1.relations)(exports.libraries, ({ one, many }) => ({
     server: one(exports.servers, {

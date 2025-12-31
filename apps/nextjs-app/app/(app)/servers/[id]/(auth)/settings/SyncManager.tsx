@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertTriangle, CheckCircle, Database, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  BookOpen,
+  CheckCircle,
+  Clock,
+  Database,
+  FolderOpen,
+  RefreshCw,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,12 +20,45 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemSeparator,
+  ItemTitle,
+} from "@/components/ui/item";
 import { fetch } from "@/lib/utils";
 
 interface SyncManagerProps {
   serverId: number;
   serverName: string;
 }
+
+const syncItems = [
+  {
+    icon: Users,
+    title: "Users & Permissions",
+    description: "Sync all user accounts and their access levels",
+  },
+  {
+    icon: FolderOpen,
+    title: "Libraries & Collections",
+    description: "Update media libraries and collection metadata",
+  },
+  {
+    icon: Database,
+    title: "Media Items",
+    description: "Sync all movies, shows, episodes and metadata",
+  },
+  {
+    icon: Clock,
+    title: "Playback History",
+    description: "Import activities",
+  },
+];
 
 export function SyncManager({ serverId }: SyncManagerProps) {
   const [isTriggering, setIsTriggering] = useState(false);
@@ -67,46 +109,56 @@ export function SyncManager({ serverId }: SyncManagerProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          Data Synchronization
-        </CardTitle>
+        <CardTitle>Data Synchronization</CardTitle>
         <CardDescription>
-          Manually trigger a complete sync of all data from your Jellyfin server
+          Trigger a complete sync of all data from your Jellyfin server
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            A full sync will update:
-          </p>
-          <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-            <li>• Users and permissions</li>
-            <li>• Media libraries and collections</li>
-            <li>• All media items and metadata</li>
-            <li>• Activity and playback history</li>
-          </ul>
-        </div>
+      <CardContent className="space-y-6">
+        <ItemGroup className="rounded-lg border">
+          {syncItems.map((item, index) => (
+            <div key={item.title}>
+              <Item size="sm">
+                <ItemMedia variant="icon">
+                  <item.icon className="h-4 w-4" />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{item.title}</ItemTitle>
+                  <ItemDescription>{item.description}</ItemDescription>
+                </ItemContent>
+              </Item>
+              {index < syncItems.length - 1 && <ItemSeparator />}
+            </div>
+          ))}
+        </ItemGroup>
 
-        <div className="pt-2">
-          <Button
-            onClick={handleTriggerFullSync}
-            disabled={isTriggering}
-            className="flex items-center gap-2"
-            size="lg"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isTriggering ? "animate-spin" : ""}`}
-            />
-            {isTriggering ? "Triggering Sync..." : "Start Full Sync"}
-          </Button>
-        </div>
+        <Item variant="muted" className="rounded-lg">
+          <ItemMedia variant="icon">
+            <BookOpen className="h-4 w-4" />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>Full Sync</ItemTitle>
+            <ItemDescription>
+              Syncs can take several minutes depending on library size. The sync
+              runs in the background.
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              onClick={handleTriggerFullSync}
+              disabled={isTriggering}
+              size="sm"
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${isTriggering ? "animate-spin" : ""}`}
+              />
+              {isTriggering ? "Starting..." : "Start Sync"}
+            </Button>
+          </ItemActions>
+        </Item>
 
         {lastSyncResult && (
-          <Alert
-            variant={lastSyncResult.success ? "default" : "destructive"}
-            className="mt-4"
-          >
+          <Alert variant={lastSyncResult.success ? "default" : "destructive"}>
             {lastSyncResult.success ? (
               <CheckCircle className="h-4 w-4" />
             ) : (
@@ -120,14 +172,6 @@ export function SyncManager({ serverId }: SyncManagerProps) {
             </AlertDescription>
           </Alert>
         )}
-
-        <div className="bg-muted/50 border rounded-lg p-3">
-          <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Full syncs can take several minutes to hours
-            depending on your library size. The sync will run in the background
-            and you can monitor progress from the dashboard.
-          </p>
-        </div>
       </CardContent>
     </Card>
   );
