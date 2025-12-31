@@ -488,7 +488,12 @@ export const getPerLibraryStatistics = async ({
 
   const lastPlayedMap = new Map<
     string,
-    { itemId: string | null; itemName: string | null; userId: string | null; userName: string | null }
+    {
+      itemId: string | null;
+      itemName: string | null;
+      userId: string | null;
+      userName: string | null;
+    }
   >();
   for (const item of lastPlayedItems) {
     if (!item.libraryId) continue;

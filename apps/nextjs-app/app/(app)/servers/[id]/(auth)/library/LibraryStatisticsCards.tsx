@@ -55,10 +55,10 @@ const getLibraryConfig = (type: string) => {
   }
 };
 
-const LibraryStatCard: React.FC<{ stats: PerLibraryStatistics; serverId: number }> = ({
-  stats,
-  serverId,
-}) => {
+const LibraryStatCard: React.FC<{
+  stats: PerLibraryStatistics;
+  serverId: number;
+}> = ({ stats, serverId }) => {
   const config = getLibraryConfig(stats.libraryType);
   const Icon = config.icon;
   const isTvLibrary = stats.libraryType === "tvshows";
@@ -238,7 +238,11 @@ export const LibraryStatisticsCards: React.FC<Props> = ({ data, serverId }) => {
   return (
     <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {data.map((stats) => (
-        <LibraryStatCard key={stats.libraryId} stats={stats} serverId={serverId} />
+        <LibraryStatCard
+          key={stats.libraryId}
+          stats={stats}
+          serverId={serverId}
+        />
       ))}
     </div>
   );
