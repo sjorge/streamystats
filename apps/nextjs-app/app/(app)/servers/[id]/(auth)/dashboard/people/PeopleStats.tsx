@@ -1,6 +1,7 @@
 import type { MediaTypeFilter } from "@/lib/db/people-stats";
 import {
   getTopDirectorActorCombinations,
+  getTopPeopleByLibraryPresence,
   getTopPeopleByPlayCount,
   getTopPeopleByWatchTime,
 } from "@/lib/db/people-stats";
@@ -17,19 +18,33 @@ export async function PeopleStats({ server, mediaType }: Props) {
   const [
     topActorsByWatchTime,
     topActorsByPlayCount,
+    topActorsByLibrary,
     topDirectorsByWatchTime,
     topDirectorsByPlayCount,
+    topDirectorsByLibrary,
     directorActorCombos,
   ] = await Promise.all([
     getTopPeopleByWatchTime(server.id, "Actor", mediaType, 20),
     getTopPeopleByPlayCount(server.id, "Actor", mediaType, 20),
+    getTopPeopleByLibraryPresence(server.id, "Actor", mediaType, 20),
     getTopPeopleByWatchTime(server.id, "Director", mediaType, 20),
     getTopPeopleByPlayCount(server.id, "Director", mediaType, 20),
+    getTopPeopleByLibraryPresence(server.id, "Director", mediaType, 20),
     getTopDirectorActorCombinations(server.id, mediaType, 15),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
+      <PeopleSection
+        title="Top Actors in Library"
+        description="Actors appearing in the most movies and series"
+        iconType="library"
+        people={topActorsByLibrary}
+        server={server}
+        variant="library"
+        emptyMessage="No actor data available yet. Sync your library to see stats!"
+      />
+
       <PeopleSection
         title="Top Actors by Watch Time"
         description="Most watched actors based on total viewing time"
@@ -37,7 +52,7 @@ export async function PeopleStats({ server, mediaType }: Props) {
         people={topActorsByWatchTime}
         server={server}
         variant="watchtime"
-        emptyMessage="No actor statistics available yet. Watch some content to see stats!"
+        emptyMessage="No actor watch statistics yet. Watch some content to see stats!"
       />
 
       <PeopleSection
@@ -47,7 +62,17 @@ export async function PeopleStats({ server, mediaType }: Props) {
         people={topActorsByPlayCount}
         server={server}
         variant="playcount"
-        emptyMessage="No actor statistics available yet."
+        emptyMessage="No actor watch statistics yet."
+      />
+
+      <PeopleSection
+        title="Top Directors in Library"
+        description="Directors with the most movies and series"
+        iconType="library"
+        people={topDirectorsByLibrary}
+        server={server}
+        variant="library"
+        emptyMessage="No director data available yet. Sync your library to see stats!"
       />
 
       <PeopleSection
@@ -57,7 +82,7 @@ export async function PeopleStats({ server, mediaType }: Props) {
         people={topDirectorsByWatchTime}
         server={server}
         variant="watchtime"
-        emptyMessage="No director statistics available yet."
+        emptyMessage="No director watch statistics yet."
       />
 
       <PeopleSection
@@ -67,7 +92,7 @@ export async function PeopleStats({ server, mediaType }: Props) {
         people={topDirectorsByPlayCount}
         server={server}
         variant="playcount"
-        emptyMessage="No director statistics available yet."
+        emptyMessage="No director watch statistics yet."
       />
 
       <DirectorActorCombinations
