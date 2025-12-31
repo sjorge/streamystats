@@ -21,44 +21,25 @@ import { RecentlyAddedSeries } from "./RecentlyAddedSeries";
 import { SeasonalRecommendations } from "./SeasonalRecommendations";
 import { SimilarSeriesStatistics } from "./SimilarSeriesStatistics";
 import { SimilarMovieStatistics } from "./SimilarStatistics";
-import { UserActivityWrapper } from "./UserActivityWrapper";
 import { UserLeaderboard } from "./UserLeaderboard";
 
 export default async function DashboardPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{
-    userActivityStartDate: string;
-    userActivityEndDate: string;
-  }>;
 }) {
   const { id } = await params;
-  const { userActivityStartDate, userActivityEndDate } = await searchParams;
 
   return (
     <Container className="relative flex flex-col">
       <Suspense fallback={<Skeleton className="h-48 w-full mb-8" />}>
-        <DashboardContent
-          serverId={id}
-          userActivityStartDate={userActivityStartDate}
-          userActivityEndDate={userActivityEndDate}
-        />
+        <DashboardContent serverId={id} />
       </Suspense>
     </Container>
   );
 }
 
-async function DashboardContent({
-  serverId,
-  userActivityStartDate,
-  userActivityEndDate,
-}: {
-  serverId: string;
-  userActivityStartDate: string;
-  userActivityEndDate: string;
-}) {
+async function DashboardContent({ serverId }: { serverId: string }) {
   const server = await getServer({ serverId });
 
   if (!server) {
@@ -75,24 +56,12 @@ async function DashboardContent({
         </div>
       )}
       <PageTitle title="Home" />
-      <GeneralStats
-        server={server}
-        userActivityStartDate={userActivityStartDate}
-        userActivityEndDate={userActivityEndDate}
-      />
+      <GeneralStats server={server} />
     </>
   );
 }
 
-async function GeneralStats({
-  server,
-  userActivityStartDate,
-  userActivityEndDate,
-}: {
-  server: ServerPublic;
-  userActivityStartDate: string;
-  userActivityEndDate: string;
-}) {
+async function GeneralStats({ server }: { server: ServerPublic }) {
   const [me, isAdmin] = await Promise.all([getMe(), isUserAdmin()]);
 
   const [
@@ -137,16 +106,7 @@ async function GeneralStats({
         <SimilarSeriesStatistics data={similarSeriesData} server={server} />
       )}
       <MostWatchedItems data={data} server={server} />
-      {isAdmin ? (
-        <>
-          <UserLeaderboard server={server} />
-          <UserActivityWrapper
-            server={server}
-            startDate={userActivityStartDate}
-            endDate={userActivityEndDate}
-          />
-        </>
-      ) : null}
+      {isAdmin ? <UserLeaderboard server={server} /> : null}
     </div>
   );
 }

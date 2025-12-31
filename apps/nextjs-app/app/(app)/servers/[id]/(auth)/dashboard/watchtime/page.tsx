@@ -17,6 +17,7 @@ import {
 import type { ServerPublic } from "@/lib/types";
 import Graph from "../Graph";
 import TotalWatchTime from "../TotalWatchTime";
+import { UserActivityWrapper } from "../UserActivityWrapper";
 import { WatchTimePerHour } from "../WatchTimePerHour";
 import { WatchTimePerWeekDay } from "../WatchTimePerWeekDay";
 import { WatchtimeDateRangeFilter } from "./WatchtimeDateRangeFilter";
@@ -149,7 +150,14 @@ async function WatchtimeStats({
         subtitle="Showing total watch time for each hour of the day"
       />
       {isAdmin ? (
-        <WatchtimeTopUsersTable server={server} users={topUsers} />
+        <>
+          <UserActivityWrapper
+            server={server}
+            startDate={startDate}
+            endDate={endDate}
+          />
+          <WatchtimeTopUsersTable server={server} users={topUsers} />
+        </>
       ) : null}
     </div>
   );
