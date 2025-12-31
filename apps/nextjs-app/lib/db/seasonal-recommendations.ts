@@ -20,7 +20,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife } from "next/cache";
 import { getActiveHolidays, type Holiday } from "../holidays";
 import { getExclusionSettings } from "./exclusions";
 import { getMe } from "./users";
@@ -84,13 +84,7 @@ async function getSeasonalRecommendationsCached(
   poolSize: number,
 ): Promise<SeasonalRecommendationResult | null> {
   "use cache";
-  cacheLife("hours");
-  cacheTag(
-    `seasonal-${serverIdNum}`,
-    userId
-      ? `seasonal-${serverIdNum}-${userId}`
-      : `seasonal-${serverIdNum}-anon`,
-  );
+  cacheLife("days");
 
   // Get server's disabled holidays and exclusion settings
   const [server, exclusions] = await Promise.all([

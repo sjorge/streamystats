@@ -1,6 +1,3 @@
-// Client statistics types and functions
-"use cache";
-
 import { db, sessions, users } from "@streamystats/database";
 import {
   and,

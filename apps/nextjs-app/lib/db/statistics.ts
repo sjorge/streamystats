@@ -20,7 +20,7 @@ import {
   sql,
   sum,
 } from "drizzle-orm";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife } from "next/cache";
 import { getStatisticsExclusions } from "./exclusions";
 
 interface ItemWithStats extends Item {
@@ -43,7 +43,6 @@ export async function getMostWatchedItems({
 }): Promise<MostWatchedItems> {
   "use cache";
   cacheLife("hours");
-  cacheTag(`most-watched-${serverId}${userId ? `-${userId}` : ""}`);
 
   // Get exclusion settings
   const { userExclusion, itemLibraryExclusion } =
@@ -221,12 +220,6 @@ export async function getWatchTimePerType({
   endDate: string;
   userId?: string | number;
 }): Promise<WatchTimePerType> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag(
-    `watch-time-per-type-${serverId}${userId ? `-${userId}` : ""}-${startDate}-${endDate}`,
-  );
-
   // Get exclusion settings
   const { userExclusion, itemLibraryExclusion } =
     await getStatisticsExclusions(serverId);
@@ -363,10 +356,6 @@ export async function getWatchTimeByLibrary({
   startDate: string;
   endDate: string;
 }): Promise<LibraryWatchTime> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag(`watch-time-by-library-${serverId}-${startDate}-${endDate}`);
-
   // Get exclusion settings
   const { userExclusion, librariesTableExclusion } =
     await getStatisticsExclusions(serverId);
