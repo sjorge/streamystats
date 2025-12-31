@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.itemPeopleRelations = exports.peopleRelations = exports.watchlistItemsRelations = exports.watchlistsRelations = exports.hiddenRecommendationsRelations = exports.anomalyEventsRelations = exports.userFingerprintsRelations = exports.activityLocationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serverJobConfigurationsRelations = exports.serversRelations = exports.watchlistItems = exports.watchlists = exports.itemPeople = exports.people = exports.anomalyEvents = exports.userFingerprints = exports.activityLocations = exports.hiddenRecommendations = exports.activityLogCursors = exports.activeSessions = exports.sessions = exports.items = exports.serverJobConfigurations = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
+exports.itemPeopleRelations = exports.peopleRelations = exports.watchlistItemsRelations = exports.watchlistsRelations = exports.hiddenRecommendationsRelations = exports.anomalyEventsRelations = exports.userFingerprintsRelations = exports.activityLocationsRelations = exports.sessionsRelations = exports.itemsRelations = exports.activitiesRelations = exports.usersRelations = exports.librariesRelations = exports.serverJobConfigurationsRelations = exports.serversRelations = exports.watchlistItems = exports.watchlists = exports.itemPeople = exports.people = exports.anomalyEvents = exports.userFingerprints = exports.activityLocations = exports.hiddenRecommendations = exports.activityLogCursors = exports.activeSessions = exports.sessions = exports.mediaSources = exports.items = exports.serverJobConfigurations = exports.jobResults = exports.activities = exports.users = exports.libraries = exports.servers = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 // Custom vector type that supports variable dimensions
 // This allows storing embeddings of any size without hardcoding dimensions
@@ -313,6 +313,7 @@ exports.items = (0, pg_core_1.pgTable)("items", {
     embedding: vector("embedding"),
     processed: (0, pg_core_1.boolean)("processed").default(false),
     peopleSynced: (0, pg_core_1.boolean)("people_synced").default(false),
+    mediaSourcesSynced: (0, pg_core_1.boolean)("media_sources_synced").default(false),
     // Timestamps
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
@@ -329,6 +330,31 @@ exports.items = (0, pg_core_1.pgTable)("items", {
     (0, pg_core_1.index)("items_server_type_idx").on(table.serverId, table.type),
     (0, pg_core_1.index)("items_series_id_idx").on(table.seriesId),
     (0, pg_core_1.index)("items_search_vector_idx").using("gin", table.searchVector),
+]);
+// Media sources table - file information for items (size, bitrate, etc.)
+exports.mediaSources = (0, pg_core_1.pgTable)("media_sources", {
+    id: (0, pg_core_1.text)("id").primaryKey(), // MediaSource ID from Jellyfin
+    itemId: (0, pg_core_1.text)("item_id")
+        .notNull()
+        .references(() => exports.items.id, { onDelete: "cascade" }),
+    serverId: (0, pg_core_1.integer)("server_id")
+        .notNull()
+        .references(() => exports.servers.id, { onDelete: "cascade" }),
+    // Core fields for statistics
+    size: (0, pg_core_1.bigint)("size", { mode: "number" }), // File size in bytes
+    bitrate: (0, pg_core_1.integer)("bitrate"),
+    container: (0, pg_core_1.text)("container"),
+    // Additional useful fields
+    name: (0, pg_core_1.text)("name"),
+    path: (0, pg_core_1.text)("path"),
+    isRemote: (0, pg_core_1.boolean)("is_remote"),
+    runtimeTicks: (0, pg_core_1.bigint)("runtime_ticks", { mode: "number" }),
+    // Timestamps
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+}, (table) => [
+    (0, pg_core_1.index)("media_sources_item_id_idx").on(table.itemId),
+    (0, pg_core_1.index)("media_sources_server_id_idx").on(table.serverId),
 ]);
 // Sessions table - user sessions and playback information
 exports.sessions = (0, pg_core_1.pgTable)("sessions", {

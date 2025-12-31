@@ -426,6 +426,7 @@ export const items = pgTable(
     embedding: vector("embedding"),
     processed: boolean("processed").default(false),
     peopleSynced: boolean("people_synced").default(false),
+    mediaSourcesSynced: boolean("media_sources_synced").default(false),
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -445,6 +446,39 @@ export const items = pgTable(
     index("items_server_type_idx").on(table.serverId, table.type),
     index("items_series_id_idx").on(table.seriesId),
     index("items_search_vector_idx").using("gin", table.searchVector),
+  ]
+);
+
+// Media sources table - file information for items (size, bitrate, etc.)
+export const mediaSources = pgTable(
+  "media_sources",
+  {
+    id: text("id").primaryKey(), // MediaSource ID from Jellyfin
+    itemId: text("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    serverId: integer("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+
+    // Core fields for statistics
+    size: bigint("size", { mode: "number" }), // File size in bytes
+    bitrate: integer("bitrate"),
+    container: text("container"),
+
+    // Additional useful fields
+    name: text("name"),
+    path: text("path"),
+    isRemote: boolean("is_remote"),
+    runtimeTicks: bigint("runtime_ticks", { mode: "number" }),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("media_sources_item_id_idx").on(table.itemId),
+    index("media_sources_server_id_idx").on(table.serverId),
   ]
 );
 
@@ -1071,6 +1105,9 @@ export type NewJobResult = typeof jobResults.$inferInsert;
 
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
+
+export type MediaSource = typeof mediaSources.$inferSelect;
+export type NewMediaSource = typeof mediaSources.$inferInsert;
 
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;

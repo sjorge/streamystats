@@ -3,6 +3,7 @@ import {
   type Item,
   items,
   libraries,
+  mediaSources,
   sessions,
   users,
 } from "@streamystats/database";
@@ -15,6 +16,7 @@ import {
   ilike,
   inArray,
   isNull,
+  max,
   type SQL,
   sql,
   sum,
@@ -310,4 +312,228 @@ export const getLibraryItemsWithStats = async ({
     total_pages: totalPages,
     total_items: totalCount,
   };
+};
+
+// Type definition for per-library statistics
+export interface PerLibraryStatistics {
+  libraryId: string;
+  libraryName: string;
+  libraryType: string;
+
+  // Content counts
+  totalFiles: number;
+  moviesCount: number;
+  seriesCount: number;
+  seasonsCount: number;
+  episodesCount: number;
+
+  // Size and time
+  totalSizeBytes: number;
+  totalRuntimeTicks: number;
+
+  // Playback stats
+  totalPlays: number;
+  totalPlaybackSeconds: number;
+
+  // Last activity
+  lastPlayedItemId: string | null;
+  lastPlayedItemName: string | null;
+  lastPlayedByUserName: string | null;
+  lastActivityTime: Date | null;
+}
+
+/**
+ * Get per-library statistics for a server
+ */
+export const getPerLibraryStatistics = async ({
+  serverId,
+}: {
+  serverId: number;
+}): Promise<PerLibraryStatistics[]> => {
+  // Get exclusion settings
+  const { librariesTableExclusion, itemLibraryExclusion, userExclusion } =
+    await getStatisticsExclusions(serverId);
+
+  // Build library conditions
+  const libraryConditions: SQL[] = [eq(libraries.serverId, serverId)];
+  if (librariesTableExclusion) {
+    libraryConditions.push(librariesTableExclusion);
+  }
+
+  // Get all libraries for this server
+  const serverLibraries = await db
+    .select({
+      id: libraries.id,
+      name: libraries.name,
+      type: libraries.type,
+    })
+    .from(libraries)
+    .where(and(...libraryConditions))
+    .orderBy(libraries.name);
+
+  if (serverLibraries.length === 0) {
+    return [];
+  }
+
+  const libraryIds = serverLibraries.map((lib) => lib.id);
+
+  // Build item conditions
+  const itemConditions: SQL[] = [
+    eq(items.serverId, serverId),
+    isNull(items.deletedAt),
+    inArray(items.libraryId, libraryIds),
+  ];
+  if (itemLibraryExclusion) {
+    itemConditions.push(itemLibraryExclusion);
+  }
+
+  // Query 1: Get item counts and runtime per library, grouped by type
+  const itemStats = await db
+    .select({
+      libraryId: items.libraryId,
+      type: items.type,
+      count: count(items.id),
+      totalRuntime: sum(items.runtimeTicks),
+    })
+    .from(items)
+    .where(and(...itemConditions))
+    .groupBy(items.libraryId, items.type);
+
+  // Query 2: Get media source sizes per library
+  const sizeStats = await db
+    .select({
+      libraryId: items.libraryId,
+      totalSize: sum(mediaSources.size),
+    })
+    .from(mediaSources)
+    .innerJoin(items, eq(mediaSources.itemId, items.id))
+    .where(and(...itemConditions))
+    .groupBy(items.libraryId);
+
+  // Build session conditions for playback stats
+  const sessionConditions: SQL[] = [
+    eq(sessions.serverId, serverId),
+    inArray(items.libraryId, libraryIds),
+  ];
+  if (userExclusion) {
+    sessionConditions.push(userExclusion);
+  }
+  if (itemLibraryExclusion) {
+    sessionConditions.push(itemLibraryExclusion);
+  }
+
+  // Query 3: Get session stats per library
+  const sessionStats = await db
+    .select({
+      libraryId: items.libraryId,
+      totalPlays: count(sessions.id),
+      totalPlayback: sum(sessions.playDuration),
+      lastActivity: max(sessions.startTime),
+    })
+    .from(sessions)
+    .innerJoin(items, eq(sessions.itemId, items.id))
+    .where(and(...sessionConditions, isNull(items.deletedAt)))
+    .groupBy(items.libraryId);
+
+  // Query 4: Get last played item per library using a subquery approach
+  const lastPlayedItems = await db
+    .selectDistinctOn([items.libraryId], {
+      libraryId: items.libraryId,
+      itemId: sessions.itemId,
+      itemName: sessions.itemName,
+      startTime: sessions.startTime,
+    })
+    .from(sessions)
+    .innerJoin(items, eq(sessions.itemId, items.id))
+    .where(and(...sessionConditions, isNull(items.deletedAt)))
+    .orderBy(items.libraryId, desc(sessions.startTime));
+
+  // Create maps for efficient lookup
+  const itemStatsMap = new Map<
+    string,
+    { counts: Record<string, number>; runtime: number }
+  >();
+  for (const stat of itemStats) {
+    if (!stat.libraryId) continue;
+    const existing = itemStatsMap.get(stat.libraryId) || {
+      counts: {},
+      runtime: 0,
+    };
+    existing.counts[stat.type] = stat.count;
+    existing.runtime += Number(stat.totalRuntime || 0);
+    itemStatsMap.set(stat.libraryId, existing);
+  }
+
+  const sizeStatsMap = new Map<string, number>();
+  for (const stat of sizeStats) {
+    if (!stat.libraryId) continue;
+    sizeStatsMap.set(stat.libraryId, Number(stat.totalSize || 0));
+  }
+
+  const sessionStatsMap = new Map<
+    string,
+    { plays: number; playback: number; lastActivity: Date | null }
+  >();
+  for (const stat of sessionStats) {
+    if (!stat.libraryId) continue;
+    sessionStatsMap.set(stat.libraryId, {
+      plays: stat.totalPlays,
+      playback: Number(stat.totalPlayback || 0),
+      lastActivity: stat.lastActivity,
+    });
+  }
+
+  const lastPlayedMap = new Map<
+    string,
+    { itemId: string | null; itemName: string | null }
+  >();
+  for (const item of lastPlayedItems) {
+    if (!item.libraryId) continue;
+    lastPlayedMap.set(item.libraryId, {
+      itemId: item.itemId,
+      itemName: item.itemName,
+    });
+  }
+
+  // Combine all data into per-library statistics
+  const result: PerLibraryStatistics[] = serverLibraries.map((library) => {
+    const itemData = itemStatsMap.get(library.id) || { counts: {}, runtime: 0 };
+    const sizeData = sizeStatsMap.get(library.id) || 0;
+    const sessionData = sessionStatsMap.get(library.id) || {
+      plays: 0,
+      playback: 0,
+      lastActivity: null,
+    };
+    const lastPlayed = lastPlayedMap.get(library.id) || {
+      itemId: null,
+      itemName: null,
+    };
+
+    const counts = itemData.counts;
+    const totalFiles = Object.values(counts).reduce((sum, c) => sum + c, 0);
+
+    return {
+      libraryId: library.id,
+      libraryName: library.name,
+      libraryType: library.type,
+
+      totalFiles,
+      moviesCount: counts.Movie || 0,
+      seriesCount: counts.Series || 0,
+      seasonsCount: counts.Season || 0,
+      episodesCount: counts.Episode || 0,
+
+      totalSizeBytes: sizeData,
+      totalRuntimeTicks: itemData.runtime,
+
+      totalPlays: sessionData.plays,
+      totalPlaybackSeconds: sessionData.playback,
+
+      lastPlayedItemId: lastPlayed.itemId,
+      lastPlayedItemName: lastPlayed.itemName,
+      lastActivityTime: sessionData.lastActivity,
+    };
+  });
+
+  return result;
 };

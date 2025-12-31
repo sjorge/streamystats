@@ -1,141 +1,178 @@
 "use client";
 
-import { Film, Folder, PlaySquare, Tv, Users } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Clock,
+  Film,
+  Folder,
+  HardDrive,
+  Music,
+  Play,
+  PlaySquare,
+  Tv,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQueryParams } from "@/hooks/useQueryParams";
+import type { PerLibraryStatistics } from "@/lib/db/library-statistics";
+import { formatBytes, formatDuration, ticksToSeconds } from "@/lib/utils";
 
 interface Props {
-  data: AggregatedLibraryStatistics;
-  isAdmin: boolean;
+  data: PerLibraryStatistics[];
 }
 
-// Define the filter types explicitly with their proper singular forms
-type FilterType = "Movie" | "Episode" | "Series" | null;
+const getLibraryIcon = (type: string) => {
+  switch (type) {
+    case "movies":
+      return Film;
+    case "tvshows":
+      return Tv;
+    case "music":
+      return Music;
+    default:
+      return Folder;
+  }
+};
 
-// Define our stats items with proper filter values
-interface StatItem {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  filterable: boolean;
-  filterValue: FilterType;
-  adminOnly: boolean;
-}
-
-export const LibraryStatisticsCards: React.FC<Props> = ({
-  data,
-  isAdmin = false,
+const LibraryStatCard: React.FC<{ stats: PerLibraryStatistics }> = ({
+  stats,
 }) => {
-  const { updateQueryParams } = useQueryParams();
-  const searchParams = useSearchParams();
-  const currentType = searchParams.get("type") as FilterType;
-
-  const stats: StatItem[] = [
-    {
-      title: "Movies",
-      value: data.movies_count,
-      icon: Film,
-      filterable: true,
-      filterValue: "Movie",
-      adminOnly: false,
-    },
-    {
-      title: "Episodes",
-      value: data.episodes_count,
-      icon: PlaySquare,
-      filterable: true,
-      filterValue: "Episode",
-      adminOnly: false,
-    },
-    {
-      title: "Series",
-      value: data.series_count,
-      icon: Tv,
-      filterable: true,
-      filterValue: "Series",
-      adminOnly: false,
-    },
-    {
-      title: "Libraries",
-      value: data.libraries_count,
-      icon: Folder,
-      filterable: false,
-      filterValue: null,
-      adminOnly: false,
-    },
-    {
-      title: "Users",
-      value: data.users_count,
-      icon: Users,
-      filterable: false,
-      filterValue: null,
-      adminOnly: true,
-    },
-  ];
-
-  const handleFilter = (filterValue: FilterType) => {
-    if (!filterValue) return;
-
-    // If the same filter is clicked again, clear it
-    if (currentType === filterValue) {
-      updateQueryParams({ type: null });
-    } else {
-      updateQueryParams({ type: filterValue });
-    }
-  };
+  const Icon = getLibraryIcon(stats.libraryType);
+  const isTvLibrary = stats.libraryType === "tvshows";
+  const isMovieLibrary = stats.libraryType === "movies";
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:pr-64 xl:pr-0">
-      {stats.map((item) => {
-        const isActive = item.filterable && item.filterValue === currentType;
+    <Card className="flex flex-col">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-semibold">
+          {stats.libraryName}
+        </CardTitle>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground capitalize">
+            {stats.libraryType}
+          </span>
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 space-y-3">
+        {/* Row 1: Total Time + Total Files */}
+        <div className="grid grid-cols-2 gap-4">
+          <StatItem
+            label="Total Time"
+            value={formatDuration(ticksToSeconds(stats.totalRuntimeTicks))}
+            icon={Clock}
+          />
+          <StatItem
+            label="Total Files"
+            value={formatNumber(stats.totalFiles)}
+            icon={Folder}
+          />
+        </div>
 
-        if (item.adminOnly && !isAdmin) {
-          return null;
-        }
+        {/* Row 2: Library Size */}
+        <div className="grid grid-cols-2 gap-4">
+          <StatItem
+            label="Library Size"
+            value={formatBytes(stats.totalSizeBytes)}
+            icon={HardDrive}
+          />
+          <StatItem
+            label="Total Plays"
+            value={formatNumber(stats.totalPlays)}
+            icon={Play}
+          />
+        </div>
 
-        return (
-          <Card
-            key={item.title}
-            className={`
-              ${
-                item.filterable
-                  ? "cursor-pointer transition-colors hover:bg-accent/60 duration-200"
-                  : ""
-              }
-              ${isActive ? "border-primary bg-primary/10" : ""}
-            `}
-            onClick={() => {
-              if (item.filterable) {
-                handleFilter(item.filterValue);
-              }
-            }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {item.title}
-              </CardTitle>
-              <item.icon
-                className={`h-4 w-4 ${
-                  isActive ? "text-primary" : "text-muted-foreground"
-                }`}
-              />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatNumber(item.value)}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+        {/* Row 3: Playback + Last Activity */}
+        <div className="grid grid-cols-2 gap-4">
+          <StatItem
+            label="Total Playback"
+            value={formatDuration(stats.totalPlaybackSeconds)}
+            icon={PlaySquare}
+          />
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Last Activity</p>
+            <p className="text-sm font-medium truncate">
+              {stats.lastActivityTime
+                ? formatDistanceToNow(new Date(stats.lastActivityTime), {
+                    addSuffix: true,
+                  })
+                : "Never"}
+            </p>
+          </div>
+        </div>
+
+        {/* Row 4: Last Played */}
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Last Played</p>
+          <p className="text-sm font-medium truncate">
+            {stats.lastPlayedItemName || "Nothing yet"}
+          </p>
+        </div>
+
+        {/* Row 5: Type-specific counts */}
+        <div className="pt-2 border-t">
+          {isTvLibrary ? (
+            <div className="flex justify-between text-sm">
+              <span>
+                <span className="font-medium">{stats.seriesCount}</span>{" "}
+                <span className="text-muted-foreground">Series</span>
+              </span>
+              <span>
+                <span className="font-medium">{stats.seasonsCount}</span>{" "}
+                <span className="text-muted-foreground">Seasons</span>
+              </span>
+              <span>
+                <span className="font-medium">{stats.episodesCount}</span>{" "}
+                <span className="text-muted-foreground">Episodes</span>
+              </span>
+            </div>
+          ) : isMovieLibrary ? (
+            <div className="text-sm">
+              <span className="font-medium">{stats.moviesCount}</span>{" "}
+              <span className="text-muted-foreground">Movies</span>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              {stats.totalFiles} items
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const StatItem: React.FC<{
+  label: string;
+  value: string;
+  icon: React.ElementType;
+}> = ({ label, value, icon: Icon }) => (
+  <div className="space-y-1">
+    <div className="flex items-center gap-1">
+      <Icon className="h-3 w-3 text-muted-foreground" />
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+    <p className="text-sm font-medium truncate">{value}</p>
+  </div>
+);
+
+export const LibraryStatisticsCards: React.FC<Props> = ({ data }) => {
+  if (data.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No libraries found
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {data.map((stats) => (
+        <LibraryStatCard key={stats.libraryId} stats={stats} />
+      ))}
     </div>
   );
 };
 
-/**
- * Adds spaces 1000s separator to a number.
- */
 function formatNumber(num: number): string {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
