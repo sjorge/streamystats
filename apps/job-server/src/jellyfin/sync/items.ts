@@ -5,8 +5,10 @@ import {
   libraries,
   sessions,
   hiddenRecommendations,
+  mediaSources,
   Server,
   NewItem,
+  NewMediaSource,
   Library,
   Item,
 } from "@streamystats/database";
@@ -369,6 +371,7 @@ async function processItem(
       etag: items.etag,
       deletedAt: items.deletedAt,
       providerIds: items.providerIds,
+      mediaSourcesSynced: items.mediaSourcesSynced,
     })
     .from(items)
     .where(eq(items.id, jellyfinItem.Id))
@@ -377,6 +380,8 @@ async function processItem(
   const isNewItem = existingItem.length === 0;
   const wasDeleted = !isNewItem && existingItem[0].deletedAt !== null;
   const hasChanged = !isNewItem && existingItem[0].etag !== jellyfinItem.Etag;
+  const needsMediaSourcesSync =
+    !isNewItem && existingItem[0].mediaSourcesSynced === false;
 
   // Check if ProviderIds are missing in existing item but present in new item
   const needsProviderIdsUpdate =
@@ -404,6 +409,20 @@ async function processItem(
         jellyfinItem.ProviderIds
       )}`
     );
+  }
+
+  // If item only needs media sources sync (no other changes), just sync media sources
+  if (
+    !isNewItem &&
+    !hasChanged &&
+    !wasDeleted &&
+    !needsProviderIdsUpdate &&
+    needsMediaSourcesSync
+  ) {
+    const serverId = await getServerIdFromLibrary(libraryId);
+    await syncMediaSources(jellyfinItem, serverId);
+    metrics.incrementItemsProcessed();
+    return;
   }
 
   if (!isNewItem && !hasChanged && !wasDeleted && !needsProviderIdsUpdate) {
@@ -499,6 +518,9 @@ async function processItem(
   };
 
   // Upsert item (also clear deletedAt in case item was previously soft-deleted)
+  // Reset sync flags when item content has changed (etag change or restored from deletion)
+  const shouldResync = hasChanged || wasDeleted;
+
   await db
     .insert(items)
     .values(itemData)
@@ -508,8 +530,16 @@ async function processItem(
         ...itemData,
         deletedAt: null, // Clear deletion flag if item is back
         updatedAt: new Date(),
+        ...(shouldResync && {
+          peopleSynced: false,
+          mediaSourcesSynced: false,
+          processed: false,
+        }),
       },
     });
+
+  // Sync media sources for this item and mark as synced
+  await syncMediaSources(jellyfinItem, serverId);
 
   metrics.incrementDatabaseOperations();
 
@@ -606,6 +636,7 @@ export async function syncRecentlyAddedItems(
 
     let allMappedItems: NewItem[] = [];
     let allInvalidItems: Array<{ id: string; error: string }> = [];
+    let allJellyfinItemsForMediaSync: JellyfinBaseItemDto[] = [];
 
     // Collect recent items from all valid libraries with their already-known library IDs
     let page = 0;
@@ -625,7 +656,7 @@ export async function syncRecentlyAddedItems(
 
         // Map items, knowing they belong to the current library
         const processStart = Date.now();
-        const { validItems, invalidItems } = await mapItemsWithKnownLibrary(
+        const { validItems, invalidItems, jellyfinItemsForMediaSync } = await mapItemsWithKnownLibrary(
           libraryItems,
           library.id,
           server.id
@@ -636,6 +667,7 @@ export async function syncRecentlyAddedItems(
 
         allMappedItems = allMappedItems.concat(validItems);
         allInvalidItems = allInvalidItems.concat(invalidItems);
+        allJellyfinItemsForMediaSync = allJellyfinItemsForMediaSync.concat(jellyfinItemsForMediaSync);
 
         console.info(
           formatSyncLogLine("recent-items-sync", {
@@ -732,6 +764,9 @@ export async function syncRecentlyAddedItems(
       sessionsMigrated,
     } = await processValidItems(allMappedItems, allInvalidItems, server.id);
 
+    // Sync media sources for all processed items
+    await syncMediaSourcesBatch(allJellyfinItemsForMediaSync, server.id);
+
     metrics.incrementItemsInserted(insertResult);
     metrics.incrementItemsUpdated(updateResult);
     metrics.incrementItemsUnchanged(unchangedCount);
@@ -814,21 +849,25 @@ export async function syncRecentlyAddedItems(
  * Map Jellyfin items to our format with known library context
  */
 async function mapItemsWithKnownLibrary(
-  items: JellyfinBaseItemDto[],
+  jellyfinItems: JellyfinBaseItemDto[],
   libraryId: string,
   serverId: number
 ): Promise<{
   validItems: NewItem[];
   invalidItems: Array<{ id: string; error: string }>;
+  jellyfinItemsForMediaSync: JellyfinBaseItemDto[];
 }> {
   const validItems: NewItem[] = [];
   const invalidItems: Array<{ id: string; error: string }> = [];
+  const jellyfinItemsForMediaSync: JellyfinBaseItemDto[] = [];
 
-  for (const item of items) {
+  for (const item of jellyfinItems) {
     try {
       // We already know the library_id since we fetched per library
       const mappedItem = mapJellyfinItem(item, libraryId, serverId);
       validItems.push(mappedItem);
+      // Keep track of original Jellyfin items for media source sync
+      jellyfinItemsForMediaSync.push(item);
     } catch (error) {
       // Catch any mapping errors
       console.error(
@@ -843,7 +882,7 @@ async function mapItemsWithKnownLibrary(
     }
   }
 
-  return { validItems, invalidItems };
+  return { validItems, invalidItems, jellyfinItemsForMediaSync };
 }
 
 /**
@@ -932,98 +971,41 @@ async function processValidItems(
   itemsMigrated: number;
   sessionsMigrated: number;
 }> {
-  // Fields that we track for changes (matching the Elixir version)
-  const trackedFields = [
-    "name",
-    "originalTitle",
-    "etag",
-    "container",
-    "sortName",
-    "premiereDate",
-    "path",
-    "officialRating",
-    "overview",
-    "communityRating",
-    "runtimeTicks",
-    "productionYear",
-    "isFolder",
-    "parentId",
-    "mediaType",
-    "width",
-    "height",
-    "seriesName",
-    "seriesId",
-    "seasonId",
-    "seasonName",
-    "indexNumber",
-    "parentIndexNumber",
-    "primaryImageAspectRatio",
-    "primaryImageTag",
-    "seriesPrimaryImageTag",
-    "primaryImageThumbTag",
-    "primaryImageLogoTag",
-    "parentThumbItemId",
-    "parentThumbImageTag",
-    "parentLogoItemId",
-    "parentLogoImageTag",
-    "backdropImageTags",
-    "parentBackdropItemId",
-    "parentBackdropImageTags",
-    "imageBlurHashes",
-    "imageTags",
-    "canDelete",
-    "canDownload",
-    "playAccess",
-    "isHD",
-    "providerIds",
-    "tags",
-    "seriesStudio",
-    "videoType",
-    "hasSubtitles",
-    "channelId",
-    "locationType",
-    "genres",
-  ] as const;
-
-  // Fetch existing items with all fields to compare
+  // Fetch existing items' etags to compare
   const jellyfinIds = validItems.map((item) => item.id);
 
   const existingItems = await db
-    .select()
+    .select({ id: items.id, etag: items.etag })
     .from(items)
     .where(and(inArray(items.id, jellyfinIds), eq(items.serverId, serverId)));
 
   const existingMap = new Map(
-    existingItems.map((item: Item) => [item.id, item])
+    existingItems.map((item) => [item.id, item.etag])
   );
 
-  // Separate items into inserts, updates, and unchanged
+  // Separate items into inserts, updates, and unchanged based on etag
   const itemsToInsert: NewItem[] = [];
   const itemsToUpdate: NewItem[] = [];
   const unchangedItems: NewItem[] = [];
 
   for (const item of validItems) {
-    const existing = existingMap.get(item.id);
+    const existingEtag = existingMap.get(item.id);
 
-    if (!existing) {
-      // New item, add to inserts
+    if (existingEtag === undefined) {
+      // New item
       itemsToInsert.push(item);
+    } else if (existingEtag !== item.etag) {
+      // Etag changed, needs update
+      itemsToUpdate.push(item);
     } else {
-      // Check if any tracked field has changed or if images have changed
-      const fieldsChanged = hasFieldsChanged(existing, item, trackedFields);
-      const imagesChanged = hasImageFieldsChanged(existing, item);
-
-      if (fieldsChanged || imagesChanged) {
-        itemsToUpdate.push(item);
-      } else {
-        unchangedItems.push(item);
-      }
+      // Unchanged
+      unchangedItems.push(item);
     }
   }
 
   // Process insertions and updates
   const insertResults = await processInserts(itemsToInsert);
-  const updateResult = await processUpdates(itemsToUpdate, trackedFields);
+  const updateResult = await processUpdates(itemsToUpdate);
   const unchangedCount = unchangedItems.length;
 
   return {
@@ -1033,115 +1015,6 @@ async function processValidItems(
     itemsMigrated: insertResults.itemsMigrated,
     sessionsMigrated: insertResults.sessionsMigrated,
   };
-}
-
-/**
- * Check if any tracked fields have changed between existing and new item
- */
-function hasFieldsChanged<T extends Record<string, any>>(
-  existing: T,
-  newItem: T,
-  trackedFields: readonly string[]
-): boolean {
-  for (const field of trackedFields) {
-    const existingValue = existing[field];
-    const newValue = newItem[field];
-
-    // Handle dates specially
-    if (existingValue instanceof Date && newValue instanceof Date) {
-      if (existingValue.getTime() !== newValue.getTime()) {
-        return true;
-      }
-    } else if (existingValue !== newValue) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Deep compare two values for equality, handling objects with potentially different key ordering
- */
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a === null || b === null) return a === b;
-  if (typeof a !== typeof b) return false;
-
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!deepEqual(a[i], b[i])) return false;
-    }
-    return true;
-  }
-
-  if (typeof a === "object" && typeof b === "object") {
-    const aObj = a as Record<string, unknown>;
-    const bObj = b as Record<string, unknown>;
-    const aKeys = Object.keys(aObj).sort();
-    const bKeys = Object.keys(bObj).sort();
-    if (aKeys.length !== bKeys.length) return false;
-    for (let i = 0; i < aKeys.length; i++) {
-      if (aKeys[i] !== bKeys[i]) return false;
-      if (!deepEqual(aObj[aKeys[i]], bObj[bKeys[i]])) return false;
-    }
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Check if image-related fields have changed
- */
-function hasImageFieldsChanged(
-  existing: Item,
-  newItem: NewItem | Item,
-): boolean {
-  // Simple scalar fields - direct comparison is fine
-  const scalarFields = [
-    "primaryImageTag",
-    "seriesPrimaryImageTag",
-    "primaryImageThumbTag",
-    "primaryImageLogoTag",
-    "primaryImageAspectRatio",
-    "parentThumbItemId",
-    "parentThumbImageTag",
-    "parentLogoItemId",
-    "parentLogoImageTag",
-    "parentBackdropItemId",
-    "canDelete",
-    "canDownload",
-    "playAccess",
-    "isHD",
-    "seriesStudio",
-  ];
-
-  for (const field of scalarFields) {
-    if ((existing as Record<string, unknown>)[field] !== (newItem as Record<string, unknown>)[field]) {
-      return true;
-    }
-  }
-
-  // Object/array fields - need deep comparison to handle key ordering differences
-  const objectFields = [
-    "backdropImageTags",
-    "parentBackdropImageTags",
-    "imageBlurHashes",
-    "imageTags",
-    "providerIds",
-    "tags",
-  ];
-
-  for (const field of objectFields) {
-    const existingValue = (existing as Record<string, unknown>)[field];
-    const newValue = (newItem as Record<string, unknown>)[field];
-    if (!deepEqual(existingValue, newValue)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 /**
@@ -1217,10 +1090,7 @@ async function processInserts(itemsToInsert: NewItem[]): Promise<{
 /**
  * Update changed items
  */
-async function processUpdates(
-  itemsToUpdate: NewItem[],
-  trackedFields: readonly string[]
-): Promise<number> {
+async function processUpdates(itemsToUpdate: NewItem[]): Promise<number> {
   if (itemsToUpdate.length === 0) return 0;
 
   let updateCount = 0;
@@ -1228,23 +1098,16 @@ async function processUpdates(
 
   for (const item of itemsToUpdate) {
     try {
-      // Convert item to update fields using type-safe key assignment
-      const updateFields: Partial<NewItem> = {};
-      for (const field of trackedFields) {
-        const key = field as keyof NewItem;
-        if (key in item) {
-          const value = item[key];
-          if (value !== undefined) {
-            // Using Object.assign for type-safe dynamic key assignment
-            Object.assign(updateFields, { [key]: value });
-          }
-        }
-      }
-      updateFields.updatedAt = new Date();
-
       await db
         .update(items)
-        .set(updateFields)
+        .set({
+          ...item,
+          updatedAt: new Date(),
+          // Reset sync flags so data will be re-fetched
+          peopleSynced: false,
+          mediaSourcesSynced: false,
+          processed: false,
+        })
         .where(and(eq(items.id, item.id), eq(items.serverId, item.serverId)));
 
       updateCount++;
@@ -1520,4 +1383,153 @@ async function findDeletedItemMatch(
   }
 
   return null;
+}
+
+/**
+ * Sync media sources for an item from Jellyfin data
+ */
+async function syncMediaSources(
+  jellyfinItem: JellyfinBaseItemDto,
+  serverId: number
+): Promise<void> {
+  const jellyfinMediaSources = jellyfinItem.MediaSources;
+
+  // If no media sources, just mark as synced
+  if (!jellyfinMediaSources || !Array.isArray(jellyfinMediaSources) || jellyfinMediaSources.length === 0) {
+    await db
+      .update(items)
+      .set({ mediaSourcesSynced: true })
+      .where(eq(items.id, jellyfinItem.Id));
+    return;
+  }
+
+  const mediaSourceRecords: NewMediaSource[] = jellyfinMediaSources
+    .map((ms: Record<string, unknown>, index: number) => ({
+      id: (ms.Id as string) || `${jellyfinItem.Id}-${index}`,
+      itemId: jellyfinItem.Id,
+      serverId,
+      size: typeof ms.Size === "number" ? ms.Size : null,
+      bitrate: typeof ms.Bitrate === "number" ? ms.Bitrate : null,
+      container: typeof ms.Container === "string" ? ms.Container : null,
+      name: typeof ms.Name === "string" ? ms.Name : null,
+      path: typeof ms.Path === "string" ? ms.Path : null,
+      isRemote: typeof ms.IsRemote === "boolean" ? ms.IsRemote : false,
+      runtimeTicks: typeof ms.RunTimeTicks === "number" ? ms.RunTimeTicks : null,
+    }));
+
+  if (mediaSourceRecords.length === 0) {
+    await db
+      .update(items)
+      .set({ mediaSourcesSynced: true })
+      .where(eq(items.id, jellyfinItem.Id));
+    return;
+  }
+
+  try {
+    await db
+      .insert(mediaSources)
+      .values(mediaSourceRecords)
+      .onConflictDoUpdate({
+        target: mediaSources.id,
+        set: {
+          size: sql`EXCLUDED.size`,
+          bitrate: sql`EXCLUDED.bitrate`,
+          container: sql`EXCLUDED.container`,
+          name: sql`EXCLUDED.name`,
+          path: sql`EXCLUDED.path`,
+          isRemote: sql`EXCLUDED.is_remote`,
+          runtimeTicks: sql`EXCLUDED.runtime_ticks`,
+          updatedAt: sql`NOW()`,
+        },
+      });
+
+    // Mark item as having media sources synced
+    await db
+      .update(items)
+      .set({ mediaSourcesSynced: true })
+      .where(eq(items.id, jellyfinItem.Id));
+  } catch (error) {
+    console.error(
+      `[items-sync] Error syncing media sources for item ${jellyfinItem.Id}: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+/**
+ * Sync media sources for multiple items in batch
+ */
+async function syncMediaSourcesBatch(
+  jellyfinItems: JellyfinBaseItemDto[],
+  serverId: number
+): Promise<void> {
+  if (jellyfinItems.length === 0) {
+    return;
+  }
+
+  const allMediaSourceRecords: NewMediaSource[] = [];
+  const allItemIds = jellyfinItems.map((item) => item.Id);
+
+  for (const jellyfinItem of jellyfinItems) {
+    const jellyfinMediaSources = jellyfinItem.MediaSources;
+
+    if (!jellyfinMediaSources || !Array.isArray(jellyfinMediaSources) || jellyfinMediaSources.length === 0) {
+      continue;
+    }
+
+    for (let index = 0; index < jellyfinMediaSources.length; index++) {
+      const ms = jellyfinMediaSources[index] as Record<string, unknown>;
+      allMediaSourceRecords.push({
+        id: (ms.Id as string) || `${jellyfinItem.Id}-${index}`,
+        itemId: jellyfinItem.Id,
+        serverId,
+        size: typeof ms.Size === "number" ? ms.Size : null,
+        bitrate: typeof ms.Bitrate === "number" ? ms.Bitrate : null,
+        container: typeof ms.Container === "string" ? ms.Container : null,
+        name: typeof ms.Name === "string" ? ms.Name : null,
+        path: typeof ms.Path === "string" ? ms.Path : null,
+        isRemote: typeof ms.IsRemote === "boolean" ? ms.IsRemote : false,
+        runtimeTicks: typeof ms.RunTimeTicks === "number" ? ms.RunTimeTicks : null,
+      });
+    }
+  }
+
+  try {
+    // Insert media sources in batches of 500 to avoid query size limits
+    if (allMediaSourceRecords.length > 0) {
+      const batchSize = 500;
+      for (let i = 0; i < allMediaSourceRecords.length; i += batchSize) {
+        const batch = allMediaSourceRecords.slice(i, i + batchSize);
+        await db
+          .insert(mediaSources)
+          .values(batch)
+          .onConflictDoUpdate({
+            target: mediaSources.id,
+            set: {
+              size: sql`EXCLUDED.size`,
+              bitrate: sql`EXCLUDED.bitrate`,
+              container: sql`EXCLUDED.container`,
+              name: sql`EXCLUDED.name`,
+              path: sql`EXCLUDED.path`,
+              isRemote: sql`EXCLUDED.is_remote`,
+              runtimeTicks: sql`EXCLUDED.runtime_ticks`,
+              updatedAt: sql`NOW()`,
+            },
+          });
+      }
+    }
+
+    // Mark all items as having media sources synced
+    await db
+      .update(items)
+      .set({ mediaSourcesSynced: true })
+      .where(inArray(items.id, allItemIds));
+  } catch (error) {
+    console.error(
+      `[items-sync] Error syncing media sources batch: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
 }

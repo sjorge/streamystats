@@ -305,6 +305,7 @@ const DEFAULT_ITEM_FIELDS = [
   "Etag",
   "ExternalUrls",
   "Genres",
+  "MediaSources",
   "OriginalTitle",
   "Overview",
   "ParentId",

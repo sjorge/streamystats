@@ -1,0 +1,1 @@
+ALTER TABLE "items" ADD COLUMN "media_sources_synced" boolean DEFAULT false;

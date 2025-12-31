@@ -65,6 +65,19 @@ export function formatDuration(
   return parts.join(" ") || "0m";
 }
 
+export function formatBytes(bytes: number | null): string {
+  if (bytes === null || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
+}
+
+export function ticksToSeconds(ticks: number | null): number {
+  if (!ticks) return 0;
+  return Math.floor(ticks / 10_000_000);
+}
+
 export function formatDateUS(date: string | Date | null): string {
   if (!date) return "Never";
   return new Intl.DateTimeFormat("en-US", {
