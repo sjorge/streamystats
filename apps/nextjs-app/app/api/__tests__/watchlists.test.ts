@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 // NOTE: These tests are pure unit tests for the watchlist route handlers.
 // We mock db/auth functions to test the route logic in isolation.
@@ -18,11 +18,13 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
   });
 }
 
-function createMockRequest(options: {
-  method?: string;
-  body?: unknown;
-  searchParams?: Record<string, string>;
-} = {}): Request & { nextUrl: { searchParams: URLSearchParams } } {
+function createMockRequest(
+  options: {
+    method?: string;
+    body?: unknown;
+    searchParams?: Record<string, string>;
+  } = {},
+): Request & { nextUrl: { searchParams: URLSearchParams } } {
   const url = new URL("http://localhost/api/watchlists");
   if (options.searchParams) {
     for (const [key, value] of Object.entries(options.searchParams)) {
@@ -123,8 +125,10 @@ const mockState = {
   isAdmin: false,
 
   // DB returns
-  watchlists: [mockWatchlist] as typeof mockWatchlist[],
-  watchlistWithItems: mockWatchlistWithItems as typeof mockWatchlistWithItems | null,
+  watchlists: [mockWatchlist] as (typeof mockWatchlist)[],
+  watchlistWithItems: mockWatchlistWithItems as
+    | typeof mockWatchlistWithItems
+    | null,
   createdWatchlist: mockWatchlist as typeof mockWatchlist,
   updatedWatchlist: mockWatchlist as typeof mockWatchlist | null,
   deleteResult: true,
@@ -180,7 +184,9 @@ bunMock.module("@/lib/db/watchlists", () => ({
 const watchlistsRoute = await import("../watchlists/route");
 const watchlistByIdRoute = await import("../watchlists/[id]/route");
 const watchlistItemsRoute = await import("../watchlists/[id]/items/route");
-const watchlistItemByIdRoute = await import("../watchlists/[id]/items/[itemId]/route");
+const watchlistItemByIdRoute = await import(
+  "../watchlists/[id]/items/[itemId]/route"
+);
 
 // ============================================================================
 // Tests
