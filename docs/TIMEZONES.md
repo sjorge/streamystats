@@ -36,3 +36,5 @@ const localHour = utcHourToLocalHour(utcHour, timezone);
 1. Server always sends UTC
 2. Client always converts using `useServerTimezone()`
 3. Never mix server-side and client-side conversion
+4. Never use `toLocaleString()`, `toLocaleDateString()`, or `toLocaleTimeString()` for dates — causes hydration mismatch
+5. Always use `<FormattedDate>` or `formatLocalDate()` with timezone parameter
