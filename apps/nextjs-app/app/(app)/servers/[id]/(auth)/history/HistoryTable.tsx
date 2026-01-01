@@ -372,6 +372,7 @@ export function HistoryTable({
           deviceNames={deviceNames}
           clientNames={clientNames}
           playMethods={playMethods}
+          hideUserFilter={hideUserColumn}
         />
       </div>
       <div className="flex items-center pb-4">
