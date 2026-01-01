@@ -142,8 +142,8 @@ export const servers = pgTable(
     syncStatus: text("sync_status").notNull().default("pending"), // pending, syncing, completed, failed
     syncProgress: text("sync_progress").notNull().default("not_started"), // not_started, users, libraries, items, activities, completed
     syncError: text("sync_error"),
-    lastSyncStarted: timestamp("last_sync_started"),
-    lastSyncCompleted: timestamp("last_sync_completed"),
+    lastSyncStarted: timestamp("last_sync_started", { withTimezone: true }),
+    lastSyncCompleted: timestamp("last_sync_completed", { withTimezone: true }),
 
     // Holiday/seasonal recommendations settings
     disabledHolidays: text("disabled_holidays").array().default([]),
@@ -158,8 +158,12 @@ export const servers = pgTable(
       .notNull()
       .default(false),
 
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    // Display timezone for this server (IANA timezone identifier)
+    // All data is stored in UTC; this controls display formatting only
+    timezone: text("timezone").notNull().default("Etc/UTC"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [unique("servers_url_unique").on(table.url)]
 );
@@ -171,8 +175,8 @@ export const libraries = pgTable("libraries", {
   serverId: integer("server_id")
     .notNull()
     .references(() => servers.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Users table - users from various servers
@@ -264,8 +268,8 @@ export const users = pgTable(
     syncPlayAccess: text("sync_play_access")
       .notNull()
       .default("CreateAndJoinGroups"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 
     // Full-text search vector - populated by database trigger
     searchVector: tsvector("search_vector"),
@@ -291,7 +295,7 @@ export const activities = pgTable(
       .references(() => servers.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }), // Optional, some activities aren't user-specific
     itemId: text("item_id"), // Optional, media item ID from server
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 
     // Full-text search vector - populated by database trigger
     searchVector: tsvector("search_vector"),
@@ -311,7 +315,7 @@ export const jobResults = pgTable("job_results", {
   result: jsonb("result"),
   error: text("error"),
   processingTime: integer("processing_time"), // in milliseconds (capped at 1 hour)
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Server job configurations table - per-server cron job settings
@@ -326,8 +330,8 @@ export const serverJobConfigurations = pgTable(
     cronExpression: text("cron_expression"), // null = use default (for cron-based jobs)
     intervalSeconds: integer("interval_seconds"), // null = use default (for interval-based jobs like session-polling)
     enabled: boolean("enabled").notNull().default(true),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     unique("server_job_config_unique").on(table.serverId, table.jobKey),
@@ -429,8 +433,8 @@ export const items = pgTable(
     mediaSourcesSynced: boolean("media_sources_synced").default(false),
 
     // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 
     // Soft delete
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -473,8 +477,8 @@ export const mediaSources = pgTable(
     runtimeTicks: bigint("runtime_ticks", { mode: "number" }),
 
     // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("media_sources_item_id_idx").on(table.itemId),
@@ -581,8 +585,8 @@ export const sessions = pgTable(
     rawData: jsonb("raw_data").notNull(), // Full Jellyfin session data
 
     // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     // Performance indexes for common query patterns
@@ -604,8 +608,8 @@ export const activeSessions = pgTable(
     sessionKey: text("session_key").notNull(),
     payload: jsonb("payload").notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.serverId, table.sessionKey] }),
@@ -620,7 +624,7 @@ export const activityLogCursors = pgTable("activity_log_cursors", {
     .references(() => servers.id, { onDelete: "cascade" }),
   cursorDate: timestamp("cursor_date", { withTimezone: true }),
   cursorId: text("cursor_id"),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Hidden recommendations table - stores user's hidden recommendations
@@ -633,7 +637,7 @@ export const hiddenRecommendations = pgTable("hidden_recommendations", {
   itemId: text("item_id")
     .references(() => items.id, { onDelete: "cascade" })
     .notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Activity locations table - geolocated IP data for activities
@@ -658,7 +662,7 @@ export const activityLocations = pgTable(
     // IP classification
     isPrivateIp: boolean("is_private_ip").default(false).notNull(),
 
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("activity_locations_activity_id_idx").on(table.activityId),
@@ -719,8 +723,8 @@ export const userFingerprints = pgTable(
     totalSessions: integer("total_sessions").default(0),
 
     lastCalculatedAt: timestamp("last_calculated_at", { withTimezone: true }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("user_fingerprints_user_id_idx").on(table.userId),
@@ -785,7 +789,7 @@ export const anomalyEvents = pgTable(
     resolvedBy: text("resolved_by"),
     resolutionNote: text("resolution_note"),
 
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("anomaly_events_user_id_idx").on(table.userId),
@@ -808,8 +812,8 @@ export const people = pgTable(
     name: text("name").notNull(),
     primaryImageTag: text("primary_image_tag"),
     searchVector: tsvector("search_vector"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id, table.serverId] }),
@@ -839,7 +843,7 @@ export const itemPeople = pgTable(
     type: text("type").notNull(), // Actor, Director, Writer, Producer, etc.
     role: text("role"), // Character name for actors
     sortOrder: integer("sort_order"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     // Unique per item+person+type (same person can be Actor AND Director in same item)
@@ -865,8 +869,8 @@ export const watchlists = pgTable(
     isPromoted: boolean("is_promoted").notNull().default(false), // Admin-only: visible on all users' home screens in external clients
     allowedItemType: text("allowed_item_type"), // If set, only items of this type can be added (Movie, Series, Episode, etc.)
     defaultSortOrder: text("default_sort_order").notNull().default("custom"), // custom, name, dateAdded, releaseDate
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 
     // Full-text search vector - populated by database trigger
     searchVector: tsvector("search_vector"),
@@ -891,7 +895,7 @@ export const watchlistItems = pgTable(
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
     position: integer("position").notNull().default(0), // For custom ordering
-    addedAt: timestamp("added_at").defaultNow().notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("watchlist_items_watchlist_idx").on(table.watchlistId),

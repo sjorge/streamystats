@@ -42,6 +42,7 @@ const SERVER_PUBLIC_SELECT = {
   excludedUserIds: servers.excludedUserIds,
   excludedLibraryIds: servers.excludedLibraryIds,
   embeddingStopRequested: servers.embeddingStopRequested,
+  timezone: servers.timezone,
   createdAt: servers.createdAt,
   updatedAt: servers.updatedAt,
   // Select secrets only to compute boolean flags; never return them to callers
