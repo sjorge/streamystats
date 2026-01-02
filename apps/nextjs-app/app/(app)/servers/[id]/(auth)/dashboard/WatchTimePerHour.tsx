@@ -19,6 +19,7 @@ import {
 import type { WatchTimePerHour as IWatchTimePerHour } from "@/lib/db/users";
 import { utcHourToLocalHour } from "@/lib/timezone";
 import { formatDuration } from "@/lib/utils";
+import { useServerTimezone } from "@/providers/ServerTimezoneProvider";
 
 const chartConfig = {
   minutes: {
@@ -33,26 +34,29 @@ interface Props {
   data: IWatchTimePerHour[];
 }
 
-const _TIMEZONE = process.env.TZ || "Etc/UTC";
-
 export const WatchTimePerHour: React.FC<Props> = ({
   title,
   subtitle,
   data,
 }) => {
+  const timezone = useServerTimezone();
+
   const formattedData = React.useMemo(() => {
     if (!data) return [];
 
-    return data.map((item) => {
-      const localHour = utcHourToLocalHour(item.hour);
-
+    // Convert UTC hours to local hours and sort by local hour (0-23)
+    const converted = data.map((item) => {
+      const localHour = utcHourToLocalHour(item.hour, timezone);
       return {
         hour: formatHour(localHour),
         minutes: Math.floor(item.watchTime / 60),
         rawHour: localHour,
       };
     });
-  }, [data]);
+
+    // Sort by local hour so chart displays 00, 01, 02, ... 23
+    return converted.sort((a, b) => a.rawHour - b.rawHour);
+  }, [data, timezone]);
 
   return (
     <Card>
