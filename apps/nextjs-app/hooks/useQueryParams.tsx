@@ -1,12 +1,12 @@
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { basePath } from "@/lib/utils";
 
 /**
  * Hook for managing query parameters in the URL with Suspense support
  */
 export function useQueryParams<_T = unknown>() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -46,10 +46,8 @@ export function useQueryParams<_T = unknown>() {
         }
 
         setIsLoading(true); // Show loading state immediately
-        const currentPath =
-          typeof window !== "undefined" ? window.location.pathname.replace(new RegExp(`^${basePath}`), '') : basePath;
 
-        router.replace(nextQueryString ? `?${nextQueryString}` : currentPath, {
+        router.replace(nextQueryString ? `?${nextQueryString}` : pathname, {
           scroll: options.scroll,
         });
       });
